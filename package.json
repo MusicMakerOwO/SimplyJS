@@ -1,6 +1,6 @@
 {
 	"name": "simplyjs",
-	"version": "1.0.1-alpha",
+	"version": "1.0.2-alpha",
 	"type": "module",
 	"description": "A Discord.JS alternative focused on minimalism and developer experience",
 	"main": "dist/index.cjs",
@@ -34,7 +34,7 @@
 		"minimal"
 	],
 	"author": "MusicMaker",
-	"license": "LGPL-3.0-only",
+	"license": "MIT",
 	"engines": {
 		"node": ">=18.0.0"
 	},
