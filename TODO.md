@@ -9,10 +9,6 @@
   - Emit/handle heartbeat ACK state and add ACK timeout detection
 - [ ] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
   - Include close-code aware backoff, max retries, and clear terminal failure state
-- [x] Complete role-management follow-ups in `src/Cache/Roles.ts`
-  - Add permission-resolvable input type for `create(...)`
-  - Add role position move API
-- [x] Create a manager class for `Channel.permission_overwrites`
 - [ ] Add more examples
   - Sending a direct message to a user
   - Sending a message in a guild channel
@@ -159,3 +155,7 @@ Contracts — add JSDoc to public abstract classes in `src/Contracts/`:
 	- Retry safely for transient failures and surface non-retryable failures clearly
 - [x] Abstract permission serialization into a dedicated util function for better testing and easy reuse
 - [x] Add events for `REACTION_ADD` and `REACTION_REMOVE`
+- [x] Complete role-management follow-ups in `src/Cache/Roles.ts`
+	- Add permission-resolvable input type for `create(...)`
+	- Add role position move API
+- [x] Create a manager class for `Channel.permission_overwrites`
