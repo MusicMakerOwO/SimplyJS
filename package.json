@@ -1,0 +1,74 @@
+{
+	"name": "simplyjs",
+	"version": "1.0.1-alpha",
+	"type": "module",
+	"description": "A Discord.JS alternative focused on minimalism and developer experience",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist/",
+		"README.md",
+		"LICENSE"
+	],
+	"keywords": [
+		"discord",
+		"discord-api",
+		"discord-js",
+		"discord-bot",
+		"bot",
+		"websocket",
+		"typescript",
+		"minimal"
+	],
+	"author": "MusicMaker",
+	"license": "LGPL-3.0-only",
+	"engines": {
+		"node": ">=18.0.0"
+	},
+	"homepage": "https://github.com/MusicMakerOwO/SimplyJS#readme",
+	"bugs": {
+		"url": "https://github.com/MusicMakerOwO/SimplyJS/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/MusicMakerOwO/SimplyJS.git"
+	},
+	"scripts": {
+		"check": "echo \"Running linter...\" && eslint . && echo \"Checking for errors ...\" && tsc  --noEmit",
+		"build": "echo \"Running linter...\" && eslint . && echo \"Checking for errors ...\" && tsc  --noEmit && echo \"Clearing old files...\" && rm -rf dist/ && echo \"Building...\" && tsup",
+		"linecount": "find . -type f -name '*.ts' -not -path './node_modules/*' -not -path './dist/*' -exec wc -l {} + | sort -n -r | head -n 10",
+		"test": "vitest run",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix"
+	},
+	"dependencies": {
+		"ws": "^8.20.0"
+	},
+	"devDependencies": {
+		"@eslint/core": "^1.2.1",
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^25.6.0",
+		"@types/ws": "^8.18.1",
+		"@typescript/native-preview": "^7.0.0-dev.20260516.1",
+		"eslint": "^10.4.0",
+		"eslint-plugin-unicorn": "^64.0.0",
+		"jiti": "^2.7.0",
+		"tsup": "^8.5.1",
+		"typescript": "^5.5.3",
+		"typescript-eslint": "^8.59.0",
+		"vitest": "^4.1.5"
+	}
+}

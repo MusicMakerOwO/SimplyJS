@@ -1,0 +1,10 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": ".",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"strict": true
+	},
+	"include": ["./**/*.ts", "../../dist"],
+}

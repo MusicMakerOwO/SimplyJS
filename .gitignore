@@ -1,0 +1,19 @@
+# Libraries
+/node_modules
+
+# IDE Files
+.vscode/*
+.idea/*
+
+# Typescript
+/dist
+/build
+tsconfig.tsbuildinfo
+
+# Temporary test files
+test.ts
+src/test.ts
+playground.ts
+src/playground.ts
+scratch.ts
+src/scratch.ts
