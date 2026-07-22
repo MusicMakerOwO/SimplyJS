@@ -62,7 +62,6 @@
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^25.6.0",
 		"@types/ws": "^8.18.1",
-		"@typescript/native-preview": "^7.0.0-dev.20260516.1",
 		"eslint": "^10.4.0",
 		"eslint-plugin-unicorn": "^64.0.0",
 		"jiti": "^2.7.0",
