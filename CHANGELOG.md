@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-alpha]
 
 ### Added
 
@@ -106,8 +106,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StructureActions.test.ts` — comprehensive regression suite for all structure action methods (50 tests): `Guild.leave()` / `Guild.modify()`, `Channel.send()` / `Channel.delete()` / `Channel.modify()`, `Role.delete()` / `Role.modify()`, `Emoji.delete()` / `Emoji.modify()` with role normalization, `Sticker.delete()` / `Sticker.modify()` with tags normalization, `Member` timeout/kick/ban/role management with audit log headers, `Message` reply/delete/update/pin/react with authorship guards, and `User.send()` DM lazy creation + caching; includes hardcoded API-format body assertions to catch parameter transformations
 
 ### Changed
-
-- Synced `TODO.md` backlog state with shipped gateway parity work by marking the original parity item complete and splitting remaining event coverage into a dedicated follow-up item.
-- Updated the `StructureActions` backlog test-count note in `TODO.md` from 44 to 50 passing tests.
-- Added new delivery backlog items in `TODO.md` for release automation and CI quality gates (`check`, `test`, and `check:examples`).
-- Expanded `src/Tests/EventDispatcher.handlers.test.ts` coverage for handler lifecycle behavior (including per-dispatch override isolation) and added event-to-intent mapping assertions using `EventRequiredIntent`.
