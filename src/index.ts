@@ -1,5 +1,5 @@
 export * from "./Builders/index.js";
-export * from "./Cache/index.js";
+export * from "./Managers/index.js";
 export * from "./Events/index.js";
 export * from "./Structures/index.js";
 export * from "./Types/index.js";

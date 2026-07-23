@@ -15,11 +15,11 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
-import { RoleCache } from "../Cache/Roles.js";
-import { StickerCache } from "../Cache/Stickers.js";
-import { EmojiCache } from "../Cache/Emojis.js";
-import { ChannelCache } from "../Cache/Channels.js";
-import { MemberCache } from "../Cache/Members.js";
+import { RoleCache } from "../Managers/Roles.js";
+import { StickerCache } from "../Managers/Stickers.js";
+import { EmojiCache } from "../Managers/Emojis.js";
+import { ChannelCache } from "../Managers/Channels.js";
+import { MemberCache } from "../Managers/Members.js";
 
 export class Guild extends APIClientStructure<DiscordGuild> {
 	id!: string;

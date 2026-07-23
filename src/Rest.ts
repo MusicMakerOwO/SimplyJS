@@ -1,5 +1,5 @@
 import { JSONObject } from "./Types/Internal.js";
-import { TTLCache } from "./Cache/TTLCache.js";
+import { TTLCache } from "./DataStructures/TTLCache.js";
 
 const DISCORD_API_BASE = "https://discord.com/api/v9";
 const DEFAULT_RETRY_COUNT = 3;

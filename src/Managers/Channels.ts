@@ -1,4 +1,3 @@
-import { Channel } from "../Structures/Channel.js";
 import { GuildCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import {
@@ -13,6 +12,8 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
+import { Channel } from "../Types/index.js";
+import { CreateChannel } from "../Factory/CreateChannel.js";
 
 export class ChannelCache extends GuildCache<string, Channel, DiscordChannel> {
 	constructor(client: Client, guild: Guild) {
@@ -23,7 +24,7 @@ export class ChannelCache extends GuildCache<string, Channel, DiscordChannel> {
 		if (this.has(data.id)) {
 			this.get(data.id)!.patch(data);
 		} else {
-			this.set(data.id, new Channel(this.client, this.guild, data));
+			this.set(data.id, CreateChannel(this.client, this.guild, data));
 		}
 		return this.get(data.id)!;
 	}

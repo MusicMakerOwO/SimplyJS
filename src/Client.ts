@@ -3,11 +3,11 @@ import { WSClient, WSOptions } from "./WSClient.js";
 import { ResolveIntents } from "./Intents.js";
 import { ObjectValues } from "./Types/HelperTypes.js";
 import { GatewayIntents, GatewayOpCodes } from "./Types/DiscordGateway.js";
-import { GuildCache } from "./Cache/Guilds.js";
+import { GuildCache } from "./Managers/Guilds.js";
 import { EventEmitter } from "node:events";
 import type { ClientEventMap } from "./Types/SimplicityTypes.js";
 import { User } from "./Structures/User.js";
-import { UserCache } from "./Cache/Users.js";
+import { UserCache } from "./Managers/Users.js";
 import { ActivityType, ClientActivity, Status } from "./Types/DiscordAPITypes.js";
 
 type ClientOptions = {

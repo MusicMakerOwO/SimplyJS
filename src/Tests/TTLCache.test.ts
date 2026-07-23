@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TTLCache } from "../Cache/TTLCache.js";
+import { TTLCache } from "../DataStructures/TTLCache.js";
 
 describe("TTLCache", () => {
 	afterEach(() => {
