@@ -15,6 +15,7 @@ import { MessagePayload } from "../Types/Internal.js";
 import { Emoji } from "./Emoji.js";
 import { Guild } from "./Guild.js";
 import { Channel } from "../Types/index.js";
+import { GuildCategoryChannel } from "./GuildCategoryChannel.js";
 
 /**
  * Normalizes user input into a valid message payload.
@@ -153,12 +154,13 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	/**
 	 * A smart getter that reads the channel (and guild) from cache on first read and overwrites itself on consecutive reads
 	 */
-	get channel(): Channel | null {
+	// physically impossible for a message to be sent in a category lmao
+	get channel(): Exclude<Channel, GuildCategoryChannel> | null {
 		const value = this.guild?.channels.get(this.channel_id) ?? null;
 		Object.defineProperty(this, 'channel', {
 			value: value
 		});
-		return value;
+		return value as Exclude<Channel, GuildCategoryChannel>;
 	}
 
 	/**
