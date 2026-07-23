@@ -79,6 +79,22 @@ export class BitField<TFlags extends Record<string, bigint>> {
 		return this.value.toString();
 	}
 
+	/**
+	 * Resolves a mixed list of flag names and/or raw values into a single combined bitmask.
+	 *
+	 * Each provided flag is either looked up by name in `this.flags`, or parsed directly
+	 * as a raw bigint/number/string value, then OR'd together into one bigint result.
+	 *
+	 * @notes This does not read or return `this.value`; it only computes a mask from the given arguments.
+	 *
+	 * @example
+	 * ```ts
+	 * const bitfield = new BitField(permissions, 0);
+	 *
+	 * // returns the combined bitmask for both flags, e.g. 1024n | 2048n = 3072n
+	 * bitfield.resolve("VIEW_CHANNEL", "SEND_MESSAGES");
+	 * ```
+	 */
 	private resolve(...flags: FlagInput<TFlags>): bigint {
 		let bits = 0n;
 		for (const flag of flags) {
