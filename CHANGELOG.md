@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Permissions system
+- `ChannelPermissionManager` (`src/Managers/ChannelPermissionManager.ts`) — manages and calculates channel-level permission overrides
+- `Resolver` (`src/Permissions/Resolver.ts`) — calculates effective member permissions at both guild and channel levels with inheritance and override support
+- Comprehensive permission resolver tests covering all permission combinations and inheritance scenarios
+
+#### Channel type hierarchy
+- `BaseChannel` (`src/Structures/BaseChannel.ts`) — new base class for all channel types with shared functionality
+- `GuildTextChannel` (`src/Structures/GuildTextChannel.ts`) — dedicated class for text channels
+- `GuildVoiceChannel` (`src/Structures/GuildVoiceChannel.ts`) — dedicated class for voice channels
+- `GuildCategoryChannel` (`src/Structures/GuildCategoryChannel.ts`) — dedicated class for category channels
+- `GuildAnnouncementChannel` (`src/Structures/GuildAnnouncementChannel.ts`) — dedicated class for announcement channels
+- `GuildForumChannel` (`src/Structures/GuildForumChannel.ts`) — dedicated class for forum channels
+- `GuildStageChannel` (`src/Structures/GuildStageChannel.ts`) — dedicated class for stage channels
+- `GuildThreadChannel` (`src/Structures/GuildThreadChannel.ts`) — dedicated class for thread channels
+- `CreateChannel` factory (`src/Factory/CreateChannel.ts`) — creates appropriate channel type instances from Discord API payloads
+- `Messageable` mixin (`src/Structures/Mixins/Channels/Messageable.ts`) — shared message-sending functionality for text-based channels
+- `ROADMAP.md` — project roadmap outlining planned features and direction
+
+### Channel Discrimination
+- New functions to easily tell channel types apart: text, voice, thread, category
+  - `isTextChannel()` -> `GuildTextChannel | GuildAnnouncementChannel`
+  - `isVoiceChannel()` -> `GuildVoiceChannel | GuildStageChannel`
+  - `isThreadChannel()` -> `GuildThreadChannel` (public/private/announcement)
+  - `isCategoryChannel()` -> `GuildCategoryChannel`
+
+#### Documentation
+- JSDoc documentation for `BitField.resolve()` method for improved IDE support and developer experience
+
+### Changed
+
+- Renamed `src/Cache/` directory to `src/Managers/` to better describe their role as cache managers with fetch/upsert operations
+- **BREAKING**: `Channel` structure split into individual type-specific classes (`GuildTextChannel`, `GuildVoiceChannel`, etc.). Code importing or type-checking `Channel` must update to use the appropriate subclass type
+
 ## [1.0.0-alpha]
 
 ### Added
