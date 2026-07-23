@@ -2,6 +2,13 @@
 
 ## Active backlog
 
+- [ ] Finish incorporating `src/Permissions/Resolver.ts`
+  - [ ] `Member.hasPermission()`
+  - [ ] `Member.permissions` as a smart-getter (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get#smart_self-overwriting_lazy_getters)
+  - [ ] `Member.hasPermissionsIn(channel)`
+  - [ ] `Member.permissionsIn(channel)` as a smart-getter (see above)
+  - Should permission functions be included on guilds and channels too?
+
 - [ ] Harden gateway reconnect/session handling in `src/WSClient.ts`
   - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
   - Track and reuse `session_id` / `resume_gateway_url` from READY
@@ -10,15 +17,15 @@
 - [ ] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
   - Include close-code aware backoff, max retries, and clear terminal failure state
 - [ ] Add more examples
-  - Sending a direct message to a user
-  - Sending a message in a guild channel
-  - Replying to a message, with and without pinging the author
-  - Building and sending an embed with `EmbedBuilder`
-  - Reacting to a message and demonstrating emoji handling
-  - Fetching guilds, users, channels, and members from caches
-  - Basic moderation example using member actions (`timeout`, `kick`, `ban`)
-  - Role management example: create, modify, and inspect role order
-  - Event logging example that prints a few common gateway events
+  - [ ] Sending a direct message to a user
+  - [ ] Sending a message in a guild channel
+  - [ ] Replying to a message, with and without pinging the author
+  - [ ] Building and sending an embed with `EmbedBuilder`
+  - [ ] Reacting to a message and demonstrating emoji handling
+  - [ ] Fetching guilds, users, channels, and members from caches
+  - [ ] Basic moderation example using member actions (`timeout`, `kick`, `ban`)
+  - [ ] Role management example: create, modify, and inspect role order
+  - [ ] Event logging example that prints a few common gateway events
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
 
@@ -53,7 +60,8 @@
 - [ ] Interaction collectors (buttons, select menus, modals)
 - [ ] Slash command builder and all the options
 - [ ] `client.registerCommands(...)`
-- [ ] Create a mixin system for channel class inheritance
+- [x] Create a mixin system for channel class inheritance
+- [ ] Start planning mixins for interactions
 
 ## JSDoc documentation
 
