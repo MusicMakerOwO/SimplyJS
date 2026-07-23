@@ -41,4 +41,8 @@ export class ChannelPermissionManager {
 	async delete(id: string): Promise<void> {
 		await this.#client.rest.delete(`/channels/${this.#channel.id}/permissions/${id}`);
 	}
+
+	[Symbol.iterator](): MapIterator<DiscordOverwrite> {
+		return this.cache.values();
+	}
 }
