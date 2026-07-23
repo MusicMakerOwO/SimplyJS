@@ -3,7 +3,6 @@ import { Client } from "../Client.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { DiscordPermissions } from "../Constants.js";
 import { Guild } from "../Structures/Guild.js";
-import { Channel } from "../Structures/Channel.js";
 import { Role } from "../Structures/Role.js";
 import { Emoji } from "../Structures/Emoji.js";
 import { Sticker } from "../Structures/Sticker.js";
@@ -22,6 +21,14 @@ import {
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
+import { CreateChannel } from "../Factory/CreateChannel.js";
+import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
+import { GuildAnnouncementChannel } from "../Structures/GuildAnnouncementChannel.js";
+import { GuildCategoryChannel } from "../Structures/GuildCategoryChannel.js";
+import { GuildForumChannel } from "../Structures/GuildForumChannel.js";
+import { GuildStageChannel } from "../Structures/GuildStageChannel.js";
+import { GuildThreadChannel } from "../Structures/GuildThreadChannel.js";
+import { GuildVoiceChannel } from "../Structures/GuildVoiceChannel.js";
 
 // ---------------------------------------------------------------------------
 // Minimal fixture helpers (mirrors GatewayEvents.cache-mutations.test.ts style)
@@ -136,8 +143,32 @@ function makeSticker(client: Client, guild: Guild, id = "sticker-1"): Sticker {
 	return new Sticker(client, guild, stickerData(id));
 }
 
-function makeChannel(client: Client, guild: Guild, id = "channel-1"): Channel {
-	return new Channel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" });
+function makeTextChannel(client: Client, guild: Guild, id = "channel-1"): GuildTextChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" }) as GuildTextChannel;
+}
+
+function makeAnnouncementChannel(client: Client, guild: Guild, id = "channel-1"): GuildAnnouncementChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_ANNOUNCEMENT, name: "announcements" }) as GuildAnnouncementChannel;
+}
+
+function makeCategoryChannel(client: Client, guild: Guild, id = "channel-1"): GuildCategoryChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_CATEGORY, name: "category" }) as GuildCategoryChannel;
+}
+
+function makeForumChannel(client: Client, guild: Guild, id = "channel-1"): GuildForumChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_FORUM, name: "forum" }) as GuildForumChannel;
+}
+
+function makeStageChannel(client: Client, guild: Guild, id = "channel-1"): GuildStageChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_STAGE_VOICE, name: "stage" }) as GuildStageChannel;
+}
+
+function makeThreadChannel(client: Client, guild: Guild, id = "channel-1"): GuildThreadChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.PUBLIC_THREAD, name: "thread" }) as GuildThreadChannel;
+}
+
+function makeVoiceChannel(client: Client, guild: Guild, id = "channel-1"): GuildVoiceChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_VOICE, name: "voice" }) as GuildVoiceChannel;
 }
 
 function makeMember(client: Client, guild: Guild, userId = "user-1"): Member {
@@ -197,18 +228,21 @@ describe("Guild action methods", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Channel
+// Channels
 // ---------------------------------------------------------------------------
+// Each concrete channel class is tested independently (rather than only
+// exercising the shared base class) so that a future override of delete(),
+// modify(), send(), etc. on any one class is caught by its own suite.
 
-describe("Channel action methods", () => {
+describe("GuildTextChannel action methods", () => {
 	let client: Client;
 	let guild: Guild;
-	let channel: Channel;
+	let channel: GuildTextChannel;
 
 	beforeEach(() => {
 		client = makeClient();
 		guild = makeGuildStructure(client);
-		channel = makeChannel(client, guild);
+		channel = makeTextChannel(client, guild);
 		vi.restoreAllMocks();
 	});
 
@@ -258,6 +292,265 @@ describe("Channel action methods", () => {
 
 	it("send() throws when content is empty", async () => {
 		await expect(channel.send({ content: "" })).rejects.toThrow("Cannot send an empty message");
+	});
+});
+
+describe("GuildAnnouncementChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildAnnouncementChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeAnnouncementChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with exact API field names in body (same shape as text channel)", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({ name: "renamed", topic: "news", nsfw: false, rate_limit_per_user: 0 });
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed",
+			topic: "news",
+			nsfw: false,
+			rate_limit_per_user: 0,
+		});
+	});
+
+	it("send() calls POST /channels/:id/messages and returns a Message instance", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		const result = await channel.send("announcement");
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "announcement" });
+		expect(result).toBeInstanceOf(Message);
+	});
+
+	it("crosspost() calls POST /channels/:id/messages/:messageId/crosspost and returns a Message instance", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData("msg-1"));
+
+		const result = await channel.crosspost("msg-1");
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages/msg-1/crosspost`, {});
+		expect(result).toBeInstanceOf(Message);
+	});
+});
+
+describe("GuildCategoryChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildCategoryChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeCategoryChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with only name/position/permission_overwrites — no parent_id", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({ name: "renamed-category", position: 2 });
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed-category",
+			position: 2,
+		});
+	});
+
+	it("does not expose a send() method — categories cannot receive messages", () => {
+		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
+	});
+
+	it("does not expose a crosspost() method", () => {
+		expect((channel as unknown as { crosspost?: unknown }).crosspost).toBeUndefined();
+	});
+});
+
+describe("GuildForumChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildForumChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeForumChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with exact forum-specific API field names", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({
+			name: "renamed-forum",
+			default_reaction_emoji: { emoji_id: null, emoji_name: "🔥" },
+			available_tags: [{ name: "bug" }],
+		});
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed-forum",
+			default_reaction_emoji: { emoji_id: null, emoji_name: "🔥" },
+			available_tags: [{ name: "bug" }],
+		});
+	});
+
+	it("does not expose a send() method — forum channels only contain threads", () => {
+		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
+	});
+});
+
+describe("GuildStageChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildStageChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeStageChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with topic but no video_quality_mode/user_limit", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({ name: "renamed-stage", topic: "town hall", bitrate: 64_000 });
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed-stage",
+			topic: "town hall",
+			bitrate: 64_000,
+		});
+	});
+
+	it("does not expose a send() method", () => {
+		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
+	});
+});
+
+describe("GuildVoiceChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildVoiceChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeVoiceChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with exact voice-specific API field names", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({ name: "renamed-voice", bitrate: 96_000, user_limit: 10, rtc_region: "us-west" });
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed-voice",
+			bitrate: 96_000,
+			user_limit: 10,
+			rtc_region: "us-west",
+		});
+	});
+
+	it("does not expose a send() method", () => {
+		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
+	});
+});
+
+describe("GuildThreadChannel action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let channel: GuildThreadChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		channel = makeThreadChannel(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /channels/:id", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.delete();
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("modify() sends PATCH with thread-specific API field names — no position/parent_id/permission_overwrites", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await channel.modify({ name: "renamed-thread", archived: true, locked: true, auto_archive_duration: 1440 });
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
+			name: "renamed-thread",
+			archived: true,
+			locked: true,
+			auto_archive_duration: 1440,
+		});
+	});
+
+	it("send() calls POST /channels/:id/messages and returns a Message instance", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		const result = await channel.send("in the thread");
+
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "in the thread" });
+		expect(result).toBeInstanceOf(Message);
+	});
+
+	it("send() throws when content is empty", async () => {
+		await expect(channel.send({ content: "" })).rejects.toThrow("Cannot send an empty message");
+	});
+
+	it("does not expose a crosspost() method", () => {
+		expect((channel as unknown as { crosspost?: unknown }).crosspost).toBeUndefined();
 	});
 });
 
@@ -1076,7 +1369,7 @@ describe("Message action methods", () => {
 
 	it("channel getter reads from cache and caches itself on first access", () => {
 		const guild = makeGuildStructure(client, "guild-1");
-		const channel = makeChannel(client, guild, "channel-1");
+		const channel = makeTextChannel(client, guild, "channel-1");
 
 		// Populate caches
 		client.guilds.set(guild.id, guild);

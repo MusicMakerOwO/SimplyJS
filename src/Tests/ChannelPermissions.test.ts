@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { DiscordChannelTypes, DiscordOverwrite } from "../Types/DiscordAPITypes.js";
-import { Channel } from "../Structures/Channel.js";
 import { Guild } from "../Structures/Guild.js";
 import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
+import { CreateChannel } from "../Factory/CreateChannel.js";
+import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
 
 function makeClient(): Client {
 	return new Client({ token: "test-token", intents: GatewayIntents.Guilds });
@@ -31,8 +32,8 @@ function makeGuild(client: Client, id = "guild-1"): Guild {
 	});
 }
 
-function makeChannel(client: Client, guild: Guild, id = "channel-1"): Channel {
-	return new Channel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" });
+function makeChannel(client: Client, guild: Guild, id = "channel-1"): GuildTextChannel {
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" }) as GuildTextChannel;
 }
 
 function overwrites(count = 1): DiscordOverwrite[] {
@@ -47,7 +48,7 @@ function overwrites(count = 1): DiscordOverwrite[] {
 describe("ChannelPermissionManager", () => {
 	let client: Client;
 	let guild: Guild;
-	let channel: Channel;
+	let channel: GuildTextChannel;
 	let manager: ChannelPermissionManager;
 
 	beforeEach(() => {

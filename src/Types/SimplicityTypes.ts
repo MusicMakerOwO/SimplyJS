@@ -5,7 +5,6 @@ import type {
 	DiscordRole,
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
-import type { Channel } from "../Structures/Channel.js";
 import type { Guild } from "../Structures/Guild.js";
 import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
@@ -13,6 +12,24 @@ import type { Role } from "../Structures/Role.js";
 import type { Sticker } from "../Structures/Sticker.js";
 import type { User } from "../Structures/User.js";
 import { Emoji } from "../Structures/Emoji.js";
+import { BaseChannel } from "../Structures/BaseChannel.js";
+import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
+import { GuildVoiceChannel } from "../Structures/GuildVoiceChannel.js";
+import { GuildAnnouncementChannel } from "../Structures/GuildAnnouncementChannel.js";
+import { GuildCategoryChannel } from "../Structures/GuildCategoryChannel.js";
+import { GuildForumChannel } from "../Structures/GuildForumChannel.js";
+import { GuildThreadChannel } from "../Structures/GuildThreadChannel.js";
+import { GuildStageChannel } from "../Structures/GuildStageChannel.js";
+
+export type Channel =
+	| GuildAnnouncementChannel
+	| GuildTextChannel
+	| GuildVoiceChannel
+	| GuildCategoryChannel
+	| GuildForumChannel
+	| GuildStageChannel
+	| GuildThreadChannel
+	| BaseChannel
 
 export type MessageDeletePayload = {
 	id: string;
@@ -155,9 +172,9 @@ export type ClientEventMap = {
 	[ClientEvents.GuildUpdate]: [oldGuild: Guild | undefined, newGuild: Guild];
 	[ClientEvents.GuildDelete]: [guild: Guild | DiscordGuild];
 
-	[ClientEvents.ChannelCreate]: [channel: Channel];
-	[ClientEvents.ChannelUpdate]: [oldChannel: Channel | undefined, newChannel: Channel];
-	[ClientEvents.ChannelDelete]: [channel: Channel | DiscordChannel];
+	[ClientEvents.ChannelCreate]: [channel: BaseChannel];
+	[ClientEvents.ChannelUpdate]: [oldChannel: BaseChannel | undefined, newChannel: BaseChannel];
+	[ClientEvents.ChannelDelete]: [channel: BaseChannel | DiscordChannel];
 
 	[ClientEvents.MemberCreate]: [member: Member];
 	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];

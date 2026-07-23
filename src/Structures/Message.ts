@@ -13,8 +13,8 @@ import { Client } from "../Client.js";
 import { User } from "./User.js";
 import { MessagePayload } from "../Types/Internal.js";
 import { Emoji } from "./Emoji.js";
-import { Channel } from "./Channel.js";
 import { Guild } from "./Guild.js";
+import { Channel } from "../Types/index.js";
 
 /**
  * Normalizes user input into a valid message payload.

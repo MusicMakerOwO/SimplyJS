@@ -1,14 +1,14 @@
 import { Client } from "../Client.js";
 import { DiscordOverwrite } from "../Types/index.js";
-import { Channel } from "../Structures/index.js";
+import { BaseChannel } from "../Structures/BaseChannel.js";
 
 export class ChannelPermissionManager {
 	#client: Client;
-	#channel: Channel;
+	#channel: BaseChannel;
 
 	cache: Map<string, DiscordOverwrite>;
 
-	constructor(client: Client, channel: Channel, overwrites: DiscordOverwrite[]) {
+	constructor(client: Client, channel: BaseChannel, overwrites: DiscordOverwrite[]) {
 		this.#client = client;
 		this.#channel = channel;
 		this.cache = new Map();
