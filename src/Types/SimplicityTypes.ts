@@ -172,9 +172,9 @@ export type ClientEventMap = {
 	[ClientEvents.GuildUpdate]: [oldGuild: Guild | undefined, newGuild: Guild];
 	[ClientEvents.GuildDelete]: [guild: Guild | DiscordGuild];
 
-	[ClientEvents.ChannelCreate]: [channel: BaseChannel];
-	[ClientEvents.ChannelUpdate]: [oldChannel: BaseChannel | undefined, newChannel: BaseChannel];
-	[ClientEvents.ChannelDelete]: [channel: BaseChannel | DiscordChannel];
+	[ClientEvents.ChannelCreate]: [channel: Channel];
+	[ClientEvents.ChannelUpdate]: [oldChannel: Channel | undefined, newChannel: Channel];
+	[ClientEvents.ChannelDelete]: [channel: Channel | DiscordChannel];
 
 	[ClientEvents.MemberCreate]: [member: Member];
 	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];
