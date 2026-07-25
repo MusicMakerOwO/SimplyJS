@@ -2,13 +2,39 @@
 
 ## Active backlog
 
+### Permissions
 - [ ] Finish incorporating `src/Permissions/Resolver.ts`
-  - [ ] `Member.hasPermission()`
-  - [ ] `Member.permissions` as a smart-getter (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get#smart_self-overwriting_lazy_getters)
-  - [ ] `Member.hasPermissionsIn(channel)`
-  - [ ] `Member.permissionsIn(channel)` as a smart-getter (see above)
+  - [ ] `Member.hasPermission(permission): boolean`
+  - [ ] `Member.permissions(): BitField<Permissions>`
+  - [ ] `Member.hasPermissionsIn(channel): boolean`
+  - [ ] `Member.permissionsIn(channel): BitField<Permissions>`
   - Should permission functions be included on guilds and channels too?
 
+
+### Moderation
+- [ ] Implement more ban controls
+  - [ ] Guild ban manager
+    - `Guild.bans.add(userID, reason?)`
+      - [ ] Update `Member.ban(reason?)` to call this new function 
+    - `Guild.bans.remove(userID, auditLogReason?)`
+    - `Guild.bans.fetch(userID)`
+  - [ ] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
+- [ ] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, maybe named `AuditLogEntry`?
+- [ ] `Guild.fetchAuditLogs()`, unknown args
+- [ ] `MESSAGE_DELETE_BULK` event
+- Invites
+  - [ ] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
+  - [ ] `INVITE_CREATE` + `INVITE_DELETE` event handler
+  - [ ] Create GuildInviteManager
+    - `Guild.invites.create(channel, options?)`
+      - https://docs.discord.com/developers/resources/channel#create-channel-invite
+    - `Guild.invites.delete(inviteCode, reason?)`
+    - `Guild.invites.fetch(inviteCode?)`
+      - Return all invites if no code provided
+      - Additional data is returned if bot has `MANAGE_GUILD` permission
+      - https://docs.discord.com/developers/resources/invite#invite-metadata-object
+
+### Quality of Life
 - [ ] Harden gateway reconnect/session handling in `src/WSClient.ts`
   - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
   - Track and reuse `session_id` / `resume_gateway_url` from READY
@@ -91,6 +117,77 @@ Builders — add JSDoc to methods in `src/Builders/`:
 Contracts — add JSDoc to public abstract classes in `src/Contracts/`:
 - [x] `DiscordStructure.ts`: `APIActionableStructure`, `APIClientStructure`, `APIGuildStructure`
 - [x] `CacheStructure.ts`: `GlobalCache`, `GuildCache` abstract methods
+
+## Discord gateway event implementation status
+
+Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events Discord sends that aren't modeled at all here (e.g. `INTERACTION_CREATE`, `VOICE_SERVER_UPDATE`, `USER_UPDATE`) are tracked separately under "Further planning".
+
+| Discord event                     | Implemented |
+|-----------------------------------|-------------|
+| READY                             | ✅           |
+| GUILD_CREATE                      | ✅           |
+| GUILD_UPDATE                      | ✅           |
+| GUILD_DELETE                      | ✅           |
+| GUILD_ROLE_CREATE                 | ✅           |
+| GUILD_ROLE_UPDATE                 | ✅           |
+| GUILD_ROLE_DELETE                 | ✅           |
+| CHANNEL_CREATE                    | ✅           |
+| CHANNEL_UPDATE                    | ✅           |
+| CHANNEL_DELETE                    | ✅           |
+| CHANNEL_PINS_UPDATE               | ❌           |
+| THREAD_CREATE                     | ❌           |
+| THREAD_UPDATE                     | ❌           |
+| THREAD_DELETE                     | ❌           |
+| THREAD_LIST_SYNC                  | ❌           |
+| THREAD_MEMBER_UPDATE              | ❌           |
+| THREAD_MEMBERS_UPDATE             | ❌           |
+| STAGE_INSTANCE_CREATE             | ❌           |
+| STAGE_INSTANCE_UPDATE             | ❌           |
+| STAGE_INSTANCE_DELETE             | ❌           |
+| VOICE_CHANNEL_STATUS_UPDATE       | ❌           |
+| VOICE_CHANNEL_START_TIME_UPDATE   | ❌           |
+| GUILD_MEMBER_ADD                  | ✅           |
+| GUILD_MEMBER_UPDATE               | ✅           |
+| GUILD_MEMBER_REMOVE               | ✅           |
+| GUILD_AUDIT_LOG_ENTRY_CREATE      | ❌           |
+| GUILD_BAN_ADD                     | ❌           |
+| GUILD_BAN_REMOVE                  | ❌           |
+| GUILD_EMOJIS_UPDATE               | ✅           |
+| GUILD_STICKERS_UPDATE             | ✅           |
+| GUILD_SOUNDBOARD_SOUND_CREATE     | ❌           |
+| GUILD_SOUNDBOARD_SOUND_UPDATE     | ❌           |
+| GUILD_SOUNDBOARD_SOUND_DELETE     | ❌           |
+| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ❌           |
+| GUILD_INTEGRATIONS_UPDATE         | ❌           |
+| INTEGRATION_CREATE                | ❌           |
+| INTEGRATION_UPDATE                | ❌           |
+| INTEGRATION_DELETE                | ❌           |
+| WEBHOOKS_UPDATE                   | ❌           |
+| INVITE_CREATE                     | ❌           |
+| INVITE_DELETE                     | ❌           |
+| VOICE_CHANNEL_EFFECT_SEND         | ❌           |
+| VOICE_STATE_UPDATE                | ❌           |
+| PRESENCE_UPDATE                   | ❌           |
+| MESSAGE_CREATE                    | ✅           |
+| MESSAGE_UPDATE                    | ✅           |
+| MESSAGE_DELETE                    | ✅           |
+| MESSAGE_DELETE_BULK               | ❌           |
+| MESSAGE_REACTION_ADD              | ✅           |
+| MESSAGE_REACTION_REMOVE           | ✅           |
+| MESSAGE_REACTION_REMOVE_ALL       | ❌           |
+| MESSAGE_REACTION_REMOVE_EMOJI     | ❌           |
+| TYPING_START                      | ❌           |
+| GUILD_SCHEDULED_EVENT_CREATE      | ❌           |
+| GUILD_SCHEDULED_EVENT_UPDATE      | ❌           |
+| GUILD_SCHEDULED_EVENT_DELETE      | ❌           |
+| GUILD_SCHEDULED_EVENT_USER_ADD    | ❌           |
+| GUILD_SCHEDULED_EVENT_USER_REMOVE | ❌           |
+| AUTO_MODERATION_RULE_CREATE       | ❌           |
+| AUTO_MODERATION_RULE_UPDATE       | ❌           |
+| AUTO_MODERATION_RULE_DELETE       | ❌           |
+| AUTO_MODERATION_ACTION_EXECUTION  | ❌           |
+| MESSAGE_POLL_VOTE_ADD             | ❌           |
+| MESSAGE_POLL_VOTE_REMOVE          | ❌           |
 
 ## Completed (verified in current codebase)
 
