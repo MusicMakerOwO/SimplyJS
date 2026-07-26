@@ -6,4 +6,5 @@ export { MessageCreate, MessageUpdate, MessageDelete } from "./Messages.js";
 export { ReactionAdd, ReactionRemove } from "./Reactions.js";
 export { EmojisUpdate } from "./Emojis.js";
 export { StickersUpdate } from "./Stickers.js";
+export { InviteCreate, InviteDelete } from "./Invites.js";
 export { Ready } from "./Ready.js";

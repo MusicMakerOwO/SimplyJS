@@ -6,6 +6,7 @@ import type {
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
 import type { Guild } from "../Structures/Guild.js";
+import type { Invite } from "../Structures/Invite.js";
 import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
 import type { Role } from "../Structures/Role.js";
@@ -35,6 +36,12 @@ export type MessageDeletePayload = {
 	id: string;
 	channel_id: string;
 	guild_id: string | null;
+};
+
+export type InviteDeletePayload = {
+	channel_id: string;
+	guild_id?: string;
+	code: string;
 };
 
 export const ClientEvents = {
@@ -163,6 +170,17 @@ export const ClientEvents = {
 
 	ReactionAdd: "ReactionAdd",
 	ReactionRemove: "ReactionRemove",
+
+	/**
+	 * Fired when an invite is created.
+	 * Listener arguments: `invite` ({@link Invite}).
+	 */
+	InviteCreate: "InviteCreate",
+	/**
+	 * Fired when an invite is deleted. Discord does not send the invite itself.
+	 * Listener arguments: `payload` ({@link InviteDeletePayload}).
+	 */
+	InviteDelete: "InviteDelete",
 } as const;
 
 export type ClientEventMap = {
@@ -217,4 +235,7 @@ export type ClientEventMap = {
 		message_user_id?: string | null
 		super_reaction: boolean
 	}];
+
+	[ClientEvents.InviteCreate]: [invite: Invite];
+	[ClientEvents.InviteDelete]: [payload: InviteDeletePayload];
 };
