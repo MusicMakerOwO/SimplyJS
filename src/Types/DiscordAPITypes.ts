@@ -877,3 +877,51 @@ export const Status = {
 	DND: 'dnd',
 	OFFLINE: 'offline'
 } as const;
+
+export type DiscordInvite = {
+	/** the type of invite */
+	type: ObjectValues<typeof DiscordInviteTypes>;
+	/** the invite code (unique ID) */
+	code: string;
+	/** the guild this invite is for */
+	guild?: DiscordGuild;
+	/** the channel this invite is for */
+	channel: DiscordChannel | null;
+	/** the user who created the invite */
+	inviter?: DiscordUser;
+	/** the type of target for this voice channel invite */
+	target_type?: ObjectValues<typeof DiscordInviteTargetTypes>;
+	/** the user whose stream to display for this voice channel stream invite */
+	target_user?: DiscordUser;
+	/** the embedded application to open for this voice channel embedded application invite */
+	target_application?: DiscordApplication;
+	/** approximate count of online members, returned from the GET /invites/<code> endpoint when with_counts is true */
+	approximate_presence_count?: number;
+	/** approximate count of total members, returned from the GET /invites/<code> endpoint when with_counts is true */
+	approximate_member_count?: number;
+	/** the expiration date of this invite */
+	expires_at: string | null;
+	/** guild scheduled event data, only included if guild_scheduled_event_id contains a valid guild scheduled event id */
+	// TODO Guild events
+	guild_scheduled_event?: JSONObject;
+	/** guild invite flags for guild invites */
+	flags?: number;
+	/** the roles assigned to the user upon accepting the invite */
+	roles?: Pick<DiscordRole, 'id' | 'name' | 'position' | 'color' | 'colors' | 'icon' | 'unicode_emoji'>[];
+}
+
+export const DiscordInviteTypes = {
+	GUILD: 0,
+	GROUP_DM: 1,
+	FRIEND: 2
+} as const;
+
+export const DiscordInviteTargetTypes = {
+	STREAM: 1,
+	EMBEDDED_APPLICATION: 2
+} as const;
+
+export const DiscordGuildInviteFlags = {
+	/** this invite is a guest invite for a voice channel */
+	IS_GUEST_INVITE: 1 << 0
+} as const;
