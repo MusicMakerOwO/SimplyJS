@@ -8,6 +8,7 @@ export * from "./Channels/GuildStageChannel.js";
 export * from "./Channels/GuildTextChannel.js";
 export * from "./Channels/GuildThreadChannel.js";
 export * from "./Channels/GuildVoiceChannel.js";
+export * from "./Invite.js";
 export * from "./Member.js";
 export * from "./Message.js";
 export * from "./Role.js";

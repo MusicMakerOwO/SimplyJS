@@ -1,4 +1,5 @@
 import { ObjectValues } from "./HelperTypes.js";
+import { DiscordApplication, DiscordUser } from "./DiscordAPITypes.js";
 
 /**
  * Gateway operation codes (`op`) define the protocol-level action for a payload.
@@ -707,3 +708,34 @@ export const GatewayEvents = {
 	 */
 	MessagePollVoteRemove: "MESSAGE_POLL_VOTE_REMOVE",
 } as const;
+
+export type GatewayInvite = {
+	/** Channel the invite is for */
+	channel_id: string,
+	/** Unique invite code */
+	code: string,
+	/** Time at which the invite was created */
+	created_at: string,
+	/** Guild of the invite */
+	guild_id?: string,
+	/** User that created the invite */
+	inviter?: DiscordUser,
+	/** How long the invite is valid for (in seconds) */
+	max_age: number,
+	/** Maximum number of times the invite can be used */
+	max_uses: number,
+	/** Type of target for this voice channel invite */
+	target_type?: number,
+	/** User whose stream to display for this voice channel stream invite */
+	target_user?: DiscordUser,
+	/** Embedded application to open for this voice channel embedded application invite */
+	target_application?: DiscordApplication,
+	/** Whether or not the invite is temporary (invited users will be kicked on disconnect unless they’re assigned a role) */
+	temporary: boolean,
+	/** How many times the invite has been used (always will be 0) */
+	uses: number,
+	/** The expiration date of this invite */
+	expires_at?: string,
+	/** The role ID(s) for roles in the guild given to the users that accept this invite */
+	role_ids?: string[]
+}
