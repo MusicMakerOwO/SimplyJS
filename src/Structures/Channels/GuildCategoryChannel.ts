@@ -1,6 +1,6 @@
-import { DiscordChannel, DiscordOverwrite } from "../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
-import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
+import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildCategoryChannel extends BaseChannel {
 	position?: number

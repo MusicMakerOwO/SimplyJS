@@ -1,5 +1,5 @@
-import { Message } from "./Message.js";
-import { DiscordMessage } from "../Types/MessageComponents.js";
+import { Message } from "../Message.js";
+import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { GuildTextChannel } from "./GuildTextChannel.js";
 
 /**

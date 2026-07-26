@@ -12,14 +12,14 @@ import type { Role } from "../Structures/Role.js";
 import type { Sticker } from "../Structures/Sticker.js";
 import type { User } from "../Structures/User.js";
 import { Emoji } from "../Structures/Emoji.js";
-import { BaseChannel } from "../Structures/BaseChannel.js";
-import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
-import { GuildVoiceChannel } from "../Structures/GuildVoiceChannel.js";
-import { GuildAnnouncementChannel } from "../Structures/GuildAnnouncementChannel.js";
-import { GuildCategoryChannel } from "../Structures/GuildCategoryChannel.js";
-import { GuildForumChannel } from "../Structures/GuildForumChannel.js";
-import { GuildThreadChannel } from "../Structures/GuildThreadChannel.js";
-import { GuildStageChannel } from "../Structures/GuildStageChannel.js";
+import { BaseChannel } from "../Structures/Channels/BaseChannel.js";
+import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
+import { GuildVoiceChannel } from "../Structures/Channels/GuildVoiceChannel.js";
+import { GuildAnnouncementChannel } from "../Structures/Channels/GuildAnnouncementChannel.js";
+import { GuildCategoryChannel } from "../Structures/Channels/GuildCategoryChannel.js";
+import { GuildForumChannel } from "../Structures/Channels/GuildForumChannel.js";
+import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
+import { GuildStageChannel } from "../Structures/Channels/GuildStageChannel.js";
 
 export type Channel =
 	| GuildAnnouncementChannel

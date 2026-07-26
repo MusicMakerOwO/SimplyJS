@@ -1,7 +1,7 @@
-import { DiscordChannel, DiscordOverwrite } from "../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
-import { Messageable } from "./Mixins/Channels/Messageable.js";
-import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
+import { Messageable } from "../Mixins/Channels/Messageable.js";
+import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildTextChannel extends Messageable(BaseChannel) {
 	position?: number

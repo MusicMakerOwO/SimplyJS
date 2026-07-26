@@ -10,7 +10,7 @@ import {
 	DiscordRole,
 	DiscordUser,
 } from "../Types/DiscordAPITypes.js";
-import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
+import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
 import { Guild } from "../Structures/Guild.js";
 import { Member } from "../Structures/Member.js";
 import { ResolvePermissions } from "../Permissions/Resolver.js";

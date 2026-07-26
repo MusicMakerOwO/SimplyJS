@@ -15,7 +15,7 @@ import { MessagePayload } from "../Types/Internal.js";
 import { Emoji } from "./Emoji.js";
 import { Guild } from "./Guild.js";
 import { Channel } from "../Types/index.js";
-import { GuildCategoryChannel } from "./GuildCategoryChannel.js";
+import { GuildCategoryChannel } from "./Channels/GuildCategoryChannel.js";
 
 /**
  * Normalizes user input into a valid message payload.

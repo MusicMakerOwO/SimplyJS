@@ -1,4 +1,4 @@
-import { DiscordChannel, DiscordOverwrite } from "../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite } from "../../Types/DiscordAPITypes.js";
 import { GuildVoiceChannel } from "./GuildVoiceChannel.js";
 
 /**

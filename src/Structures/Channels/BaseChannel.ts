@@ -1,8 +1,8 @@
-import { Client } from "../Client.js";
-import { DiscordChannel, DiscordChannelTypes } from "../Types/DiscordAPITypes.js";
-import { ObjectValues } from "../Types/HelperTypes.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
-import { Guild } from "./Guild.js";
+import { Client } from "../../Client.js";
+import { DiscordChannel, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
+import { ObjectValues } from "../../Types/HelperTypes.js";
+import { APIGuildStructure } from "../../Contracts/DiscordStructure.js";
+import { Guild } from "../Guild.js";
 import { GuildTextChannel } from "./GuildTextChannel.js";
 import { GuildThreadChannel } from "./GuildThreadChannel.js";
 import { GuildAnnouncementChannel } from "./GuildAnnouncementChannel.js";

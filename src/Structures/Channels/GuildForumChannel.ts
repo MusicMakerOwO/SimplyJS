@@ -1,10 +1,10 @@
 import {
 	DiscordChannel, DiscordDefaultReaction, DiscordForumLayoutTypes,
 	DiscordForumTag, DiscordOverwrite, DiscordSortOrderTypes
-} from "../Types/DiscordAPITypes.js";
-import { ObjectValues } from "../Types/HelperTypes.js";
+} from "../../Types/DiscordAPITypes.js";
+import { ObjectValues } from "../../Types/HelperTypes.js";
 import { BaseChannel } from "./BaseChannel.js";
-import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
+import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildForumChannel extends BaseChannel {
 	position?: number

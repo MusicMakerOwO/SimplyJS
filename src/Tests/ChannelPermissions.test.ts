@@ -5,7 +5,7 @@ import { DiscordChannelTypes, DiscordOverwrite } from "../Types/DiscordAPITypes.
 import { Guild } from "../Structures/Guild.js";
 import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
-import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
+import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
 
 function makeClient(): Client {
 	return new Client({ token: "test-token", intents: GatewayIntents.Guilds });

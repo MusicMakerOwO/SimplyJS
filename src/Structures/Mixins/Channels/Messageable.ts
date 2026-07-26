@@ -1,4 +1,4 @@
-import { BaseChannel } from "../../BaseChannel.js";
+import { BaseChannel } from "../../Channels/BaseChannel.js";
 import { CreateMessagePayload, Message } from "../../Message.js";
 import { MessagePayload } from "../../../Types/Internal.js";
 import { DiscordMessage } from "../../../Types/MessageComponents.js";

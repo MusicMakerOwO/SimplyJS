@@ -22,13 +22,13 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
-import { GuildTextChannel } from "../Structures/GuildTextChannel.js";
-import { GuildAnnouncementChannel } from "../Structures/GuildAnnouncementChannel.js";
-import { GuildCategoryChannel } from "../Structures/GuildCategoryChannel.js";
-import { GuildForumChannel } from "../Structures/GuildForumChannel.js";
-import { GuildStageChannel } from "../Structures/GuildStageChannel.js";
-import { GuildThreadChannel } from "../Structures/GuildThreadChannel.js";
-import { GuildVoiceChannel } from "../Structures/GuildVoiceChannel.js";
+import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
+import { GuildAnnouncementChannel } from "../Structures/Channels/GuildAnnouncementChannel.js";
+import { GuildCategoryChannel } from "../Structures/Channels/GuildCategoryChannel.js";
+import { GuildForumChannel } from "../Structures/Channels/GuildForumChannel.js";
+import { GuildStageChannel } from "../Structures/Channels/GuildStageChannel.js";
+import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
+import { GuildVoiceChannel } from "../Structures/Channels/GuildVoiceChannel.js";
 
 // ---------------------------------------------------------------------------
 // Minimal fixture helpers (mirrors GatewayEvents.cache-mutations.test.ts style)

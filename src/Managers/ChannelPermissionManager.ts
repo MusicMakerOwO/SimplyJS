@@ -1,6 +1,6 @@
 import { Client } from "../Client.js";
 import { DiscordOverwrite } from "../Types/index.js";
-import { BaseChannel } from "../Structures/BaseChannel.js";
+import { BaseChannel } from "../Structures/Channels/BaseChannel.js";
 
 export class ChannelPermissionManager {
 	#client: Client;

@@ -1,6 +1,6 @@
-import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata } from "../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
-import { Messageable } from "./Mixins/Channels/Messageable.js";
+import { Messageable } from "../Mixins/Channels/Messageable.js";
 
 export class GuildThreadChannel extends Messageable(BaseChannel) {
 	owner_id?: string
