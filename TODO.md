@@ -23,8 +23,8 @@
 - [ ] `Guild.fetchAuditLogs()`, unknown args
 - [ ] `MESSAGE_DELETE_BULK` event
 - Invites
-  - [ ] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
-  - [ ] `INVITE_CREATE` + `INVITE_DELETE` event handler
+  - [x] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
+  - [x] `INVITE_CREATE` + `INVITE_DELETE` event handler
   - [ ] Create GuildInviteManager
     - `Guild.invites.create(channel, options?)`
       - https://docs.discord.com/developers/resources/channel#create-channel-invite
