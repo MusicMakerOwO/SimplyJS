@@ -11,10 +11,10 @@
 - `WSClient` extends `EventEmitter<WSEvents>` (typed events: `RAW`, `HEARTBEAT`, `HEARTBEAT_ACK`) and creates a dispatch function with `CreateDispatch()`; gateway dispatches flow through `this.dispatch(this.client, data.t, data.d)`.
 - Event-to-intent resolution lives in `src/Intents.ts` via `EventRequiredIntent`; this is the main cross-file bridge between gateway events and enabled intents.
 - Intent normalization helpers (`ResolveIntents`, `HasIntent`) convert mixed user input (number, key names, numeric array) into a bitfield.
-- Gateway dispatch flows: `WSClient.#handleMessage` → `CreateDispatch()` result from `src/EventDispatcher.ts` → handler module exported from `src/Events/index.ts` (e.g., `GuildCreate`) → updates `Client` cache or structure in `src/Structures/` or `src/Cache/`.
+- Gateway dispatch flows: `WSClient.#handleMessage` → `CreateDispatch()` result from `src/EventDispatcher.ts` → handler module exported from `src/Events/index.ts` (e.g., `GuildCreate`) → updates `Client` cache or structure in `src/Structures/` (channel classes live under `src/Structures/Channels/`) or `src/Managers/`.
 - Gateway handlers then emit the public client event surface from `src/Types/SimplicityTypes.ts` (`ClientEvents` / `ClientEventMap`) via `Client.emit(...)`.
 - `Client.guilds` and `Client.users` are top-level caches (`GuildCache`, `UserCache`, both extending `GlobalCache<string, V, API>`); `fetch(id)` uses REST and `upsert()` to patch/create entries, and `Guild` owns nested caches for `channels`, `roles`, `emojis`, `stickers`, and `members`.
-- `src/Rest.ts` keeps route/bucket rate-limit state in `src/Cache/TTLCache.ts` (`routeRateLimits`, `routeToBucket`) and exposes `RestOptions` for `retryAfterRateLimit`, `rateLimitDurationMultiplier`, and `perRouteRateLimits`.
+- `src/Rest.ts` keeps route/bucket rate-limit state in `src/DataStructures/TTLCache.ts` (`routeRateLimits`, `routeToBucket`) and exposes `RestOptions` for `retryAfterRateLimit`, `rateLimitDurationMultiplier`, and `perRouteRateLimits`.
 - Abstract base classes in `src/Contracts/` define the structural contracts:
   - `APIClientStructure<T>` — client-bound structures needing `client` access (holds `protected readonly client: Client`)
   - `APIGuildStructure<T>` — guild-owned structures needing both `client` and `guild` access (holds `protected readonly client: Client` and `protected readonly guild: Guild`)
