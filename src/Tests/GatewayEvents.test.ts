@@ -15,6 +15,7 @@ import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
 import { Ready } from "../Events/Ready.js";
 import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
+import { GuildBanAdd, GuildBanRemove } from "../Events/Bans.js";
 import { ClientEvents } from "../Types/SimplicityTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
@@ -522,5 +523,39 @@ describe("Gateway event handlers mutate caches", () => {
 		expect(emojiDeleteCall?.[1].id).toBe(guildPayload.id);
 		expect(emojiDeleteCall?.[2].id).toBe("emoji-1");
 		expect(client.guilds.get(guildPayload.id)?.emojis.has("emoji-1")).toBe(false);
+	});
+
+	it("GuildBanAdd upserts user to cache and emits GuildBanAdd event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildModeration });
+		const emitSpy = vi.spyOn(client, "emit");
+		const guildPayload = createGuild();
+		const bannedUser = createUser("banned-user-1");
+
+		await GuildCreate.handler(client, guildPayload);
+		await GuildBanAdd.handler(client, { guild_id: guildPayload.id, user: bannedUser });
+
+		expect(client.users.has(bannedUser.id)).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.GuildBanAdd,
+			expect.objectContaining({ id: guildPayload.id }),
+			expect.objectContaining({ id: bannedUser.id })
+		);
+	});
+
+	it("GuildBanRemove upserts user to cache and emits GuildBanRemove event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildModeration });
+		const emitSpy = vi.spyOn(client, "emit");
+		const guildPayload = createGuild();
+		const unbannedUser = createUser("unbanned-user-1");
+
+		await GuildCreate.handler(client, guildPayload);
+		await GuildBanRemove.handler(client, { guild_id: guildPayload.id, user: unbannedUser });
+
+		expect(client.users.has(unbannedUser.id)).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.GuildBanRemove,
+			expect.objectContaining({ id: guildPayload.id }),
+			expect.objectContaining({ id: unbannedUser.id })
+		);
 	});
 });

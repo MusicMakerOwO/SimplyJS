@@ -181,6 +181,18 @@ export const ClientEvents = {
 	 * Listener arguments: `payload` ({@link InviteDeletePayload}).
 	 */
 	InviteDelete: "InviteDelete",
+
+	/**
+	 * Fired when a user is banned from a guild.
+	 * Listener arguments: `guild` ({@link Guild}), `user` ({@link User}).
+	 */
+	GuildBanAdd: "GuildBanAdd",
+	/**
+	 * Fired when a user ban is removed from a guild.
+	 * Listener arguments: `guild` ({@link Guild}), `user` ({@link User}).
+	 */
+	GuildBanRemove: "GuildBanRemove",
+
 } as const;
 
 export type ClientEventMap = {
@@ -238,4 +250,7 @@ export type ClientEventMap = {
 
 	[ClientEvents.InviteCreate]: [invite: Invite];
 	[ClientEvents.InviteDelete]: [payload: InviteDeletePayload];
+
+	[ClientEvents.GuildBanAdd]: [guild: Guild, user: User];
+	[ClientEvents.GuildBanRemove]: [guild: Guild, user: User];
 };
