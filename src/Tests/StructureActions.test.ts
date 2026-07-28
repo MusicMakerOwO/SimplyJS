@@ -1461,4 +1461,166 @@ describe("User.send() DM flow", () => {
 		const dmCreationCalls = spy.mock.calls.filter(([route]) => route === "/users/@me/channels");
 		expect(dmCreationCalls).toHaveLength(1);
 	});
+
+	// ---------------------------------------------------------------------------
+	// Guild Bans
+	// ---------------------------------------------------------------------------
+
+	describe("Guild.bans manager action methods", () => {
+		let client: Client;
+		let guild: Guild;
+
+		beforeEach(() => {
+			client = makeClient();
+			guild = makeGuildStructure(client);
+			vi.restoreAllMocks();
+		});
+
+		it("create() calls POST /guilds/:guildId/bans/:userId with empty headers when no reason", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+			await guild.bans.create("user-1");
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-1`, {});
+		});
+
+		it("create() accepts a User object and extracts the ID", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+			const user = makeUser(client, "user-2");
+
+			await guild.bans.create(user);
+
+			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-2`, {});
+		});
+
+		it("create() accepts a DiscordUser object and extracts the ID", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+			const discordUser: DiscordUser = userData("user-3");
+
+			await guild.bans.create(discordUser);
+
+			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-3`, {});
+		});
+
+		it("create() sends X-Audit-Log-Reason header when reason is provided", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+			await guild.bans.create("user-1", "spam and harassment");
+
+			expect(spy).toHaveBeenCalledWith(
+				`/guild/${guild.id}/bans/user-1`,
+				{ "X-Audit-Log-Reason": "spam and harassment" }
+			);
+		});
+
+		it("delete() calls DELETE /guilds/:guildId/bans/:guildId with empty headers when no reason", async () => {
+			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+			await guild.bans.delete();
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/${guild.id}`, {});
+		});
+
+		it("delete() sends X-Audit-Log-Reason header when reason is provided", async () => {
+			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+			await guild.bans.delete("user reformed");
+
+			expect(spy).toHaveBeenCalledWith(
+				`/guilds/${guild.id}/bans/${guild.id}`,
+				{ "X-Audit-Log-Reason": "user reformed" }
+			);
+		});
+
+		it("fetch() with user ID calls GET /guilds/:guildId/bans/:userId and returns a single ban", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue({
+				user: userData("banned-user"),
+				reason: "spam"
+			});
+
+			const result = await guild.bans.fetch("banned-user");
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/banned-user`);
+			expect(result).toEqual({
+				user: expect.any(User),
+				reason: "spam"
+			});
+		});
+
+		it("fetch() without arguments calls GET /guilds/:guildId/bans and returns an array", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([
+				{ user: userData("user-1"), reason: "spam" },
+				{ user: userData("user-2"), reason: null }
+			]);
+
+			const result = await guild.bans.fetch();
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans`);
+			expect(Array.isArray(result)).toBe(true);
+			expect(result).toHaveLength(2);
+		});
+
+		it("fetch() with limit option includes limit as query parameter", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.bans.fetch({ limit: 50 });
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toContain(`?limit=50`);
+		});
+
+		it("fetch() with before option includes before as query parameter", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.bans.fetch({ before: "user-123" });
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toContain(`?before=user-123`);
+		});
+
+		it("fetch() with after option includes after as query parameter", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.bans.fetch({ after: "user-456" });
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toContain(`?after=user-456`);
+		});
+
+		it("fetch() with multiple options includes all parameters in query string", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.bans.fetch({ limit: 100, before: "user-123", after: "user-456" });
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toContain(`limit=100`);
+			expect(route).toContain(`before=user-123`);
+			expect(route).toContain(`after=user-456`);
+		});
+
+		it("fetch() returns array with User instances instead of raw DiscordUser", async () => {
+			vi.spyOn(client.rest, "get").mockResolvedValue([
+				{ user: userData("user-1"), reason: "spam" }
+			]);
+
+			const result = await guild.bans.fetch();
+
+			expect(result[0].user).toBeInstanceOf(User);
+			expect(result[0].user.id).toBe("user-1");
+		});
+
+		it("fetch() with no options does not include query parameters in URL", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.bans.fetch();
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toBe(`/guilds/${guild.id}/bans`);
+			expect(route).not.toContain("?");
+		});
+	});
 });
