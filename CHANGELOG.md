@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Resolver` (`src/Permissions/Resolver.ts`) — calculates effective member permissions at both guild and channel levels with inheritance and override support
 - Comprehensive permission resolver tests covering all permission combinations and inheritance scenarios
 
+#### Invites
+- `Invite` class (`src/Structures/Invite.ts`) — wraps the Discord invite object/metadata, exposing invite, inviter, target, and expiration details
+- `INVITE_CREATE` and `INVITE_DELETE` gateway event handlers (`src/Events/Invites.ts`)
+- Test coverage for the `Invite` class and its event handlers
+
+#### Bans
+- `GuildBanManager` (`src/Managers/GuildBans.ts`) — manages guild bans with `create()`, `delete()`, and paginated `fetch()` operations
+- `GuildBanAdd` and `GuildBanRemove` gateway event handlers (`src/Events/Bans.ts`)
+- `ClientEvents.GuildBanAdd` and `ClientEvents.GuildBanRemove` client events with JSDoc documentation
+- Pagination support for fetching bans: `limit`, `before`, and `after` query parameters
+- Comprehensive test coverage for ban events and manager operations
+
 #### Channel type hierarchy
 - `BaseChannel` (`src/Structures/BaseChannel.ts`) — new base class for all channel types with shared functionality
 - `GuildTextChannel` (`src/Structures/GuildTextChannel.ts`) — dedicated class for text channels
@@ -40,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Renamed `src/Cache/` directory to `src/Managers/` to better describe their role as cache managers with fetch/upsert operations
+- Moved channel structure classes (`BaseChannel`, `GuildTextChannel`, `GuildVoiceChannel`, etc.) into `src/Structures/Channels/`
 - **BREAKING**: `Channel` structure split into individual type-specific classes (`GuildTextChannel`, `GuildVoiceChannel`, etc.). Code importing or type-checking `Channel` must update to use the appropriate subclass type
 
 ## [1.0.0-alpha]
