@@ -13,12 +13,12 @@
 
 ### Moderation
 - [ ] Implement more ban controls
-  - [ ] Guild ban manager
+  - [x] Guild ban manager
     - `Guild.bans.add(userID, reason?)`
       - [ ] Update `Member.ban(reason?)` to call this new function 
     - `Guild.bans.remove(userID, auditLogReason?)`
     - `Guild.bans.fetch(userID)`
-  - [ ] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
+  - [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
 - [ ] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, maybe named `AuditLogEntry`?
 - [ ] `Guild.fetchAuditLogs()`, unknown args
 - [ ] `MESSAGE_DELETE_BULK` event
