@@ -57,7 +57,7 @@ function roleData(id = "role-1"): DiscordRole {
 }
 
 function channelData(id = "channel-1"): DiscordChannel {
-	return { id, type: DiscordChannelTypes.GUILD_TEXT, guild_id: "guild-1", name: "general" };
+	return { id, type: DiscordChannelTypes.GUILD_TEXT, guild_id: "guild-1", name: "general", permission_overwrites: [] };
 }
 
 /** The fat shape, as returned by `GET /invites/<code>` */

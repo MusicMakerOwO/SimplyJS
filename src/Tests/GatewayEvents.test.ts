@@ -75,7 +75,8 @@ function createChannel(id = "channel-1", guildId = "guild-1"): DiscordChannel {
 		id,
 		type: DiscordChannelTypes.GUILD_TEXT,
 		guild_id: guildId,
-		name: "general"
+		name: "general",
+		permission_overwrites: []
 	};
 }
 

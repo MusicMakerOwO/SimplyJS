@@ -33,7 +33,7 @@ function makeGuild(client: Client, id = "guild-1"): Guild {
 }
 
 function makeChannel(client: Client, guild: Guild, id = "channel-1"): GuildTextChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" }) as GuildTextChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general", permission_overwrites: [] }) as GuildTextChannel;
 }
 
 function overwrites(count = 1): DiscordOverwrite[] {
