@@ -15,7 +15,7 @@
 - [ ] Implement more ban controls
   - [x] Guild ban manager
     - `Guild.bans.add(userID, reason?)`
-      - [ ] Update `Member.ban(reason?)` to call this new function 
+      - [x] Update `Member.ban(reason?)` to call this new function 
     - `Guild.bans.remove(userID, auditLogReason?)`
     - `Guild.bans.fetch(userID)`
   - [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
