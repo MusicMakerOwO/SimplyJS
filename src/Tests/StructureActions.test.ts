@@ -11,20 +11,25 @@ import { Message } from "../Structures/Message.js";
 import { User } from "../Structures/User.js";
 import { Invite } from "../Structures/index.js";
 import {
+	DiscordAuditLog,
+	DiscordAuditLogEvent,
 	DiscordChannel,
 	DiscordChannelTypes,
 	DiscordEmoji,
 	DiscordGuild,
 	DiscordInvite, DiscordInviteTypes,
 	DiscordMember,
+	DiscordOverwrite,
 	DiscordRole,
 	DiscordSticker,
 	DiscordStickerFormatTypes,
 	DiscordStickerTypes,
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
+import { ObjectValues } from "../Types/HelperTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
+import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
 import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
 import { GuildAnnouncementChannel } from "../Structures/Channels/GuildAnnouncementChannel.js";
 import { GuildCategoryChannel } from "../Structures/Channels/GuildCategoryChannel.js";
@@ -146,24 +151,28 @@ function makeSticker(client: Client, guild: Guild, id = "sticker-1"): Sticker {
 	return new Sticker(client, guild, stickerData(id));
 }
 
+// Moveable/PermissionOverwrites require `position`/`permission_overwrites` to be present on the
+// payload (they assign via non-null assertion), so every fixture below that mixes them in must
+// supply both fields — matching what Discord always sends for these channel types.
+
 function makeTextChannel(client: Client, guild: Guild, id = "channel-1"): GuildTextChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general" }) as GuildTextChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_TEXT, name: "general", position: 0, permission_overwrites: [] }) as GuildTextChannel;
 }
 
 function makeAnnouncementChannel(client: Client, guild: Guild, id = "channel-1"): GuildAnnouncementChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_ANNOUNCEMENT, name: "announcements" }) as GuildAnnouncementChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_ANNOUNCEMENT, name: "announcements", position: 0, permission_overwrites: [] }) as GuildAnnouncementChannel;
 }
 
 function makeCategoryChannel(client: Client, guild: Guild, id = "channel-1"): GuildCategoryChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_CATEGORY, name: "category" }) as GuildCategoryChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_CATEGORY, name: "category", position: 0, permission_overwrites: [] }) as GuildCategoryChannel;
 }
 
 function makeForumChannel(client: Client, guild: Guild, id = "channel-1"): GuildForumChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_FORUM, name: "forum" }) as GuildForumChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_FORUM, name: "forum", position: 0, permission_overwrites: [] }) as GuildForumChannel;
 }
 
 function makeStageChannel(client: Client, guild: Guild, id = "channel-1"): GuildStageChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_STAGE_VOICE, name: "stage" }) as GuildStageChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_STAGE_VOICE, name: "stage", position: 0, permission_overwrites: [], topic: null }) as GuildStageChannel;
 }
 
 function makeThreadChannel(client: Client, guild: Guild, id = "channel-1"): GuildThreadChannel {
@@ -171,7 +180,7 @@ function makeThreadChannel(client: Client, guild: Guild, id = "channel-1"): Guil
 }
 
 function makeVoiceChannel(client: Client, guild: Guild, id = "channel-1"): GuildVoiceChannel {
-	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_VOICE, name: "voice" }) as GuildVoiceChannel;
+	return CreateChannel(client, guild, { id, type: DiscordChannelTypes.GUILD_VOICE, name: "voice", position: 0, permission_overwrites: [] }) as GuildVoiceChannel;
 }
 
 function makeMember(client: Client, guild: Guild, userId = "user-1"): Member {
@@ -228,6 +237,115 @@ describe("Guild action methods", () => {
 
 		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}`, {});
 	});
+
+	// ---------------------------------------------------------------------------
+	// fetchAuditLogs()
+	// ---------------------------------------------------------------------------
+
+	function auditLogData(): DiscordAuditLog {
+		return {
+			application_commands: [],
+			audit_log_entries: [
+				{
+					target_id: "channel-1",
+					user_id: "user-1",
+					id: "entry-1",
+					action_type: DiscordAuditLogEvent.CHANNEL_UPDATE,
+				},
+			],
+			auto_moderation_rules: [],
+			guild_scheduled_events: [],
+			integrations: [],
+			threads: [],
+			users: [],
+			webhooks: [],
+		};
+	}
+
+	it("fetchAuditLogs() calls GET /guilds/:id/audit-logs with no query string when no options given", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
+
+		await guild.fetchAuditLogs();
+
+		expect(spy).toHaveBeenCalledOnce();
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/audit-logs`);
+	});
+
+	it("fetchAuditLogs() builds a query string with all provided filters using exact API field names", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
+
+		await guild.fetchAuditLogs({
+			user_id: "user-1",
+			action_type: DiscordAuditLogEvent.MEMBER_KICK,
+			before: "before-id",
+			after: "after-id",
+			limit: 25,
+		});
+
+		const [route] = spy.mock.calls[0]!;
+		expect(route).toBe(
+			`/guilds/${guild.id}/audit-logs?user_id=user-1&action_type=20&before=before-id&after=after-id&limit=25`
+		);
+	});
+
+	it("fetchAuditLogs() omits query params that were not provided", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
+
+		await guild.fetchAuditLogs({ limit: 10 });
+
+		const [route] = spy.mock.calls[0]!;
+		expect(route).toBe(`/guilds/${guild.id}/audit-logs?limit=10`);
+	});
+
+	it("fetchAuditLogs() with action_type: 0 still includes it in the query string (falsy-but-valid value)", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
+
+		await guild.fetchAuditLogs({ action_type: 0 as ObjectValues<typeof DiscordAuditLogEvent> });
+
+		const [route] = spy.mock.calls[0]!;
+		expect(route).toBe(`/guilds/${guild.id}/audit-logs?action_type=0`);
+	});
+
+	it("fetchAuditLogs() returns the raw audit log object unchanged", async () => {
+		const data = auditLogData();
+		vi.spyOn(client.rest, "get").mockResolvedValue(data);
+
+		const result = await guild.fetchAuditLogs();
+
+		expect(result).toEqual(data);
+	});
+
+	it("fetchAuditLogs() upserts referenced users into the global user cache", async () => {
+		const data = auditLogData();
+		data.users = [userData("logged-user")];
+		vi.spyOn(client.rest, "get").mockResolvedValue(data);
+
+		await guild.fetchAuditLogs();
+
+		expect(client.users.get("logged-user")).toBeInstanceOf(User);
+	});
+
+	it("fetchAuditLogs() upserts referenced threads into the guild's channel cache", async () => {
+		const data = auditLogData();
+		data.threads = [
+			{ id: "thread-1", type: DiscordChannelTypes.PUBLIC_THREAD, name: "thread" } as DiscordChannel,
+		];
+		vi.spyOn(client.rest, "get").mockResolvedValue(data);
+
+		await guild.fetchAuditLogs();
+
+		expect(guild.channels.get("thread-1")).toBeInstanceOf(GuildThreadChannel);
+	});
+
+	it("fetchAuditLogs() does not throw and returns empty arrays when no related entities are referenced", async () => {
+		vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
+
+		const result = await guild.fetchAuditLogs();
+
+		expect(result.users).toEqual([]);
+		expect(result.threads).toEqual([]);
+		expect(result.audit_log_entries).toHaveLength(1);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -256,6 +374,21 @@ describe("GuildTextChannel action methods", () => {
 
 		expect(spy).toHaveBeenCalledOnce();
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
+	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
+		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
+		const originalManager = channel.permission_overwrites;
+
+		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
+
+		expect(channel.permission_overwrites).toBe(originalManager);
+		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact API field names in body", async () => {
@@ -318,6 +451,11 @@ describe("GuildAnnouncementChannel action methods", () => {
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
 	});
 
+	it("patch() (via Moveable/PermissionOverwrites, inherited from GuildTextChannel) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
 	it("modify() sends PATCH with exact API field names in body (same shape as text channel)", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
@@ -370,6 +508,21 @@ describe("GuildCategoryChannel action methods", () => {
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
 	});
 
+	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
+	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
+		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
+		const originalManager = channel.permission_overwrites;
+
+		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
+
+		expect(channel.permission_overwrites).toBe(originalManager);
+		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+	});
+
 	it("modify() sends PATCH with only name/position/permission_overwrites — no parent_id", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
@@ -408,6 +561,21 @@ describe("GuildForumChannel action methods", () => {
 		await channel.delete();
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
+	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
+		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
+		const originalManager = channel.permission_overwrites;
+
+		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
+
+		expect(channel.permission_overwrites).toBe(originalManager);
+		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact forum-specific API field names", async () => {
@@ -451,6 +619,33 @@ describe("GuildStageChannel action methods", () => {
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
 	});
 
+	it("patch() (via Moveable/PermissionOverwrites, inherited from GuildVoiceChannel) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
+	it("patch() sets topic from the payload (non-null assertion — always present for stage channels)", () => {
+		expect(channel.topic).toBeNull();
+
+		channel.patch({
+			id: channel.id, type: channel.type, position: 0, permission_overwrites: [], topic: "live now",
+		});
+
+		expect(channel.topic).toBe("live now");
+	});
+
+	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
+		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
+		const originalManager = channel.permission_overwrites;
+
+		channel.patch({
+			id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite], topic: channel.topic,
+		});
+
+		expect(channel.permission_overwrites).toBe(originalManager);
+		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+	});
+
 	it("modify() sends PATCH with topic but no video_quality_mode/user_limit", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
@@ -482,6 +677,21 @@ describe("GuildVoiceChannel action methods", () => {
 		await channel.delete();
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`);
+	});
+
+	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
+		expect(channel.position).toBe(0);
+		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+	});
+
+	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
+		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
+		const originalManager = channel.permission_overwrites;
+
+		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
+
+		expect(channel.permission_overwrites).toBe(originalManager);
+		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact voice-specific API field names", async () => {
