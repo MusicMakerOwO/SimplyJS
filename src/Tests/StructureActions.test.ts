@@ -429,6 +429,56 @@ describe("GuildTextChannel action methods", () => {
 	it("send() throws when content is empty", async () => {
 		await expect(channel.send({ content: "" })).rejects.toThrow("Cannot send an empty message");
 	});
+
+	it("deleteMessage() accepts an ID or a Message and sends the audit log reason as a header", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await channel.deleteMessage("msg-9");
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages/msg-9`, undefined);
+
+		await channel.deleteMessage(new Message(client, messageData()), "spam");
+		const [route, headers] = spy.mock.calls[1]!;
+		expect(route).toBe(`/channels/${channel.id}/messages/msg-1`);
+		expect(headers).toEqual({ "X-Audit-Log-Reason": "spam" });
+	});
+
+	it("bulkDeleteMessages() posts unique IDs to the bulk-delete route", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		const deleted = await channel.bulkDeleteMessages([
+			"msg-1",
+			new Message(client, { ...messageData(), id: "msg-2" }),
+			"msg-1"
+		], "cleanup");
+
+		expect(deleted).toEqual(["msg-1", "msg-2"]);
+		expect(spy).toHaveBeenCalledWith(
+			`/channels/${channel.id}/messages/bulk-delete`,
+			{ messages: ["msg-1", "msg-2"] },
+			{ "X-Audit-Log-Reason": "cleanup" }
+		);
+	});
+
+	it("bulkDeleteMessages() falls back to a single delete for one message", async () => {
+		const postSpy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+		const deleteSpy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		const deleted = await channel.bulkDeleteMessages(["msg-1", "msg-1"]);
+
+		expect(deleted).toEqual(["msg-1"]);
+		expect(postSpy).not.toHaveBeenCalled();
+		expect(deleteSpy).toHaveBeenCalledWith(`/channels/${channel.id}/messages/msg-1`, undefined);
+	});
+
+	it("bulkDeleteMessages() rejects empty and oversized batches", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		await expect(channel.bulkDeleteMessages([])).rejects.toThrow("Cannot bulk delete without any messages");
+		await expect(
+			channel.bulkDeleteMessages(Array.from({ length: 101 }, (_, index) => `msg-${index}`))
+		).rejects.toThrow("Cannot bulk delete more than 100 messages at once, received 101");
+		expect(spy).not.toHaveBeenCalled();
+	});
 });
 
 describe("GuildAnnouncementChannel action methods", () => {
