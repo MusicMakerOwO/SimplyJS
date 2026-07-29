@@ -9,10 +9,13 @@ import { Sticker } from "../Structures/Sticker.js";
 import { Member } from "../Structures/Member.js";
 import { Message } from "../Structures/Message.js";
 import { User } from "../Structures/User.js";
+import { Invite } from "../Structures/index.js";
 import {
+	DiscordChannel,
 	DiscordChannelTypes,
 	DiscordEmoji,
 	DiscordGuild,
+	DiscordInvite, DiscordInviteTypes,
 	DiscordMember,
 	DiscordRole,
 	DiscordSticker,
@@ -1620,6 +1623,163 @@ describe("User.send() DM flow", () => {
 
 			const [route] = spy.mock.calls[0]!;
 			expect(route).toBe(`/guilds/${guild.id}/bans`);
+			expect(route).not.toContain("?");
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// Guild Invites
+	// ---------------------------------------------------------------------------
+
+	function inviteData(code = "test-code"): DiscordInvite {
+		return {
+			type: DiscordInviteTypes.GUILD,
+			code: code,
+			channel: {} as DiscordChannel,
+			expires_at: null
+		};
+	}
+
+	describe("Guild.invites manager action methods", () => {
+		let client: Client;
+		let guild: Guild;
+		let channel: GuildTextChannel;
+
+		beforeEach(() => {
+			client = makeClient();
+			guild = makeGuildStructure(client);
+			channel = makeTextChannel(client, guild);
+			guild.channels.set(channel.id, channel);
+			vi.restoreAllMocks();
+		});
+
+		it("create() calls POST /channels/:channelId/invites with exact options", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData("new-code"));
+
+			await guild.invites.create(channel.id, { max_age: 3600, max_uses: 5 });
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(
+				`/channels/${channel.id}/invites`,
+				{ max_age: 3600, max_uses: 5 }
+			);
+		});
+
+		it("create() returns an Invite instance", async () => {
+			vi.spyOn(client.rest, "post").mockResolvedValue(inviteData("code-1"));
+
+			const result = await guild.invites.create(channel.id, { max_age: 86400 });
+
+			expect(result).toBeInstanceOf(Invite);
+		});
+
+		it("create() throws when channel does not exist in guild", async () => {
+			await expect(
+				guild.invites.create("unknown-channel", { max_age: 3600 })
+			).rejects.toThrow("Unknown channel, does that channel exist in this guild?");
+		});
+
+		it("create() sends all provided options in API body", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData());
+
+			await guild.invites.create(channel.id, {
+				max_age: 7200,
+				max_uses: 10,
+				temporary: true,
+				unique: true,
+				target_type: 1,
+				target_user_id: "user-123",
+			});
+
+			const [, body] = spy.mock.calls[0]!;
+			expect(body).toEqual({
+				max_age: 7200,
+				max_uses: 10,
+				temporary: true,
+				unique: true,
+				target_type: 1,
+				target_user_id: "user-123",
+			});
+		});
+
+		it("create() with only max_age option sends just that field", async () => {
+			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData());
+
+			await guild.invites.create(channel.id, { max_age: 3600 });
+
+			const [, body] = spy.mock.calls[0]!;
+			expect(body).toEqual({ max_age: 3600 });
+		});
+
+		it("delete() calls DELETE /guilds/:guildId/invites/:code with empty headers when no reason", async () => {
+			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+			await guild.invites.delete("test-code");
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/invites/test-code`, {});
+		});
+
+		it("delete() sends X-Audit-Log-Reason header when reason is provided", async () => {
+			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+			await guild.invites.delete("spam-code", "spam invite");
+
+			expect(spy).toHaveBeenCalledWith(
+				`/guilds/${guild.id}/invites/spam-code`,
+				{ "X-Audit-Log-Reason": "spam invite" }
+			);
+		});
+
+		it("fetch() with code calls GET /guilds/:guildId/invites/:code and returns a single Invite", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue(inviteData("test-code"));
+
+			const result = await guild.invites.fetch("test-code");
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/invites/test-code`);
+			expect(result).toBeInstanceOf(Invite);
+		});
+
+		it("fetch() without arguments calls GET /guilds/:guildId/invites and returns an array", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([
+				inviteData("code-1"),
+				inviteData("code-2"),
+			]);
+
+			const result = await guild.invites.fetch();
+
+			expect(spy).toHaveBeenCalledOnce();
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/invites`);
+			expect(Array.isArray(result)).toBe(true);
+			expect(result).toHaveLength(2);
+		});
+
+		it("fetch() returns array with Invite instances instead of raw DiscordInvite", async () => {
+			vi.spyOn(client.rest, "get").mockResolvedValue([inviteData("code-1")]);
+
+			const result = await guild.invites.fetch();
+
+			expect(result[0]).toBeInstanceOf(Invite);
+			expect(result[0].code).toBe("code-1");
+		});
+
+		it("fetch() with code returns a single Invite instance", async () => {
+			vi.spyOn(client.rest, "get").mockResolvedValue(inviteData("single-code"));
+
+			const result = await guild.invites.fetch("single-code");
+
+			expect(result).toBeInstanceOf(Invite);
+			expect((result as Invite).code).toBe("single-code");
+		});
+
+		it("fetch() without arguments does not include query parameters", async () => {
+			const spy = vi.spyOn(client.rest, "get").mockResolvedValue([]);
+
+			await guild.invites.fetch();
+
+			const [route] = spy.mock.calls[0]!;
+			expect(route).toBe(`/guilds/${guild.id}/invites`);
 			expect(route).not.toContain("?");
 		});
 	});
