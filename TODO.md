@@ -3,11 +3,11 @@
 ## Active backlog
 
 ### Permissions
-- [ ] Finish incorporating `src/Permissions/Resolver.ts`
-  - [ ] `Member.hasPermission(permission): boolean`
-  - [ ] `Member.permissions(): BitField<Permissions>`
-  - [ ] `Member.hasPermissionsIn(channel): boolean`
-  - [ ] `Member.permissionsIn(channel): BitField<Permissions>`
+- [x] Finish incorporating `src/Permissions/Resolver.ts`
+  - [x] `Member.hasPermission(permission): boolean`
+  - [x] `Member.permissions(): BitField<Permissions>`
+  - [x] `Member.hasPermissionsIn(channel): boolean`
+  - [x] `Member.permissionsIn(channel): BitField<Permissions>`
   - Should permission functions be included on guilds and channels too?
 
 
