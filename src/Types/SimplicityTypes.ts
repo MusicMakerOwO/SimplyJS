@@ -32,6 +32,14 @@ export type Channel =
 	| GuildThreadChannel
 	| BaseChannel
 
+/** The channels a message can actually live in - i.e. every channel exposing `send()` */
+export type MessageableChannel =
+	| GuildAnnouncementChannel
+	| GuildTextChannel
+	| GuildVoiceChannel
+	| GuildStageChannel
+	| GuildThreadChannel
+
 export type MessageDeletePayload = {
 	id: string;
 	channel_id: string;

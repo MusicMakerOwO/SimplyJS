@@ -1,8 +1,10 @@
-import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata } from "../../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { Messageable } from "../Mixins/Channels/Messageable.js";
 
 export class GuildThreadChannel extends Messageable(BaseChannel) {
+	declare type: typeof DiscordChannelTypes.ANNOUNCEMENT_THREAD | typeof DiscordChannelTypes.PUBLIC_THREAD | typeof DiscordChannelTypes.PRIVATE_THREAD
+
 	owner_id?: string
 	parent_id?: string | null
 	last_message_id?: string | null

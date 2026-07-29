@@ -1,3 +1,4 @@
+import { DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { Message } from "../Message.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { GuildTextChannel } from "./GuildTextChannel.js";
@@ -7,6 +8,8 @@ import { GuildTextChannel } from "./GuildTextChannel.js";
  * with one extra ability: crossposting a message to following servers
  */
 export class GuildAnnouncementChannel extends GuildTextChannel {
+	declare type: typeof DiscordChannelTypes.GUILD_ANNOUNCEMENT
+
 	/**
 	 * Crossposts a message to all servers following this announcement channel.
 	 * @param messageId The ID of the message to crosspost.

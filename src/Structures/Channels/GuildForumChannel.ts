@@ -1,12 +1,13 @@
 import {
 	DiscordChannel, DiscordDefaultReaction, DiscordForumLayoutTypes,
-	DiscordForumTag, DiscordOverwrite, DiscordSortOrderTypes
-} from "../../Types/DiscordAPITypes.js";
+	DiscordForumTag, DiscordOverwrite, DiscordSortOrderTypes, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../../Types/HelperTypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildForumChannel extends BaseChannel {
+	declare type: typeof DiscordChannelTypes.GUILD_FORUM | typeof DiscordChannelTypes.GUILD_MEDIA
+
 	position?: number
 	permission_overwrites?: ChannelPermissionManager
 	topic?: string | null

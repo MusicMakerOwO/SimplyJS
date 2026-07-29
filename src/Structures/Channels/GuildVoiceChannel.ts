@@ -1,9 +1,12 @@
-import { DiscordChannel, DiscordOverwrite, DiscordVideoQualityModes } from "../../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite, DiscordVideoQualityModes, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../../Types/HelperTypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
+import { Messageable } from "../Mixins/Channels/Messageable.js";
 
-export class GuildVoiceChannel extends BaseChannel {
+export class GuildVoiceChannel extends Messageable(BaseChannel) {
+	declare type: typeof DiscordChannelTypes.GUILD_VOICE | typeof DiscordChannelTypes.GUILD_STAGE_VOICE
+
 	position?: number
 	permission_overwrites?: ChannelPermissionManager
 	bitrate?: number

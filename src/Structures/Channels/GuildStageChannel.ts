@@ -1,4 +1,4 @@
-import { DiscordChannel, DiscordOverwrite } from "../../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { GuildVoiceChannel } from "./GuildVoiceChannel.js";
 
 /**
@@ -6,6 +6,8 @@ import { GuildVoiceChannel } from "./GuildVoiceChannel.js";
  * (the live stage subject) and no video quality mode
  */
 export class GuildStageChannel extends GuildVoiceChannel {
+	declare type: typeof DiscordChannelTypes.GUILD_STAGE_VOICE
+
 	topic?: string | null
 
 	patch(data: DiscordChannel): void {

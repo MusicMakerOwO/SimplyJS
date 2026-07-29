@@ -462,10 +462,6 @@ describe("GuildStageChannel action methods", () => {
 			bitrate: 64_000,
 		});
 	});
-
-	it("does not expose a send() method", () => {
-		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
-	});
 });
 
 describe("GuildVoiceChannel action methods", () => {
@@ -499,10 +495,6 @@ describe("GuildVoiceChannel action methods", () => {
 			user_limit: 10,
 			rtc_region: "us-west",
 		});
-	});
-
-	it("does not expose a send() method", () => {
-		expect((channel as unknown as { send?: unknown }).send).toBeUndefined();
 	});
 });
 

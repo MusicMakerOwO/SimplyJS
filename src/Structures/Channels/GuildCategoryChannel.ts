@@ -1,8 +1,10 @@
-import { DiscordChannel, DiscordOverwrite } from "../../Types/DiscordAPITypes.js";
+import { DiscordChannel, DiscordOverwrite, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildCategoryChannel extends BaseChannel {
+	declare type: typeof DiscordChannelTypes.GUILD_CATEGORY
+
 	position?: number
 	permission_overwrites?: ChannelPermissionManager
 	// no parent_id - categories can't be nested
