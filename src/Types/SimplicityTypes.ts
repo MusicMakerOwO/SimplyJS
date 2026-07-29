@@ -1,4 +1,5 @@
 import type {
+	DiscordAuditLogEntry,
 	DiscordChannel,
 	DiscordEmoji,
 	DiscordGuild,
@@ -201,6 +202,12 @@ export const ClientEvents = {
 	 */
 	GuildBanRemove: "GuildBanRemove",
 
+	/**
+	 * Fired when an audit log entry is created in a guild.
+	 * Listener arguments: `guild` ({@link Guild}), `entry` ({@link DiscordAuditLogEntry}).
+	 */
+	AuditLogEntryCreate: "AuditLogEntryCreate",
+
 } as const;
 
 export type ClientEventMap = {
@@ -261,4 +268,6 @@ export type ClientEventMap = {
 
 	[ClientEvents.GuildBanAdd]: [guild: Guild, user: User];
 	[ClientEvents.GuildBanRemove]: [guild: Guild, user: User];
+
+	[ClientEvents.AuditLogEntryCreate]: [guild: Guild, entry: DiscordAuditLogEntry];
 };

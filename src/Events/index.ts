@@ -7,4 +7,6 @@ export { ReactionAdd, ReactionRemove } from "./Reactions.js";
 export { EmojisUpdate } from "./Emojis.js";
 export { StickersUpdate } from "./Stickers.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
+export { GuildBanAdd, GuildBanRemove } from "./Bans.js";
+export { AuditLogEntryCreate } from "./AuditLogs.js";
 export { Ready } from "./Ready.js";

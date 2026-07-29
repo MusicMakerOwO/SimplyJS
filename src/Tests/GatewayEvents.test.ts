@@ -16,6 +16,8 @@ import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.
 import { Ready } from "../Events/Ready.js";
 import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
 import { GuildBanAdd, GuildBanRemove } from "../Events/Bans.js";
+import { AuditLogEntryCreate } from "../Events/AuditLogs.js";
+import { DiscordAuditLogEvent } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplicityTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
@@ -541,6 +543,47 @@ describe("Gateway event handlers mutate caches", () => {
 			expect.objectContaining({ id: guildPayload.id }),
 			expect.objectContaining({ id: bannedUser.id })
 		);
+	});
+
+	it("AuditLogEntryCreate emits the entry without the guild_id field", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildModeration });
+		const emitSpy = vi.spyOn(client, "emit");
+		const guildPayload = createGuild();
+
+		await GuildCreate.handler(client, guildPayload);
+		await AuditLogEntryCreate.handler(client, {
+			guild_id: guildPayload.id,
+			id: "entry-1",
+			target_id: "user-1",
+			user_id: "mod-1",
+			action_type: DiscordAuditLogEvent.MEMBER_KICK,
+			reason: "spam"
+		});
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.AuditLogEntryCreate);
+		expect(call?.[1].id).toBe(guildPayload.id);
+		expect(call?.[2]).toEqual({
+			id: "entry-1",
+			target_id: "user-1",
+			user_id: "mod-1",
+			action_type: DiscordAuditLogEvent.MEMBER_KICK,
+			reason: "spam"
+		});
+	});
+
+	it("AuditLogEntryCreate ignores entries for uncached guilds", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildModeration });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await AuditLogEntryCreate.handler(client, {
+			guild_id: "unknown-guild",
+			id: "entry-1",
+			target_id: null,
+			user_id: null,
+			action_type: DiscordAuditLogEvent.MEMBER_KICK
+		});
+
+		expect(emitSpy.mock.calls.find(([event]) => event === ClientEvents.AuditLogEntryCreate)).toBeUndefined();
 	});
 
 	it("GuildBanRemove upserts user to cache and emits GuildBanRemove event", async () => {
