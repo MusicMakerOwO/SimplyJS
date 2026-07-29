@@ -155,13 +155,8 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	 * `deleteMessageSeconds` defaults to `0`, which keeps existing message history.
 	 * @param options Ban options including delete window and optional audit log reason.
 	 */
-	async ban(options: { deleteMessageSeconds?: number, reason?: string } = {}): Promise<void> {
-		await this.client.rest.put(`/guilds/${this.guild.id}/bans/${this.user.id}`, {
-			delete_message_seconds: options.deleteMessageSeconds ?? 0,
-		}, options.reason
-			? { "X-Audit-Log-Reason": options.reason }
-			: {}
-		);
+	async ban(options: { delete_message_seconds?: number, reason?: string } = {}): Promise<void> {
+		await this.guild.bans.create(this.user.id, options);
 	}
 
 	/**

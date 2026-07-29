@@ -1102,16 +1102,14 @@ describe("Member action methods", () => {
 		});
 	});
 
-	it("ban() sends exact API body: delete_message_seconds (snake_case) and no camelCase", async () => {
+	it("ban() sends exact API body: delete_message_seconds (snake_case)", async () => {
 		const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
-		await member.ban({ deleteMessageSeconds: 86400, reason: "spam" });
+		await member.ban({ delete_message_seconds: 86400, reason: "spam" });
 
 		const [route, body, headers] = spy.mock.calls[0]! as [string, Record<string, unknown>, Record<string, string>];
 		expect(route).toBe(`/guilds/${guild.id}/bans/${member.user.id}`);
-		// API field is snake_case — camelCase input must be converted
 		expect(body).toEqual({ delete_message_seconds: 86400 });
-		expect("deleteMessageSeconds" in body).toBe(false);
 		expect(headers).toEqual({ "X-Audit-Log-Reason": "spam" });
 	});
 
@@ -1127,7 +1125,7 @@ describe("Member action methods", () => {
 	it("ban() sends empty headers object when no reason provided", async () => {
 		const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
-		await member.ban({ deleteMessageSeconds: 0 });
+		await member.ban({ delete_message_seconds: 0 });
 
 		const [,, headers] = spy.mock.calls[0]!;
 		expect(headers).toEqual({});
@@ -1471,40 +1469,41 @@ describe("User.send() DM flow", () => {
 			vi.restoreAllMocks();
 		});
 
-		it("create() calls POST /guilds/:guildId/bans/:userId with empty headers when no reason", async () => {
-			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+		it("create() calls PUT /guilds/:guildId/bans/:userId with empty headers when no reason", async () => {
+			const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
 			await guild.bans.create("user-1");
 
 			expect(spy).toHaveBeenCalledOnce();
-			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-1`, {});
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/user-1`, { delete_message_seconds: 0 }, {});
 		});
 
 		it("create() accepts a User object and extracts the ID", async () => {
-			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+			const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 			const user = makeUser(client, "user-2");
 
 			await guild.bans.create(user);
 
-			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-2`, {});
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/user-2`, { delete_message_seconds: 0 }, {});
 		});
 
 		it("create() accepts a DiscordUser object and extracts the ID", async () => {
-			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+			const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 			const discordUser: DiscordUser = userData("user-3");
 
 			await guild.bans.create(discordUser);
 
-			expect(spy).toHaveBeenCalledWith(`/guild/${guild.id}/bans/user-3`, {});
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/user-3`, { delete_message_seconds: 0 }, {});
 		});
 
 		it("create() sends X-Audit-Log-Reason header when reason is provided", async () => {
-			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+			const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
-			await guild.bans.create("user-1", "spam and harassment");
+			await guild.bans.create("user-1", { reason: "spam and harassment" });
 
 			expect(spy).toHaveBeenCalledWith(
-				`/guild/${guild.id}/bans/user-1`,
+				`/guilds/${guild.id}/bans/user-1`,
+				{ delete_message_seconds: 0 },
 				{ "X-Audit-Log-Reason": "spam and harassment" }
 			);
 		});

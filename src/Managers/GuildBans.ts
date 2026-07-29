@@ -11,9 +11,15 @@ export class GuildBanManager {
 		this.guild = guild;
 	}
 
-	async create(user: User | DiscordUser | string, reason?: string): Promise<void> {
+	async create(user: User | DiscordUser | string, options: { delete_message_seconds?: number, reason?: string } = {}): Promise<void> {
 		const userID = typeof user === 'object' ? user.id : user;
-		await this.client.rest.post(`/guild/${this.guild.id}/bans/${userID}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
+		await this.client.rest.put(
+			`/guilds/${this.guild.id}/bans/${userID}`,
+			{
+				delete_message_seconds: options.delete_message_seconds ?? 0
+			},
+			options.reason ? { 'X-Audit-Log-Reason': options.reason } : {}
+		);
 	}
 
 	async delete(reason?: string): Promise<void> {
