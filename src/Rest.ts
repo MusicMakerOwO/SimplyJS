@@ -1,4 +1,4 @@
-import { JSONObject } from "./Types/Internal.js";
+import { JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 
 const DISCORD_API_BASE = "https://discord.com/api/v9";
@@ -172,7 +172,7 @@ export class Rest {
 	async #request<T>(
 		method: RestMethod,
 		route: string,
-		data: JSONObject | null,
+		data: JSONObject | JSONArray | null,
 		options: RestRequestOptions = {}
 	): Promise<T> {
 		this.isAuthenticated();
@@ -245,12 +245,12 @@ export class Rest {
 	}
 
 	/** Sends a POST request to the provided path. This can only be used for discord requests */
-	post<T>(path: string, data: JSONObject, headers?: Record<string, string>): Promise<T> {
+	post<T>(path: string, data: JSONObject | JSONArray, headers?: Record<string, string>): Promise<T> {
 		return this.#request<T>("POST", path, data, headers ? { headers } : {});
 	}
 
 	/** Sends a PATCH request to the provided path. This can only be used for discord requests */
-	patch<T>(path: string, data: JSONObject | null, headers?: Record<string, string>): Promise<T> {
+	patch<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>): Promise<T> {
 		return this.#request<T>("PATCH", path, data, headers ? { headers } : {});
 	}
 
@@ -260,7 +260,7 @@ export class Rest {
 	}
 
 	/** Sends a PUT request to the provided path. This can only be used for discord requests */
-	put<T>(path: string, data: JSONObject | null, headers?: Record<string, string>): Promise<T> {
+	put<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>): Promise<T> {
 		return this.#request<T>("PUT", path, data, headers ? { headers } : {});
 	}
 }

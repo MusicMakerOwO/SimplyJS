@@ -21,7 +21,8 @@ export function defineEvent<
 }
 
 export type JSONValue = string | number | boolean | null | JSONValue[] | { [key: string]: JSONValue };
-export type JSONObject = Record<string, JSONValue> | JSONValue[];
+export type JSONObject = Record<string, JSONValue>;
+export type JSONArray = JSONValue[];
 
 export type MessagePayload = {
 	content?: string;
