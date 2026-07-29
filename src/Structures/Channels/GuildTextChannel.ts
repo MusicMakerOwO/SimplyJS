@@ -1,6 +1,6 @@
 import { DiscordChannel, DiscordOverwrite, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
-import { Messageable } from "../Mixins/Channels/Messageable.js";
+import { Messageable } from "../../Mixins/Channels/Messageable.js";
 import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
 
 export class GuildTextChannel extends Messageable(BaseChannel) {

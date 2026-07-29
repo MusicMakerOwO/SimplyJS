@@ -2,7 +2,7 @@ import { DiscordChannel, DiscordOverwrite, DiscordVideoQualityModes, DiscordChan
 import { ObjectValues } from "../../Types/HelperTypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
-import { Messageable } from "../Mixins/Channels/Messageable.js";
+import { Messageable } from "../../Mixins/Channels/Messageable.js";
 
 export class GuildVoiceChannel extends Messageable(BaseChannel) {
 	declare type: typeof DiscordChannelTypes.GUILD_VOICE | typeof DiscordChannelTypes.GUILD_STAGE_VOICE
