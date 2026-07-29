@@ -1,9 +1,6 @@
 import { ClientEvents } from "../../../dist/index.js";
-import { EventHandler } from "../types.js";
+import { createEvent } from "../types.js";
 
-export default {
-	name: ClientEvents.Ready,
-	execute(client, user) {
-		console.log(`[ready] Logged in as ${user.username}`);
-	}
-} as EventHandler<typeof ClientEvents.Ready>;
+export default createEvent(ClientEvents.Ready, (client, user) => {
+	console.log(`[ready] Logged in as ${user.username}`);
+});
