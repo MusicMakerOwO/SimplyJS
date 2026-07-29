@@ -5,16 +5,20 @@ import { Messageable } from "../../Mixins/Channels/Messageable.js";
 export class GuildThreadChannel extends Messageable(BaseChannel) {
 	declare type: typeof DiscordChannelTypes.ANNOUNCEMENT_THREAD | typeof DiscordChannelTypes.PUBLIC_THREAD | typeof DiscordChannelTypes.PRIVATE_THREAD
 
-	owner_id?: string
-	parent_id?: string | null
-	last_message_id?: string | null
-	message_count?: number
-	member_count?: number
-	thread_metadata?: DiscordThreadMetadata
-	member?: DiscordThreadMember
-	total_message_sent?: number
-	applied_tags?: string[]
-	rate_limit_per_user?: number
+	// `declare` avoids emitting a field initializer — with useDefineForClassFields (target
+	// es2022+), an emitted initializer would run after super() and wipe the value patch() just
+	// set during construction (patch() is invoked from BaseChannel's constructor, further up
+	// the super() chain than this class's own field declarations).
+	declare owner_id?: string
+	declare parent_id?: string | null
+	declare last_message_id?: string | null
+	declare message_count?: number
+	declare member_count?: number
+	declare thread_metadata?: DiscordThreadMetadata
+	declare member?: DiscordThreadMember
+	declare total_message_sent?: number
+	declare applied_tags?: string[]
+	declare rate_limit_per_user?: number
 	// no permission_overwrites - threads inherit from parent
 
 	patch(data: DiscordChannel): void {

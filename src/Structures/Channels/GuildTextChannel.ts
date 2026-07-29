@@ -1,25 +1,26 @@
 import { DiscordChannel, DiscordOverwrite, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { Messageable } from "../../Mixins/Channels/Messageable.js";
-import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManager.js";
+import { Moveable } from "../../Mixins/Channels/Moveable.js";
+import { PermissionOverwrites } from "../../Mixins/Channels/PermissionOverwrites.js";
 
-export class GuildTextChannel extends Messageable(BaseChannel) {
+export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(BaseChannel))) {
 	declare type: typeof DiscordChannelTypes.GUILD_TEXT | typeof DiscordChannelTypes.GUILD_ANNOUNCEMENT
 
-	position?: number
-	permission_overwrites?: ChannelPermissionManager
-	topic?: string | null
-	nsfw?: boolean
-	last_message_id?: string | null
-	rate_limit_per_user?: number
-	parent_id?: string | null
-	last_pin_timestamp?: string | null
-	default_auto_archive_duration?: number
+	// `declare` avoids emitting a field initializer — with useDefineForClassFields (target
+	// es2022+), an emitted initializer would run after super() and wipe the value patch() just
+	// set during construction (patch() is invoked from BaseChannel's constructor, further up
+	// the super() chain than this class's own field declarations).
+	declare topic?: string | null
+	declare nsfw?: boolean
+	declare last_message_id?: string | null
+	declare rate_limit_per_user?: number
+	declare parent_id?: string | null
+	declare last_pin_timestamp?: string | null
+	declare default_auto_archive_duration?: number
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
-		if (data.position !== undefined) this.position = data.position;
-		if (data.permission_overwrites !== undefined) this.permission_overwrites = new ChannelPermissionManager(this.client, this, data.permission_overwrites);
 		if (data.topic !== undefined) this.topic = data.topic;
 		if (data.nsfw !== undefined) this.nsfw = data.nsfw;
 		if (data.last_message_id !== undefined) this.last_message_id = data.last_message_id;

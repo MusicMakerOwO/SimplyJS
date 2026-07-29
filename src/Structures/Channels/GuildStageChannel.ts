@@ -8,11 +8,14 @@ import { GuildVoiceChannel } from "./GuildVoiceChannel.js";
 export class GuildStageChannel extends GuildVoiceChannel {
 	declare type: typeof DiscordChannelTypes.GUILD_STAGE_VOICE
 
-	topic?: string | null
+	// `declare` avoids emitting a field initializer — with useDefineForClassFields (target
+	// es2022+), an emitted initializer would run after super() and wipe the value patch()
+	// just set during construction.
+	declare topic: string | null
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
-		if (data.topic !== undefined) this.topic = data.topic;
+		this.topic = data.topic!;
 	}
 
 	// narrower than GuildVoiceChannel.modify() - no video_quality_mode or user_limit
