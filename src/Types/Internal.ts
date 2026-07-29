@@ -34,3 +34,6 @@ export type MessagePayload = {
 	components?: JSONObject[];
 	sticker_ids?: string[];
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Constructor<T = object> = new (...args: any[]) => T;

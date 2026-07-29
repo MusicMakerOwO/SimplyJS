@@ -1,10 +1,7 @@
 import { BaseChannel } from "../../Structures/Channels/BaseChannel.js";
 import { CreateMessagePayload, Message } from "../../Structures/Message.js";
-import { MessagePayload } from "../../Types/Internal.js";
+import { Constructor, MessagePayload } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Constructor<T = object> = new (...args: any[]) => T;
 
 type MessageableClass<T> = {
 	send(content: string | MessagePayload): Promise<Message>;
