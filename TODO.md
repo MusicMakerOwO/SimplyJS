@@ -25,7 +25,7 @@
 - Invites
   - [x] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
   - [x] `INVITE_CREATE` + `INVITE_DELETE` event handler
-  - [ ] Create GuildInviteManager
+  - [x] Create GuildInviteManager
     - `Guild.invites.create(channel, options?)`
       - https://docs.discord.com/developers/resources/channel#create-channel-invite
     - `Guild.invites.delete(inviteCode, reason?)`
@@ -150,8 +150,8 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 | GUILD_MEMBER_UPDATE               | ✅           |
 | GUILD_MEMBER_REMOVE               | ✅           |
 | GUILD_AUDIT_LOG_ENTRY_CREATE      | ❌           |
-| GUILD_BAN_ADD                     | ❌           |
-| GUILD_BAN_REMOVE                  | ❌           |
+| GUILD_BAN_ADD                     | ✅           |
+| GUILD_BAN_REMOVE                  | ✅           |
 | GUILD_EMOJIS_UPDATE               | ✅           |
 | GUILD_STICKERS_UPDATE             | ✅           |
 | GUILD_SOUNDBOARD_SOUND_CREATE     | ❌           |
@@ -163,8 +163,8 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 | INTEGRATION_UPDATE                | ❌           |
 | INTEGRATION_DELETE                | ❌           |
 | WEBHOOKS_UPDATE                   | ❌           |
-| INVITE_CREATE                     | ❌           |
-| INVITE_DELETE                     | ❌           |
+| INVITE_CREATE                     | ✅           |
+| INVITE_DELETE                     | ✅           |
 | VOICE_CHANNEL_EFFECT_SEND         | ❌           |
 | VOICE_STATE_UPDATE                | ❌           |
 | PRESENCE_UPDATE                   | ❌           |
