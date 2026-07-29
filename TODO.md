@@ -43,13 +43,13 @@
 - [ ] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
   - Include close-code aware backoff, max retries, and clear terminal failure state
 - [ ] Add more examples
-  - [ ] Sending a direct message to a user
-  - [ ] Sending a message in a guild channel
-  - [ ] Replying to a message, with and without pinging the author
-  - [ ] Building and sending an embed with `EmbedBuilder`
+  - [x] Sending a direct message to a user
+  - [x] Sending a message in a guild channel
+  - [x] Replying to a message, with and without pinging the author
+  - [x] Building and sending an embed with `EmbedBuilder`
   - [ ] Reacting to a message and demonstrating emoji handling
-  - [ ] Fetching guilds, users, channels, and members from caches
-  - [ ] Basic moderation example using member actions (`timeout`, `kick`, `ban`)
+  - [x] Fetching guilds, users, channels, and members from caches
+  - [x] Basic moderation example using member actions (`timeout`, `kick`, `ban`)
   - [ ] Role management example: create, modify, and inspect role order
   - [ ] Event logging example that prints a few common gateway events
 - [ ] Add release automation + quality gates
