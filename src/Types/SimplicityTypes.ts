@@ -47,6 +47,12 @@ export type MessageDeletePayload = {
 	guild_id: string | null;
 };
 
+export type MessageDeleteBulkPayload = {
+	ids: string[];
+	channel_id: string;
+	guild_id: string | null;
+};
+
 export type InviteDeletePayload = {
 	channel_id: string;
 	guild_id?: string;
@@ -176,6 +182,11 @@ export const ClientEvents = {
 	 * Listener arguments: `payload` ({@link MessageDeletePayload}).
 	 */
 	MessageDelete: "MessageDelete",
+	/**
+	 * Fired when multiple messages are deleted at once.
+	 * Listener arguments: `payload` ({@link MessageDeleteBulkPayload}).
+	 */
+	MessageDeleteBulk: "MessageDeleteBulk",
 
 	ReactionAdd: "ReactionAdd",
 	ReactionRemove: "ReactionRemove",
@@ -240,6 +251,7 @@ export type ClientEventMap = {
 	[ClientEvents.MessageCreate]: [message: Message];
 	[ClientEvents.MessageUpdate]: [message: Message];
 	[ClientEvents.MessageDelete]: [payload: MessageDeletePayload];
+	[ClientEvents.MessageDeleteBulk]: [payload: MessageDeleteBulkPayload];
 
 	[ClientEvents.ReactionAdd]: [payload: {
 		guild: Guild | { id: string } | null,

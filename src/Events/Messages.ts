@@ -22,6 +22,17 @@ export const MessageDelete = defineEvent({
 	}
 });
 
+export const MessageDeleteBulk = defineEvent({
+	name: GatewayEvents.MessageDeleteBulk,
+	handler: (client, data: {
+		ids: string[],
+		channel_id: string,
+		guild_id: string | null
+	}) => {
+		client.emit(ClientEvents.MessageDeleteBulk, data);
+	}
+});
+
 export const MessageUpdate = defineEvent({
 	name: GatewayEvents.MessageUpdate,
 	handler: (client, data: DiscordMessage & { guild_id: string | null; member?: JSONObject }) => {

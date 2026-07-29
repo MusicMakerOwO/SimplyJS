@@ -12,7 +12,7 @@
 
 
 ### Moderation
-- [ ] Implement more ban controls
+- [x] Implement more ban controls
   - [x] Guild ban manager
     - `Guild.bans.add(userID, reason?)`
       - [x] Update `Member.ban(reason?)` to call this new function 
@@ -21,7 +21,7 @@
   - [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
 - [x] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, named `AuditLogEntryCreate`
 - [x] `Guild.fetchAuditLogs()`, unknown args
-- [ ] `MESSAGE_DELETE_BULK` event
+- [x] `MESSAGE_DELETE_BULK` event
 - [x] `Channel.bulkDeleteMessages(messages, reason?)` — accepts `Message[]` or ID strings
 - [x] `Channel.deleteMessage(message, reason?)`
 - Invites
@@ -173,7 +173,7 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 | MESSAGE_CREATE                    | ✅           |
 | MESSAGE_UPDATE                    | ✅           |
 | MESSAGE_DELETE                    | ✅           |
-| MESSAGE_DELETE_BULK               | ❌           |
+| MESSAGE_DELETE_BULK               | ✅           |
 | MESSAGE_REACTION_ADD              | ✅           |
 | MESSAGE_REACTION_REMOVE           | ✅           |
 | MESSAGE_REACTION_REMOVE_ALL       | ❌           |
