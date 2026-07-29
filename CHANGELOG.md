@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pagination support for fetching bans: `limit`, `before`, and `after` query parameters
 - Comprehensive test coverage for ban events and manager operations
 
+#### Messages
+- `Channel.deleteMessage(message, reason?)` and `Channel.bulkDeleteMessages(messages, reason?)` on the `Messageable` mixin — both accept `Message` instances or raw IDs
+- `bulkDeleteMessages()` de-duplicates IDs, falls back to a single delete for one message, and rejects empty or >100 message batches
+- Test coverage for both delete paths, including audit log reason headers
+
+#### Audit logs
+- `AuditLogEntryCreate` gateway event handler (`src/Events/AuditLogs.ts`) for `GUILD_AUDIT_LOG_ENTRY_CREATE`
+- `ClientEvents.AuditLogEntryCreate` client event, emitting the guild and the raw `DiscordAuditLogEntry`
+- Registered the ban and audit log handlers in `src/Events/index.ts` so the dispatcher actually routes them
+
 #### Channel type hierarchy
 - `BaseChannel` (`src/Structures/BaseChannel.ts`) — new base class for all channel types with shared functionality
 - `GuildTextChannel` (`src/Structures/GuildTextChannel.ts`) — dedicated class for text channels
