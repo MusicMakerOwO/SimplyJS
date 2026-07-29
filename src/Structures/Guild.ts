@@ -1,5 +1,7 @@
 import { Client } from "../Client.js";
 import {
+	DiscordAuditLog,
+	DiscordAuditLogEvent,
 	DiscordChannel,
 	DiscordDefaultMessageNotificationLevels,
 	DiscordExplicitContentFilterLevels,
@@ -171,6 +173,51 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 */
 	async leave(): Promise<void> {
 		await this.client.rest.delete(`/users/@me/guilds/${this.id}`);
+	}
+
+	/**
+	 * Returns an audit log object for the guild. Requires the `VIEW_AUDIT_LOG` permission.
+	 *
+	 * The returned list of audit log entries is ordered based on whether you use `before` or
+	 * `after`. When using `before`, the list is ordered by the audit log entry ID descending
+	 * (newer entries first). If `after` is used, the list is reversed and appears in ascending
+	 * order (older entries first). Omitting both `before` and `after` defaults to before the
+	 * current timestamp and will show the most recent entries in descending order by ID, the
+	 * opposite can be achieved using `after: "0"` (showing oldest entries).
+	 */
+	async fetchAuditLogs(options: {
+		/** Entries from a specific user ID */
+		user_id?: string;
+		/** Entries for a specific audit log event */
+		action_type?: ObjectValues<typeof DiscordAuditLogEvent>;
+		/** Entries with ID less than a specific audit log entry ID */
+		before?: string;
+		/** Entries with ID greater than a specific audit log entry ID */
+		after?: string;
+		/** Maximum number of entries (between 1-100) to return, defaults to 50 */
+		limit?: number;
+	} = {}): Promise<DiscordAuditLog> {
+		const params = new URLSearchParams();
+		if (options.user_id) params.append('user_id', options.user_id);
+		if (options.action_type !== undefined) params.append('action_type', options.action_type.toString());
+		if (options.before) params.append('before', options.before);
+		if (options.after) params.append('after', options.after);
+		if (options.limit) params.append('limit', options.limit.toString());
+		const query = params.toString()
+			? `?${params.toString()}`
+			: '';
+
+		const auditLog = await this.client.rest.get<DiscordAuditLog>(`/guilds/${this.id}/audit-logs${query}`);
+
+		for (const user of auditLog.users) {
+			this.client.users.upsert(user);
+		}
+
+		for (const thread of auditLog.threads) {
+			this.channels.upsert(thread);
+		}
+
+		return auditLog;
 	}
 
 	/**

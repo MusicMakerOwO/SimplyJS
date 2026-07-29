@@ -20,8 +20,9 @@
     - `Guild.bans.fetch(userID)`
   - [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
 - [ ] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, maybe named `AuditLogEntry`?
-- [ ] `Guild.fetchAuditLogs()`, unknown args
+- [x] `Guild.fetchAuditLogs()`, unknown args
 - [ ] `MESSAGE_DELETE_BULK` event
+- [ ] `Channel.bulkDeleteMessages(...)`
 - Invites
   - [x] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
   - [x] `INVITE_CREATE` + `INVITE_DELETE` event handler

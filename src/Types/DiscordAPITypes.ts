@@ -925,3 +925,444 @@ export const DiscordGuildInviteFlags = {
 	/** this invite is a guest invite for a voice channel */
 	IS_GUEST_INVITE: 1 << 0
 } as const;
+
+
+export type DiscordAuditLog = {
+	/** List of application commands referenced in the audit log */
+	// TODO Interactions :(
+	application_commands: JSONObject[];
+	/** List of audit log entries, sorted from most to least recent */
+	audit_log_entries: DiscordAuditLogEntry[];
+	/** List of auto moderation rules referenced in the audit log */
+	auto_moderation_rules: DiscordAutoModerationRule[];
+	/** List of guild scheduled events referenced in the audit log */
+	// TODO Guild events
+	guild_scheduled_events: JSONObject[];
+	/** List of partial integration objects */
+	// TODO Integrations
+	integrations: JSONObject[];
+	/** List of threads referenced in the audit log* */
+	threads: DiscordChannel[];
+	/** List of users referenced in the audit log */
+	users: DiscordUser[];
+	/** List of webhooks referenced in the audit log */
+	webhooks: DiscordWebhook[];
+}
+
+export type DiscordAuditLogEntry = {
+	/** ID of the affected entity (webhook, user, role, etc.) */
+	target_id: string | null;
+	/** Changes made to the target_id */
+	changes?: DiscordAuditLogChange[];
+	/** User or app that made the changes */
+	user_id: string | null;
+	/** ID of the entry */
+	id: string;
+	/** Type of action that occurred */
+	action_type: ObjectValues<typeof DiscordAuditLogEvent>;
+	/** Additional info for certain event types */
+	options?: DiscordAuditEntryInfo;
+	/** Reason for the change (1-512 characters) */
+	reason?: string;
+}
+
+export type DiscordAutoModerationRule = {
+	/** the id of this rule */
+	id: string;
+	/** the id of the guild which this rule belongs to */
+	guild_id: string;
+	/** the rule name */
+	name: string;
+	/** the user which first created this rule */
+	creator_id: string;
+	/** the rule event type */
+	event_type: ObjectValues<typeof DiscordAutoModerationRuleEventType>;
+	/** the rule trigger type */
+	trigger_type: ObjectValues<typeof DiscordAutoModerationRuleTriggerType>;
+	/** the rule trigger metadata */
+	trigger_metadata: DiscordAutoModerationRuleTriggerMetadata;
+	/** the actions which will execute when the rule is triggered */
+	actions: DiscordAutoModerationAction[];
+	/** whether the rule is enabled */
+	enabled: boolean;
+	/** the role ids that should not be affected by the rule (Maximum of 20) */
+	exempt_roles: string[];
+	/** the channel ids that should not be affected by the rule (Maximum of 50) */
+	exempt_channels: string[];
+}
+
+export type DiscordWebhook = {
+	/** the id of the webhook */
+	id: string;
+	/** the type of the webhook */
+	type: ObjectValues<typeof DiscordWebhookType>;
+	/** the guild id this webhook is for, if any */
+	guild_id?: string | null;
+	/** the channel id this webhook is for, if any */
+	channel_id: string | null;
+	/** the user this webhook was created by (not returned when getting a webhook with its token) */
+	user?: DiscordUser;
+	/** the default name of the webhook */
+	name: string | null;
+	/** the default user avatar hash of the webhook */
+	avatar: string | null;
+	/** the secure token of the webhook (returned for Incoming Webhooks) */
+	token?: string;
+	/** the bot/OAuth2 application that created this webhook */
+	application_id: string | null;
+	/** the guild of the channel that this webhook is following (returned for Channel Follower Webhooks) */
+	source_guild?: Partial<DiscordGuild>;
+	/** the channel that this webhook is following (returned for Channel Follower Webhooks) */
+	source_channel?: Partial<DiscordChannel>;
+	/** the url used for executing the webhook (returned by the webhooks OAuth2 flow) */
+	url?: string;
+}
+
+export const DiscordWebhookType = {
+	/** Incoming Webhooks can post messages to channels with a generated token */
+	Incoming: 1,
+	/** Channel Follower Webhooks are internal webhooks used with Channel Following to post new messages into channels */
+	ChannelFollower: 2,
+	/** Application webhooks are webhooks used with Interactions */
+	Application: 3
+} as const;
+
+/**
+ * Many audit log events include a `changes` array in their entry object. The structure for
+ * the individual changes varies based on the event type and its changed objects, so apps
+ * shouldn't depend on a single pattern of handling audit log events.
+ *
+ * If `new_value` is not present in the change object while `old_value` is, it indicates that
+ * the property has been reset or set to null. If `old_value` isn't included, it indicated that
+ * the property was previously null.
+ *
+ * Some events don't follow the same pattern as other audit log events (see
+ * {@link DiscordAuditLogChange} for the general shape). The exceptions are:
+ * - **Command Permission**: the `key` is a snowflake instead of a field name. It represents the
+ *   entity whose command permissions were affected (a role, channel, or user ID). The change
+ *   object's `old_value`/`new_value` are the previous and updated command permissions objects
+ *   for that entity, rather than a single field's value.
+ * - **Invite and Invite Metadata**: uses an additional `channel_id` key (instead of the invite
+ *   object's nested `channel.id`).
+ * - **Partial Role**: uses `$add` and `$remove` as keys instead of field names. When present,
+ *   `new_value` is an array of partial role objects (each containing the role's `id` and `name`)
+ *   describing which roles were added or removed.
+ * - **Webhook**: uses an `avatar_hash` key (instead of `avatar`).
+ */
+export type DiscordAuditLogChange<T extends JSONObject = JSONObject> = {
+	/** New value of the key. Mixed type, matches the changed object field's type. Absent (while `old_value` is present) if the property was reset or set to null */
+	new_value?: T | null;
+	/** Old value of the key. Mixed type, matches the changed object field's type. Absent (while `new_value` is present) if the property was previously null */
+	old_value?: T | null;
+	/** Name of the changed entity, with a few exceptions - see {@link DiscordAuditLogChange} */
+	key: string;
+}
+
+/**
+ * Extra context attached to a {@link DiscordAuditLogEntry}'s `options` field. Which fields are
+ * present depends entirely on the entry's `action_type` (see the per-field docs below for the
+ * relevant {@link DiscordAuditLogEvent} values) - none of these fields are guaranteed for any
+ * given entry.
+ */
+export type DiscordAuditEntryInfo = {
+	/** ID of the app whose permissions were targeted. Present for: `APPLICATION_COMMAND_PERMISSION_UPDATE` */
+	application_id?: string;
+	/** Name of the Auto Moderation rule that was triggered. Present for: `AUTO_MODERATION_BLOCK_MESSAGE`, `AUTO_MODERATION_FLAG_TO_CHANNEL`, `AUTO_MODERATION_USER_COMMUNICATION_DISABLED`, `AUTO_MODERATION_QUARANTINE_USER` */
+	auto_moderation_rule_name?: string;
+	/** Trigger type of the Auto Moderation rule that was triggered. Present for: `AUTO_MODERATION_BLOCK_MESSAGE`, `AUTO_MODERATION_FLAG_TO_CHANNEL`, `AUTO_MODERATION_USER_COMMUNICATION_DISABLED`, `AUTO_MODERATION_QUARANTINE_USER` */
+	auto_moderation_rule_trigger_type?: string;
+	/** Channel in which the entities were targeted. Present for: `MEMBER_MOVE`, `MESSAGE_PIN`, `MESSAGE_UNPIN`, `MESSAGE_DELETE`, `STAGE_INSTANCE_CREATE`, `STAGE_INSTANCE_UPDATE`, `STAGE_INSTANCE_DELETE`, `AUTO_MODERATION_BLOCK_MESSAGE`, `AUTO_MODERATION_FLAG_TO_CHANNEL`, `AUTO_MODERATION_USER_COMMUNICATION_DISABLED`, `AUTO_MODERATION_QUARANTINE_USER`, `VOICE_CHANNEL_STATUS_CREATE`, `VOICE_CHANNEL_STATUS_DELETE` */
+	channel_id?: string;
+	/** Number of entities that were targeted. Present for: `MESSAGE_DELETE`, `MESSAGE_BULK_DELETE`, `MEMBER_DISCONNECT`, `MEMBER_MOVE` */
+	count?: string;
+	/** Number of days after which inactive members were kicked. Present for: `MEMBER_PRUNE` */
+	delete_member_days?: string;
+	/** ID of the overwritten entity. Present for: `CHANNEL_OVERWRITE_CREATE`, `CHANNEL_OVERWRITE_UPDATE`, `CHANNEL_OVERWRITE_DELETE` */
+	id?: string;
+	/** Number of members removed by the prune. Present for: `MEMBER_PRUNE` */
+	members_removed?: string;
+	/** ID of the message that was targeted. Present for: `MESSAGE_PIN`, `MESSAGE_UNPIN` */
+	message_id?: string;
+	/** Name of the role if `type` is "0" (not present if `type` is "1"). Present for: `CHANNEL_OVERWRITE_CREATE`, `CHANNEL_OVERWRITE_UPDATE`, `CHANNEL_OVERWRITE_DELETE` */
+	role_name?: string;
+	/** Type of overwritten entity - role ("0") or member ("1"). Present for: `CHANNEL_OVERWRITE_CREATE`, `CHANNEL_OVERWRITE_UPDATE`, `CHANNEL_OVERWRITE_DELETE` */
+	type?: string;
+	/** The type of integration which performed the action. Present for: `MEMBER_KICK`, `MEMBER_ROLE_UPDATE` */
+	integration_type?: string;
+	/** The new voice channel status. Present for: `VOICE_CHANNEL_STATUS_CREATE` */
+	status?: string;
+}
+
+/**
+ * Lists the audit log events and values (the `action_type` field on a {@link DiscordAuditLogEntry})
+ * that an app may receive. Each value's comment notes which object's values may be included in the
+ * entry's `changes` array. Though there are exceptions (see {@link DiscordAuditLogChange}), possible
+ * keys in the `changes` array typically correspond to the noted object's own fields. If no object is
+ * noted, there won't be a `changes` array in the entry, though other fields like `target_id` still
+ * exist and many have fields in the `options` object (see {@link DiscordAuditEntryInfo}).
+ *
+ * You should assume that your app may run into any field for the changed object, though none are
+ * guaranteed to be present. In most cases only a subset of the object's fields will be in the
+ * `changes` array.
+ *
+ * Object Changed values marked with `*` have exception(s) to their available keys - see
+ * {@link DiscordAuditLogChange} for details.
+ */
+export const DiscordAuditLogEvent = {
+	/** Server settings were updated. Object Changed: Guild */
+	GUILD_UPDATE: 1,
+	/** Channel was created. Object Changed: Channel */
+	CHANNEL_CREATE: 10,
+	/** Channel settings were updated. Object Changed: Channel */
+	CHANNEL_UPDATE: 11,
+	/** Channel was deleted. Object Changed: Channel */
+	CHANNEL_DELETE: 12,
+	/** Permission overwrite was added to a channel. Object Changed: Channel Overwrite */
+	CHANNEL_OVERWRITE_CREATE: 13,
+	/** Permission overwrite was updated for a channel. Object Changed: Channel Overwrite */
+	CHANNEL_OVERWRITE_UPDATE: 14,
+	/** Permission overwrite was deleted from a channel. Object Changed: Channel Overwrite */
+	CHANNEL_OVERWRITE_DELETE: 15,
+	/** Member was removed from server */
+	MEMBER_KICK: 20,
+	/** Members were pruned from server */
+	MEMBER_PRUNE: 21,
+	/** Member was banned from server */
+	MEMBER_BAN_ADD: 22,
+	/** Server ban was lifted for a member */
+	MEMBER_BAN_REMOVE: 23,
+	/** Member was updated in server. Object Changed: Member */
+	MEMBER_UPDATE: 24,
+	/** Member was added or removed from a role. Object Changed: Partial Role* */
+	MEMBER_ROLE_UPDATE: 25,
+	/** Member was moved to a different voice channel */
+	MEMBER_MOVE: 26,
+	/** Member was disconnected from a voice channel */
+	MEMBER_DISCONNECT: 27,
+	/** Bot user was added to server */
+	BOT_ADD: 28,
+	/** Role was created. Object Changed: Role */
+	ROLE_CREATE: 30,
+	/** Role was edited. Object Changed: Role */
+	ROLE_UPDATE: 31,
+	/** Role was deleted. Object Changed: Role */
+	ROLE_DELETE: 32,
+	/** Server invite was created. Object Changed: Invite and Invite Metadata* */
+	INVITE_CREATE: 40,
+	/** Server invite was updated. Object Changed: Invite and Invite Metadata* */
+	INVITE_UPDATE: 41,
+	/** Server invite was deleted. Object Changed: Invite and Invite Metadata* */
+	INVITE_DELETE: 42,
+	/** Webhook was created. Object Changed: Webhook* */
+	WEBHOOK_CREATE: 50,
+	/** Webhook properties or channel were updated. Object Changed: Webhook* */
+	WEBHOOK_UPDATE: 51,
+	/** Webhook was deleted. Object Changed: Webhook* */
+	WEBHOOK_DELETE: 52,
+	/** Emoji was created. Object Changed: Emoji */
+	EMOJI_CREATE: 60,
+	/** Emoji name was updated. Object Changed: Emoji */
+	EMOJI_UPDATE: 61,
+	/** Emoji was deleted. Object Changed: Emoji */
+	EMOJI_DELETE: 62,
+	/** Single message was deleted */
+	MESSAGE_DELETE: 72,
+	/** Multiple messages were deleted */
+	MESSAGE_BULK_DELETE: 73,
+	/** Message was pinned to a channel */
+	MESSAGE_PIN: 74,
+	/** Message was unpinned from a channel */
+	MESSAGE_UNPIN: 75,
+	/** App was added to server. Object Changed: Integration */
+	INTEGRATION_CREATE: 80,
+	/** App was updated (as an example, its scopes were updated). Object Changed: Integration */
+	INTEGRATION_UPDATE: 81,
+	/** App was removed from server. Object Changed: Integration */
+	INTEGRATION_DELETE: 82,
+	/** Stage instance was created (stage channel becomes live). Object Changed: Stage Instance */
+	STAGE_INSTANCE_CREATE: 83,
+	/** Stage instance details were updated. Object Changed: Stage Instance */
+	STAGE_INSTANCE_UPDATE: 84,
+	/** Stage instance was deleted (stage channel no longer live). Object Changed: Stage Instance */
+	STAGE_INSTANCE_DELETE: 85,
+	/** Sticker was created. Object Changed: Sticker */
+	STICKER_CREATE: 90,
+	/** Sticker details were updated. Object Changed: Sticker */
+	STICKER_UPDATE: 91,
+	/** Sticker was deleted. Object Changed: Sticker */
+	STICKER_DELETE: 92,
+	/** Event was created. Object Changed: Guild Scheduled Event */
+	GUILD_SCHEDULED_EVENT_CREATE: 100,
+	/** Event was updated. Object Changed: Guild Scheduled Event */
+	GUILD_SCHEDULED_EVENT_UPDATE: 101,
+	/** Event was cancelled. Object Changed: Guild Scheduled Event */
+	GUILD_SCHEDULED_EVENT_DELETE: 102,
+	/** Thread was created in a channel. Object Changed: Thread */
+	THREAD_CREATE: 110,
+	/** Thread was updated. Object Changed: Thread */
+	THREAD_UPDATE: 111,
+	/** Thread was deleted. Object Changed: Thread */
+	THREAD_DELETE: 112,
+	/** Permissions were updated for a command. Object Changed: Command Permission* */
+	APPLICATION_COMMAND_PERMISSION_UPDATE: 121,
+	/** Soundboard sound was created. Object Changed: Soundboard Sound */
+	SOUNDBOARD_SOUND_CREATE: 130,
+	/** Soundboard sound was updated. Object Changed: Soundboard Sound */
+	SOUNDBOARD_SOUND_UPDATE: 131,
+	/** Soundboard sound was deleted. Object Changed: Soundboard Sound */
+	SOUNDBOARD_SOUND_DELETE: 132,
+	/** Auto Moderation rule was created. Object Changed: Auto Moderation Rule */
+	AUTO_MODERATION_RULE_CREATE: 140,
+	/** Auto Moderation rule was updated. Object Changed: Auto Moderation Rule */
+	AUTO_MODERATION_RULE_UPDATE: 141,
+	/** Auto Moderation rule was deleted. Object Changed: Auto Moderation Rule */
+	AUTO_MODERATION_RULE_DELETE: 142,
+	/** Message was blocked by Auto Moderation */
+	AUTO_MODERATION_BLOCK_MESSAGE: 143,
+	/** Message was flagged by Auto Moderation */
+	AUTO_MODERATION_FLAG_TO_CHANNEL: 144,
+	/** Member was timed out by Auto Moderation */
+	AUTO_MODERATION_USER_COMMUNICATION_DISABLED: 145,
+	/** Member was quarantined by Auto Moderation */
+	AUTO_MODERATION_QUARANTINE_USER: 146,
+	/** Creator monetization request was created */
+	CREATOR_MONETIZATION_REQUEST_CREATED: 150,
+	/** Creator monetization terms were accepted */
+	CREATOR_MONETIZATION_TERMS_ACCEPTED: 151,
+	/** Guild Onboarding Question was created. Object Changed: Onboarding Prompt Structure */
+	ONBOARDING_PROMPT_CREATE: 163,
+	/** Guild Onboarding Question was updated. Object Changed: Onboarding Prompt Structure */
+	ONBOARDING_PROMPT_UPDATE: 164,
+	/** Guild Onboarding Question was deleted. Object Changed: Onboarding Prompt Structure */
+	ONBOARDING_PROMPT_DELETE: 165,
+	/** Guild Onboarding was created. Object Changed: Guild Onboarding */
+	ONBOARDING_CREATE: 166,
+	/** Guild Onboarding was updated. Object Changed: Guild Onboarding */
+	ONBOARDING_UPDATE: 167,
+	/** Guild Server Guide was created */
+	HOME_SETTINGS_CREATE: 190,
+	/** Guild Server Guide was updated */
+	HOME_SETTINGS_UPDATE: 191,
+	/** A voice channel status was set by a user */
+	VOICE_CHANNEL_STATUS_CREATE: 192,
+	/** A voice channel status was deleted by a user */
+	VOICE_CHANNEL_STATUS_DELETE: 193
+} as const;
+
+/**
+ * Indicates in what event context a rule should be checked.
+ */
+export const DiscordAutoModerationRuleEventType = {
+	/** when a member sends or edits a message in the guild */
+	MESSAGE_SEND: 1,
+	/** when a member edits their profile */
+	MEMBER_UPDATE: 2
+} as const;
+
+/**
+ * Characterizes the type of content which can trigger the rule. The comment on each value notes
+ * the maximum number of rules of that trigger type allowed per guild.
+ */
+export const DiscordAutoModerationRuleTriggerType = {
+	/** check if content contains words from a user defined list of keywords. Max per guild: 6 */
+	KEYWORD: 1,
+	/** check if content represents generic spam. Max per guild: 1 */
+	SPAM: 3,
+	/** check if content contains words from internal pre-defined wordsets. Max per guild: 1 */
+	KEYWORD_PRESET: 4,
+	/** check if content contains more unique mentions than allowed. Max per guild: 1 */
+	MENTION_SPAM: 5,
+	/** check if member profile contains words from a user defined list of keywords. Max per guild: 1 */
+	MEMBER_PROFILE: 6
+} as const;
+
+/**
+ * Additional data used to determine whether a rule should be triggered. Different fields are
+ * relevant based on the value of `trigger_type`.
+ *
+ * Field limits:
+ * - `keyword_filter`: max array length 1000, max 60 characters per string. Associated trigger types: `KEYWORD`, `MEMBER_PROFILE`
+ * - `regex_patterns`: max array length 10, max 260 characters per string. Associated trigger types: `KEYWORD`, `MEMBER_PROFILE`
+ * - `allow_list`: max array length 100 (or 1000 for `KEYWORD_PRESET`), max 60 characters per string. Associated trigger types: `KEYWORD`, `MEMBER_PROFILE` (100), `KEYWORD_PRESET` (1000)
+ */
+export type DiscordAutoModerationRuleTriggerMetadata = {
+	/**
+	 * Substrings which will be searched for in content (Maximum of 1000). Associated Trigger Types: `KEYWORD`, `MEMBER_PROFILE`
+	 *
+	 * A keyword can be a phrase which contains multiple words. Wildcard symbols can be used to
+	 * customize how each keyword will be matched. Each keyword must be 60 characters or less.
+	 */
+	keyword_filter?: string[];
+	/**
+	 * Regular expression patterns which will be matched against content (Maximum of 10). Associated Trigger Types: `KEYWORD`, `MEMBER_PROFILE`
+	 *
+	 * Only Rust flavored regex is currently supported, which can be tested in online editors such
+	 * as Rustexp. Each regex pattern must be 260 characters or less.
+	 */
+	regex_patterns?: string[];
+	/** the internally pre-defined wordsets which will be searched for in content. Associated Trigger Types: `KEYWORD_PRESET` */
+	presets?: ObjectValues<typeof DiscordAutoModerationKeywordPresetType>[];
+	/**
+	 * Substrings which should not trigger the rule (Maximum of 100 or 1000). Associated Trigger Types: `KEYWORD`, `KEYWORD_PRESET`, `MEMBER_PROFILE`
+	 *
+	 * Each allow_list keyword can be a phrase which contains multiple words. Wildcard symbols can
+	 * be used to customize how each keyword will be matched. Rules with `KEYWORD` trigger_type
+	 * accept a maximum of 100 keywords. Rules with `KEYWORD_PRESET` trigger_type accept a maximum
+	 * of 1000 keywords.
+	 */
+	allow_list?: string[];
+	/** total number of unique role and user mentions allowed per message (Maximum of 50). Associated Trigger Types: `MENTION_SPAM` */
+	mention_total_limit?: number;
+	/** whether to automatically detect mention raids. Associated Trigger Types: `MENTION_SPAM` */
+	mention_raid_protection_enabled?: boolean;
+}
+
+export type DiscordAutoModerationAction = {
+	/** the type of action */
+	type: ObjectValues<typeof DiscordAutoModerationActionType>;
+	/**
+	 * Additional metadata needed during execution for this specific action type.
+	 *
+	 * Can be omitted based on `type`. See {@link DiscordAutoModerationActionMetadata} to
+	 * understand which `type` values require metadata to be set.
+	 */
+	metadata?: DiscordAutoModerationActionMetadata;
+}
+
+export const DiscordAutoModerationActionType = {
+	/** blocks a member's message and prevents it from being posted. A custom explanation can be specified and shown to members whenever their message is blocked */
+	BLOCK_MESSAGE: 1,
+	/** logs user content to a specified channel */
+	SEND_ALERT_MESSAGE: 2,
+	/**
+	 * timeout user for a specified duration
+	 *
+	 * A TIMEOUT action can only be set up for `KEYWORD` and `MENTION_SPAM` rules. The
+	 * MODERATE_MEMBERS permission is required to use the TIMEOUT action type.
+	 */
+	TIMEOUT: 3,
+	/** prevents a member from using text, voice, or other interactions */
+	BLOCK_MEMBER_INTERACTION: 4
+} as const;
+
+/**
+ * Additional data used when an action is executed. Different fields are relevant based on the
+ * value of `type` on the containing {@link DiscordAutoModerationAction}.
+ */
+export type DiscordAutoModerationActionMetadata = {
+	/** channel to which user content should be logged (must be an existing channel). Associated Action Types: `SEND_ALERT_MESSAGE` */
+	channel_id?: string;
+	/** timeout duration in seconds (maximum of 2419200 seconds / 4 weeks). Associated Action Types: `TIMEOUT` */
+	duration_seconds?: number;
+	/** additional explanation that will be shown to members whenever their message is blocked (maximum of 150 characters). Associated Action Types: `BLOCK_MESSAGE` */
+	custom_message?: string;
+}
+
+export const DiscordAutoModerationKeywordPresetType = {
+	/** words that may be considered forms of swearing or cursing */
+	PROFANITY: 1,
+	/** words that refer to sexually explicit behavior or activity */
+	SEXUAL_CONTENT: 2,
+	/** personal insults or words that may be considered hate speech */
+	SLURS: 3
+} as const;
