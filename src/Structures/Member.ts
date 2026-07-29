@@ -3,6 +3,10 @@ import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
 import { Client } from "../Client.js";
 import { User } from "./User.js";
 import { Guild } from "./Guild.js";
+import { ResolvePermissions, type PermissionResolvable } from "../Permissions/Resolver.js";
+import { BitField } from "../DataStructures/BitField.js";
+import { DiscordPermissions } from "../Constants.js";
+import type { Channel } from "../Types/index.js";
 
 export class Member extends APIGuildStructure<DiscordMember> {
 	/** Backing user for this guild member */
@@ -27,8 +31,6 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	flags!: number
 	/** Whether the member still has membership screening pending */
 	pending?: boolean
-	/** Guild permission bitfield string, when included by the API */
-	permissions?: string
 	/** ISO timestamp when timeout expires, or `null` when not timed out */
 	communication_disabled_until?: string | null
 	/** Avatar decoration metadata for this member profile */
@@ -69,10 +71,6 @@ export class Member extends APIGuildStructure<DiscordMember> {
 			this.pending = data.pending;
 		}
 
-		if ('permissions' in data) {
-			this.permissions = data.permissions;
-		}
-
 		if ('communication_disabled_until' in data) {
 			this.communication_disabled_until = data.communication_disabled_until;
 		}
@@ -88,6 +86,71 @@ export class Member extends APIGuildStructure<DiscordMember> {
 
 	get id(): string {
 		return this.user.id;
+	}
+
+	/**
+	 * Guild-level permissions for this member, with no channel overwrites applied.
+	 *
+	 * Resolved on access from the member's current roles, so the value always reflects
+	 * the live cache rather than a snapshot taken at patch time. Guild owners and members
+	 * with `ADMINISTRATOR` resolve to every permission.
+	 *
+	 * @example
+	 * ```ts
+	 * member.permissions.has("KICK_MEMBERS");
+	 * member.permissions.toString(); // "8"
+	 * ```
+	 */
+	permissions(): BitField<typeof DiscordPermissions> {
+		return ResolvePermissions(this.guild, this);
+	}
+
+	/**
+	 * Resolves this member's effective permissions inside a specific channel, applying the
+	 * channel's `@everyone`, role, and member permission overwrites on top of guild permissions.
+	 *
+	 * @param channel The channel to resolve permissions for.
+	 *
+	 * @example
+	 * ```ts
+	 * member.permissionsIn(channel).has("SEND_MESSAGES");
+	 * ```
+	 */
+	permissionsIn(channel: Channel): BitField<typeof DiscordPermissions> {
+		return ResolvePermissions(this.guild, this, channel);
+	}
+
+	/**
+	 * Tests whether this member has every provided guild-level permission.
+	 *
+	 * Channel overwrites are not considered — use {@link Member.hasPermissionsIn} for that.
+	 *
+	 * @param permissions Permission names and/or raw bit values to test.
+	 *
+	 * @example
+	 * ```ts
+	 * member.hasPermission("BAN_MEMBERS");
+	 * member.hasPermission("KICK_MEMBERS", DiscordPermissions.MANAGE_ROLES);
+	 * ```
+	 */
+	hasPermission(...permissions: PermissionResolvable): boolean {
+		return this.permissions().has(...permissions);
+	}
+
+	/**
+	 * Tests whether this member has every provided permission inside a specific channel,
+	 * with that channel's permission overwrites applied.
+	 *
+	 * @param channel The channel to resolve permissions for.
+	 * @param permissions Permission names and/or raw bit values to test.
+	 *
+	 * @example
+	 * ```ts
+	 * member.hasPermissionsIn(channel, "VIEW_CHANNEL", "SEND_MESSAGES");
+	 * ```
+	 */
+	hasPermissionsIn(channel: Channel, ...permissions: PermissionResolvable): boolean {
+		return this.permissionsIn(channel).has(...permissions);
 	}
 
 	/**

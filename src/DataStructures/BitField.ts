@@ -1,6 +1,6 @@
 import { ObjectValues } from "../Types/index.js";
 
-type FlagInput<FlagMap extends Record<string, bigint>> = Array<keyof FlagMap | ObjectValues<FlagMap>>;
+export type FlagInput<FlagMap extends Record<string, bigint>> = Array<keyof FlagMap | ObjectValues<FlagMap>>;
 type FlagValue = string | number | bigint;
 export type BitFieldValue<FlagMap extends Record<string, bigint>> = string | number | bigint | FlagInput<FlagMap>;
 

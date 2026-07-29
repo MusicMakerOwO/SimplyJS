@@ -16,6 +16,7 @@ import { Member } from "../Structures/Member.js";
 import { ResolvePermissions } from "../Permissions/Resolver.js";
 import { DiscordPermissions } from "../Constants.js";
 import { BitField } from "../DataStructures/BitField.js";
+import { CreateChannel } from "../Factory/CreateChannel.js";
 
 const ALL_PERMISSIONS: bigint = Object.values(DiscordPermissions).reduce((value, permission) => value | permission);
 
@@ -133,8 +134,7 @@ describe("ResolvePermissions", () => {
 			{ id: "guild-1", type: 0, allow: "0", deny: DiscordPermissions.SEND_MESSAGES.toString() },
 		]);
 
-		if (!channel.permission_overwrites) throw new Error("Expected permission_overwrites to exist on test channel");
-		const resolved = ResolvePermissions(guild, member, channel as GuildTextChannel & { permission_overwrites: NonNullable<GuildTextChannel["permission_overwrites"]> });
+		const resolved = ResolvePermissions(guild, member, channel);
 
 		expect(resolved.value).toBe(ALL_PERMISSIONS);
 		expect(resolved.has("SEND_MESSAGES")).toBe(true);
@@ -155,8 +155,7 @@ describe("ResolvePermissions", () => {
 			{ id: "user-1", type: 1, allow: DiscordPermissions.VIEW_CHANNEL.toString(), deny: "0" },
 		]);
 
-		if (!channel.permission_overwrites) throw new Error("Expected permission_overwrites to exist on test channel");
-		const resolved = ResolvePermissions(guild, member, channel as GuildTextChannel & { permission_overwrites: NonNullable<GuildTextChannel["permission_overwrites"]> });
+		const resolved = ResolvePermissions(guild, member, channel);
 
 		expect(resolved.has("VIEW_CHANNEL")).toBe(true);
 		expect(resolved.has("SEND_MESSAGES")).toBe(true);
@@ -177,8 +176,7 @@ describe("ResolvePermissions", () => {
 			{ id: "role-b", type: 0, allow: DiscordPermissions.SEND_MESSAGES.toString(), deny: "0" },
 		]);
 
-		if (!channel.permission_overwrites) throw new Error("Expected permission_overwrites to exist on test channel");
-		const resolved = ResolvePermissions(guild, member, channel as GuildTextChannel & { permission_overwrites: NonNullable<GuildTextChannel["permission_overwrites"]> });
+		const resolved = ResolvePermissions(guild, member, channel);
 
 		expect(resolved.has("SEND_MESSAGES")).toBe(true);
 	});
@@ -191,5 +189,103 @@ describe("ResolvePermissions", () => {
 		const member = makeMember(client, guild, "user-1", ["ghost-role"]);
 
 		expect(() => ResolvePermissions(guild, member)).toThrow("Role does not exist in cache");
+	});
+
+	it("ignores channels that carry no permission overwrite manager", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [makeRole("guild-1", DiscordPermissions.VIEW_CHANNEL)],
+		});
+		const member = makeMember(client, guild, "user-1", []);
+		const channel = CreateChannel(client, guild, { type: DiscordChannelTypes.PUBLIC_THREAD, id: "thread-id" })
+
+		const resolved = ResolvePermissions(guild, member, channel);
+
+		expect(resolved.has("VIEW_CHANNEL")).toBe(true);
+	});
+});
+
+describe("Member permission helpers", () => {
+	it("resolves guild-level permissions through the permissions getter", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [
+				makeRole("guild-1", DiscordPermissions.VIEW_CHANNEL),
+				makeRole("role-mod", DiscordPermissions.KICK_MEMBERS),
+			],
+		});
+		const member = makeMember(client, guild, "user-1", ["role-mod"]);
+
+		expect(member.permissions()).toBeInstanceOf(BitField);
+		expect(member.permissions().value).toBe(ResolvePermissions(guild, member).value);
+		expect(member.permissions().has("VIEW_CHANNEL", "KICK_MEMBERS")).toBe(true);
+		expect(member.permissions().has("BAN_MEMBERS")).toBe(false);
+	});
+
+	it("recomputes permissions when the member's roles change", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [
+				makeRole("guild-1", 0n),
+				makeRole("role-mod", DiscordPermissions.BAN_MEMBERS),
+			],
+		});
+		const member = makeMember(client, guild, "user-1", []);
+
+		expect(member.hasPermission("BAN_MEMBERS")).toBe(false);
+
+		member.roles = ["role-mod"];
+
+		expect(member.hasPermission("BAN_MEMBERS")).toBe(true);
+	});
+
+	it("accepts both permission names and raw bit values", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [makeRole("guild-1", DiscordPermissions.VIEW_CHANNEL | DiscordPermissions.SEND_MESSAGES)],
+		});
+		const member = makeMember(client, guild, "user-1", []);
+
+		expect(member.hasPermission("VIEW_CHANNEL", DiscordPermissions.SEND_MESSAGES)).toBe(true);
+		expect(member.hasPermission(DiscordPermissions.MANAGE_ROLES)).toBe(false);
+	});
+
+	it("grants every permission to the guild owner", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, { ownerID: "owner-1", roles: [makeRole("guild-1", 0n)] });
+		const member = makeMember(client, guild, "owner-1", []);
+
+		expect(member.permissions().value).toBe(ALL_PERMISSIONS);
+		expect(member.hasPermission("MANAGE_GUILD")).toBe(true);
+	});
+
+	it("applies channel overwrites through permissionsIn()", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [makeRole("guild-1", DiscordPermissions.VIEW_CHANNEL | DiscordPermissions.SEND_MESSAGES)],
+		});
+		const member = makeMember(client, guild, "user-1", []);
+		const channel = makeChannelWithOverwrites(client, guild, [
+			{ id: "user-1", type: 1, allow: "0", deny: DiscordPermissions.SEND_MESSAGES.toString() },
+		]);
+
+		expect(member.permissions().has("SEND_MESSAGES")).toBe(true);
+		expect(member.permissionsIn(channel).has("SEND_MESSAGES")).toBe(false);
+		expect(member.permissionsIn(channel).has("VIEW_CHANNEL")).toBe(true);
+	});
+
+	it("checks channel-scoped permissions through hasPermissionsIn()", () => {
+		const client = makeClient();
+		const guild = makeGuild(client, {
+			roles: [makeRole("guild-1", DiscordPermissions.VIEW_CHANNEL)],
+		});
+		const member = makeMember(client, guild, "user-1", []);
+		const channel = makeChannelWithOverwrites(client, guild, [
+			{ id: "guild-1", type: 0, allow: DiscordPermissions.SEND_MESSAGES.toString(), deny: "0" },
+		]);
+
+		expect(member.hasPermissionsIn(channel, "VIEW_CHANNEL", "SEND_MESSAGES")).toBe(true);
+		expect(member.hasPermissionsIn(channel, "MANAGE_MESSAGES")).toBe(false);
+		expect(member.hasPermission("SEND_MESSAGES")).toBe(false);
 	});
 });

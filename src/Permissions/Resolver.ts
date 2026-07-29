@@ -1,8 +1,18 @@
-import { Channel } from "../Types/index.js";
-import { Guild, Member } from "../Structures/index.js";
-import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
+import type { Channel } from "../Types/index.js";
+import type { Guild, Member } from "../Structures/index.js";
+import type { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
 import { DiscordPermissions } from "../Constants.js";
-import { BitField } from "../DataStructures/BitField.js";
+import { BitField, type FlagInput } from "../DataStructures/BitField.js";
+
+/**
+ * Permission names and/or raw bit values accepted by the permission check helpers.
+ *
+ * @example
+ * ```ts
+ * const perms: PermissionResolvable = ["SEND_MESSAGES", DiscordPermissions.VIEW_CHANNEL];
+ * ```
+ */
+export type PermissionResolvable = FlagInput<typeof DiscordPermissions>;
 
 const ALL_PERMISSIONS: bigint = Object.values(DiscordPermissions).reduce( (x, a) => x | a );
 
@@ -39,7 +49,7 @@ const ALL_PERMISSIONS: bigint = Object.values(DiscordPermissions).reduce( (x, a)
  *
  * @see https://docs.discord.com/developers/topics/permissions#permission-overwrites
  */
-export function ResolvePermissions(guild: Guild, member: Member, channel?: Channel & { permission_overwrites: ChannelPermissionManager }): BitField<typeof DiscordPermissions> {
+export function ResolvePermissions(guild: Guild, member: Member, channel?: Channel & { permission_overwrites?: ChannelPermissionManager }): BitField<typeof DiscordPermissions> {
 	if (member.user.id === guild.owner_id) {
 		return new BitField(DiscordPermissions, ALL_PERMISSIONS);
 	}
@@ -60,10 +70,12 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 		}
 	}
 
-	if (!channel || permissions === ALL_PERMISSIONS) return new BitField(DiscordPermissions, permissions);
+	// Channels without a permission overwrite manager (categories aside, e.g. DMs) have nothing to apply
+	const overwrites = channel?.permission_overwrites;
+	if (!overwrites || permissions === ALL_PERMISSIONS) return new BitField(DiscordPermissions, permissions);
 
 	// Apply @everyone role overwrite
-	const everyoneOverwrite = channel.permission_overwrites.get(guild.id);
+	const everyoneOverwrite = overwrites.get(guild.id);
 	if (everyoneOverwrite) {
 		permissions &= ~BigInt(everyoneOverwrite.deny);
 		permissions |= BigInt(everyoneOverwrite.allow);
@@ -73,7 +85,7 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 	let roleAllow = 0n;
 	let roleDeny = 0n;
 	for (const roleID of member.roles) {
-		const roleOverwrite = channel.permission_overwrites.get(roleID);
+		const roleOverwrite = overwrites.get(roleID);
 		if (roleOverwrite) {
 			roleAllow |= BigInt(roleOverwrite.allow);
 			roleDeny |= BigInt(roleOverwrite.deny);
@@ -83,7 +95,7 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 	permissions |= roleAllow;
 
 	// Apply member-specific overwrite
-	const memberOverwrite = channel.permission_overwrites.get(member.user.id);
+	const memberOverwrite = overwrites.get(member.user.id);
 	if (memberOverwrite) {
 		permissions &= ~BigInt(memberOverwrite.deny);
 		permissions |= BigInt(memberOverwrite.allow);
