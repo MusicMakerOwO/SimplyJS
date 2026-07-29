@@ -21,6 +21,7 @@ import { EmojiCache } from "../Managers/Emojis.js";
 import { ChannelCache } from "../Managers/Channels.js";
 import { MemberCache } from "../Managers/Members.js";
 import { GuildBanManager } from "../Managers/GuildBans.js";
+import { GuildInviteManager } from "../Managers/Invites.js";
 
 export class Guild extends APIClientStructure<DiscordGuild> {
 	id!: string;
@@ -71,6 +72,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	stickers: StickerCache;
 	members: MemberCache;
 	bans: GuildBanManager;
+	invites: GuildInviteManager;
 
 	constructor(client: Client, data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[] }) {
 		super(client);
@@ -80,6 +82,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.stickers = new StickerCache(client, this);
 		this.members  = new MemberCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
+		this.invites  = new GuildInviteManager(client, this);
 
 		this.patch(data);
 	}
