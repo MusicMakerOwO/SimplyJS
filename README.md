@@ -1,22 +1,44 @@
 # SimplyJS
-A Discord.JS alternative focused on minimalism and developer experience
 
-TypeScript-first from the ground up, meant for bots that don't need
-every corner of the Discord API surface.
-It's currently alpha software at `1.0.2-alpha`, so the public API can still shift between releases.
+A Discord.JS alternative focused on minimalism and developer experience.
 
-## Requirements
+ - [About](#about)
+ - [Why SimplyJS](#why-simplyjs)
+ - [Installation](#installation)
+ - [Quick Start](#quick-start)
+ - [Usage](#usage)
+	- [Sending messages & replies](#sending-messages--replies)
+	- [Direct messages](#direct-messages)
+	- [Embeds](#embeds)
+	- [Fetching & moderation](#fetching--moderation)
+	- [Command handlers (multi-file)](#command-handlers-multi-file)
+	- [Event handlers (multi-file)](#event-handlers-multi-file)
+	- [Overriding gateway event handlers](#overriding-gateway-event-handlers)
+	- [Rotating presence/status](#rotating-presencestatus)
+ - [Examples](#examples)
+ - [Advanced / Internals](#advanced--internals)
+ - [Development](#development)
+ - [Status and known limitations](#status-and-known-limitations)
+ - [Contributing](#contributing)
+ - [License](#license)
 
-- Node.js >= 18
-- A Discord bot token
+## About
 
-## Install
+SimplyJS is a TypeScript-first Discord library meant for bots that don't need every corner of the Discord API surface. It's currently alpha software at `1.0.2-alpha`, so the public API can still shift between releases.
+
+## Why SimplyJS
+
+Most Discord libraries grow to cover every possible use case, which means a lot of surface area you never touch just to get a bot running. SimplyJS goes the other way: a small, typed core (gateway, REST, caches, structures) that covers the common paths well, and gets out of your way for everything else. No enums to memorize instead of string keys, no hidden magic in the event pipeline, and no dependencies beyond `ws`. If you outgrow it, the internals are small enough to read in an afternoon (see [Advanced / Internals](#advanced--internals)).
+
+## Installation
+
+Requirements: Node.js >= 18 and a Discord bot token.
 
 ```bash
 npm install simplyjs
 ```
 
-## Quick start
+## Quick Start
 
 ```ts
 import { Client, ClientEvents } from "simplyjs";
@@ -47,42 +69,175 @@ process.on("SIGINT", async () => {
 });
 ```
 
-More end-to-end examples live in `examples/`: a ping-pong bot (`1-ping`), a rotating presence/status bot (`2-rotating-status`), a single-file prefix command bot (`3-prefix-commands`), and a multi-file command-registry bot (`4-prefix-handler`) that loads command objects (`{ name, execute(client, message, args) }`) into a `Map` and dispatches them from a shared `MessageCreate` listener.
+## Usage
 
-## Architecture
+### Sending messages & replies
 
-`Client` is the composition root. Everything else hangs off it. On construction
-it resolves your intents into a bitfield and starts the gateway and HTTP clients.
-It also owns the top-level guild/user caches. Login and destroy are both just:
-kick off the socket lifecycle, then poll until it is done.
+`message.reply()` attaches to the triggering message; `channel.send()` sends a standalone message instead.
 
-Gateway messages flow through the library in a fixed pipeline. `WSClient` (`src/WSClient.ts`) owns the raw socket: it opens the connection, runs the `Hello` → `Identify` → heartbeat handshake, and hands every incoming `DISPATCH` payload to a dispatch function built by `CreateDispatch()` (`src/EventDispatcher.ts`). That dispatcher is really just a lookup table: it takes the gateway event name and routes it to the matching handler in `src/Events/`, where each domain gets its own file. Handlers are declared with `defineEvent(...)` (`src/Types/Internal.ts`) so the dispatcher knows the payload shape at compile time instead of trusting `any`.
+```ts
+client.on(ClientEvents.MessageCreate, async (message) => {
+	if (!message.content.startsWith("!")) return;
+	const [command, ...args] = message.content.slice(1).split(/ +/);
 
-From there a handler does two things: it updates whatever cache or structure the event touches (`src/Managers/*.ts`, `src/Structures/*.ts`), and it emits the public-facing event through `Client.emit(...)` using the names and payloads defined in `src/Types/SimplicityTypes.ts`. The structures themselves (`Guild`, `Channel`, `Message`, etc.) are thin wrappers around the raw API objects. Their job is to expose the methods you actually call, like `message.reply()`, `member.kick()`, or `channel.send()`, all of which route back through `client.rest`.
+	if (command === "announce" && message.channel) {
+		await message.channel.send(args.join(" ") || "📢");
+	}
+});
+```
 
-That REST layer lives in `src/Rest.ts`. It authenticates every request against `https://discord.com/api/v9`, and it tracks rate limits per route (`routeRateLimits`, `routeToBucket`) using the generic `TTLCache` (`src/DataStructures/TTLCache.ts`). If Discord returns a `429` or a transient `5xx`, the request is retried rather than surfaced as an error.
+> **NOTE**\
+> `message.reply()` pings the original author by default, matching Discord's own client behavior. Pass `{ ping: false }` to suppress it:
+> ```ts
+> await message.reply("Got it, no ping!", { ping: false });
+> ```
 
-### Non-obvious design notes
+### Direct messages
 
-**Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a single bitfield. The same file also maps each gateway event to the intent required to receive it, via `EventRequiredIntent`, so a missing intent fails loudly instead of just silently dropping events.
+`message.user.send()` opens or reuses a DM channel automatically.
 
-**Permissions and intents are bigint bitfields, not enums.** The generic `BitField` class (`src/DataStructures/BitField.ts`) backs things like `Role.permissions`. If you're looking for the raw Discord permission flag values, they live in `Constants.ts`.
+```ts
+client.on(ClientEvents.MessageCreate, async (message) => {
+	if (!message.content.startsWith("!dm ")) return;
+	const text = message.content.slice(4);
 
-**There are no TypeScript `enum`s in this codebase.** Every constant-like map (opcodes, intents, events, statuses, activity types) is defined as an `as const` object instead, with `ObjectValues<typeof X>` (`src/Types/HelperTypes.ts`) deriving the value union. It's a deliberate pattern, not an oversight, and it's applied consistently across `src/Types/*.ts`.
+	try {
+		await message.user.send(text || "Hi!");
+		await message.reply("Check your DMs!");
+	} catch {
+		await message.reply("I couldn't DM you - do you have DMs disabled?");
+	}
+});
+```
 
-**`Ready` doesn't fire the moment the gateway says it should.** `src/Events/Ready.ts` first collects every guild ID from the `READY` payload, including ones marked `unavailable`, then waits for a matching `GuildCreate` for each one. Only once every guild has arrived, or 15 seconds have passed, does the library emit its own public `Ready` event. This exists specifically so your handlers never fire before the caches are actually populated.
+> **WARNING**\
+> DMs can fail if the user has them closed or has blocked the bot - always wrap `send()` to a user in a `try`/`catch`.
 
-**Timers are required to call `.unref()`.** This isn't a convention you have to remember; it's enforced by a custom ESLint rule, `local/require-unref-on-timers` (`eslint.config.ts`). The polling loops in `Client.login()` and `Client.destroy()` are the reference examples if you're adding a new timer and want to see the pattern in practice.
+### Embeds
 
-**Structures split along ownership, and so do caches.** `APIClientStructure<T>` is for anything scoped to the client itself, and it holds a reference to `client`. `APIGuildStructure<T>` is for anything owned by a guild, and it holds both `client` and `guild`. See `src/Contracts/DiscordStructure.ts` for the base classes. Caches mirror the same split: `GlobalCache` and `GuildCache` in `src/Contracts/CacheStructure.ts`.
+`EmbedBuilder` validates as you build, not just when you send - each setter enforces the relevant Discord field limit immediately.
 
-## Advanced usage
+```ts
+import { EmbedBuilder } from "simplyjs";
 
-A few things that don't fit the quick-start example but are worth knowing about. See `CODE_STYLE_AND_RULES.md` for the reasoning behind the patterns these are built on.
+const embed = new EmbedBuilder()
+	.setTitle(`${message.user.username}`)
+	.setColor("#5865F2")
+	.addFields([
+		{ name: "ID", value: message.user.id, inline: true },
+		{ name: "Bot?", value: message.user.bot ? "Yes" : "No", inline: true }
+	])
+	.setFooter({ text: `Requested in #${message.channel?.name ?? "unknown"}` })
+	.setTimestamp(new Date());
+
+await message.reply({ embeds: [embed] });
+```
+
+| Limit | Max |
+| --- | --- |
+| `setTitle()` | 256 characters |
+| `setFooter()` | 2048 characters |
+| Total embed size (`EmbedBuilder.validate()`) | 6000 characters |
+
+> **NOTE**\
+> If you're coming from `discord.js`: there's no named-color constant support (hex string or decimal number only), fields can be set via plain property assignment (`embed.description = "..."`) as well as setters, and validation errors throw synchronously as soon as a limit is exceeded rather than surfacing later as a Discord API error. `EmbedBuilder.from(embed)` hydrates a builder from an existing payload if you need to edit one you fetched.
+
+### Fetching & moderation
+
+Resolve a `@mention` or raw ID against the guild's member cache, falling back to a fetch:
+
+```ts
+async function resolveMember(client: FullClient, guildId: string, input?: string) {
+	const id = (/\d+/.exec(input ?? "") ?? [])[0];
+	if (!id) return null;
+
+	const guild = client.guilds.get(guildId);
+	if (!guild) return null;
+
+	return guild.members.get(id) ?? await guild.members.fetch(id).catch(() => null);
+}
+```
+
+Moderation actions are methods directly on the structure:
+
+```ts
+const member = await resolveMember(client, message.guild_id!, args.shift());
+if (!member) return message.reply("Couldn't find that member");
+
+try {
+	await member.kick(args.join(" ") || undefined);
+	await message.reply(`Kicked **${member.user.username}**`);
+} catch {
+	await message.reply("Something went wrong - do I have the Kick Members permission?");
+}
+```
+
+### Command handlers (multi-file)
+
+Load command objects into a `Map` and dispatch them from a shared `MessageCreate` listener - the same pattern most prefix-command bots converge on:
+
+```ts
+// commands/ping.ts
+export default {
+	name: "ping",
+	async execute(client, message, args) {
+		await message.reply("Pong!");
+	}
+};
+```
+
+```ts
+// index.ts
+import * as Commands from "./commands";
+
+client.commands = new Map();
+for (const command of Object.values(Commands)) {
+	client.commands.set(command.name, command);
+}
+
+const PREFIX = "!";
+client.on(ClientEvents.MessageCreate, async (message) => {
+	if (!message.content.startsWith(PREFIX)) return;
+	const [name, ...args] = message.content.slice(PREFIX.length).split(/ +/);
+
+	const handler = client.commands.get(name);
+	if (!handler) return;
+
+	try {
+		await handler.execute(client, message, args);
+	} catch (error) {
+		console.log(error);
+		await message.reply("Something went wrong!");
+	}
+});
+```
+
+### Event handlers (multi-file)
+
+Splitting event handling into one file per event keeps things tidy as a bot grows - `createEvent()` pairs a handler with the event it's bound to so it stays type-safe:
+
+```ts
+// events/ready.ts
+import { ClientEvents } from "simplyjs";
+import { createEvent } from "./types.js";
+
+export default createEvent(ClientEvents.Ready, (client, user) => {
+	console.log(`[ready] Logged in as ${user.username}`);
+});
+```
+
+```ts
+// index.ts
+import * as Events from "./events";
+
+for (const event of Object.values(Events)) {
+	client.on(event.name, (...args: any[]) => event.execute(client, ...args));
+}
+```
 
 ### Overriding gateway event handlers
 
-Every dispatch event (`GUILD_CREATE`, `MESSAGE_CREATE`, etc.) has a built-in handler that updates caches/structures before emitting the public client event (`src/Events/*.ts`, wired up by `CreateDispatch()` in `src/EventDispatcher.ts`). If you need different behavior for a specific gateway event, pass an override through the `ws` option on `Client` - it replaces that event's entry in the dispatcher's lookup table entirely, so you're responsible for whatever caching the default handler would have done:
+Every dispatch event (`GUILD_CREATE`, `MESSAGE_CREATE`, etc.) has a built-in handler that updates caches/structures before emitting the public client event. Pass an override through the `ws` option to replace that event's entry entirely:
 
 ```ts
 import { Client, GatewayEvents } from "simplyjs";
@@ -94,48 +249,80 @@ const client = new Client({
 		eventOverrides: {
 			[GatewayEvents.MessageCreate]: (client, data) => {
 				console.log("raw MESSAGE_CREATE payload:", data);
-				// note: the built-in handler that upserts the message into
-				// cache and emits ClientEvents.MessageCreate never runs here
 			}
 		}
 	}
 });
 ```
 
-This is a full replacement, not a "run before/after" hook - `CreateDispatch()` builds one handler map at construction time and doesn't support layering (see `src/EventDispatcher.ts`).
+> **WARNING**\
+> This is a full replacement, not a "run before/after" hook - the built-in handler that upserts the message into cache and emits `ClientEvents.MessageCreate` never runs once you override it. `CreateDispatch()` builds one handler map at construction time and doesn't support layering.
 
-### Replying without pinging the author
-
-`Message.reply()` pings the original author by default (matching Discord's own client behavior). Pass `{ ping: false }` to suppress it - internally this just sets `allowed_mentions.replied_user = false` on the outgoing payload (`src/Structures/Message.ts`):
+### Rotating presence/status
 
 ```ts
-client.on(ClientEvents.MessageCreate, async (message) => {
-	await message.reply("Got it, no ping!", { ping: false });
+import { ActivityType } from "simplyjs";
+
+client.on(ClientEvents.Ready, (user) => {
+	const statuses = [
+		{ type: ActivityType.PLAYING, name: "with SimplyJS" },
+		{ type: ActivityType.LISTENING, name: "some tunes" },
+		{ type: ActivityType.WATCHING, name: "the matrix" }
+	];
+
+	let i = 0;
+	setInterval(() => {
+		const status = statuses[i];
+		client.setStatusMessage(status.type, status.name);
+		i = (i + 1) % statuses.length;
+	}, 5_000).unref();
 });
 ```
 
-### `EmbedBuilder`
+## Examples
 
-`EmbedBuilder` (`src/Builders/EmbedBuilder.ts`) validates as you build, not just when you send. Each setter enforces the relevant Discord field limit immediately (e.g. `setTitle()` throws past 256 characters, `setFooter()` throws past 2048), and the static `EmbedBuilder.validate(embed)` re-checks the assembled object for an empty embed or a total character count over 6000 before anything is sent. There's also `EmbedBuilder.from(embed)` to hydrate a builder from an existing payload (e.g. one fetched off an existing message) instead of only building from scratch.
+Full end-to-end projects live in [`examples/`](./examples):
 
-```ts
-import { EmbedBuilder } from "simplyjs";
+| Folder | What it shows |
+| --- | --- |
+| [`1-ping`](./examples/1-ping) | Smallest possible bot - login, `Ready`, one `!ping` command |
+| [`2-rotating-status`](./examples/2-rotating-status) | Rotating presence/status on an interval |
+| [`3-prefix-commands`](./examples/3-prefix-commands) | Single-file prefix command bot |
+| [`4-prefix-handler`](./examples/4-prefix-handler) | Multi-file command registry loaded into a `Map` |
+| [`5-sending-dms`](./examples/5-sending-dms) | Sending DMs and handling closed-DM failures |
+| [`6-embeds`](./examples/6-embeds) | `EmbedBuilder` usage, including error-style embeds |
+| [`7-fetching-and-moderation`](./examples/7-fetching-and-moderation) | Member resolution, kicks, bans, timeouts, role management |
+| [`8-event-handler`](./examples/8-event-handler) | One-file-per-event handler structure |
 
-const embed = new EmbedBuilder()
-	.setTitle("Help")
-	.setDescription(commandList)
-	.setColor("#ff7900")
-	.addFields([{ name: "Prefix", value: "!", inline: true }]);
+## Advanced / Internals
 
-await message.reply({ embeds: [embed] });
-```
+`Client` is the composition root - on construction it resolves your intents into a bitfield and starts the gateway (`WSClient`) and REST (`Rest`) clients, and owns the top-level guild/user caches.
 
-If you're coming from `discord.js`, the main differences: there's no `EmbedBuilder#setColor` accepting named color constants (hex string or decimal number only), fields are set via plain property assignment or the same setters (`embed.description = "..."` works too - it's a plain class, not getter/setter-only), and validation errors throw synchronously as soon as a limit is exceeded rather than surfacing later as a Discord API error.
+Gateway messages flow through a fixed pipeline: `WSClient` (`src/WSClient.ts`) owns the raw socket, runs the `Hello` → `Identify` → heartbeat handshake, and hands every `DISPATCH` payload to a dispatcher built by `CreateDispatch()` (`src/EventDispatcher.ts`), which routes each gateway event to a handler in `src/Events/`. Handlers update the relevant cache/structure and then emit the public-facing event via `Client.emit(...)`. Structures (`Guild`, `Channel`, `Message`, etc.) are thin wrappers around the raw API objects that expose the methods you call, like `message.reply()` or `member.kick()`, all routed back through `client.rest` (`src/Rest.ts`), which authenticates every request, retries `429`s/transient `5xx`s, and tracks rate limits per route via a `TTLCache` (`src/DataStructures/TTLCache.ts`).
+
+Non-obvious design notes:
+
+> **HINT**\
+> **Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a bitfield. The same file maps each gateway event to the intent required to receive it via `EventRequiredIntent`, so a missing intent fails loudly instead of silently dropping events.
+
+> **NOTE**\
+> **Permissions and intents are bigint bitfields, not enums.** The generic `BitField` class (`src/DataStructures/BitField.ts`) backs things like `Role.permissions`. Raw Discord permission flag values live in `Constants.ts`.
+
+> **NOTE**\
+> **There are no TypeScript `enum`s in this codebase.** Every constant-like map (opcodes, intents, events, statuses, activity types) is an `as const` object instead, with `ObjectValues<typeof X>` (`src/Types/HelperTypes.ts`) deriving the value union - a deliberate pattern applied consistently across `src/Types/*.ts`.
+
+> **HINT**\
+> **`Ready` doesn't fire the moment the gateway says it should.** `src/Events/Ready.ts` collects every guild ID from the `READY` payload (including ones marked `unavailable`), then waits for a matching `GuildCreate` for each one. Only once every guild has arrived, or 15 seconds have passed, does the library emit its own public `Ready` event - so handlers never fire before caches are actually populated.
+
+> **WARNING**\
+> **Timers are required to call `.unref()`.** This is enforced by a custom ESLint rule, `local/require-unref-on-timers` (`eslint.config.ts`). The polling loops in `Client.login()`/`Client.destroy()` are the reference examples if you're adding a new timer.
+
+Structures and caches also split along ownership: `APIClientStructure<T>` holds a reference to `client` only, `APIGuildStructure<T>` holds both `client` and `guild` (`src/Contracts/DiscordStructure.ts`), and caches mirror the split via `GlobalCache`/`GuildCache` (`src/Contracts/CacheStructure.ts`). See `CODE_STYLE_AND_RULES.md` for the full reasoning behind these patterns.
 
 ## Development
 
 ```bash
-npm run check      # eslint + tsc --noEmit
+npm run check       # eslint + tsc --noEmit
 npm run build       # check, then rm -rf dist/ and tsup (emits ESM + CJS + .d.ts to dist/)
 npm test            # vitest run (tests live in src/Tests/**/*.ts)
 npm run lint        # eslint .
@@ -162,11 +349,17 @@ Before opening a PR:
 - If you're adding a new gateway event handler, cache, or structure, make sure it's exported from the right barrel file (`src/Events/index.ts`, `src/index.ts`, etc.) — see section 11 of `CODE_STYLE_AND_RULES.md`.
 - If you fix or add something meaningful, add an entry to `CHANGELOG.md` and check off (or add) the matching item in `TODO.md`.
 
-There's no formal CONTRIBUTING.md or PR template yet, so use your judgment and keep changes scoped.
+There's no formal CONTRIBUTING.md or PR template yet, so use your judgment and keep changes scoped. Keep commits scoped to one logical change, using this repo's loose `type(scope): Description` convention:
 
-### Commit hygiene
-
-Existing history follows a loose `type(scope): Description` convention (e.g. `feat(workflow): Added tests for node 20, 22, and 24`, `fix(package.json): Updated license to match git repo`). Keep commits scoped to one logical change, and write messages that describe *what changed and why*, not just "fix stuff" — it makes `git log`/`git blame` actually useful when tracking down why a particular pattern exists later.
+| Type       | Description                                                      |
+|------------|------------------------------------------------------------------|
+| `feat`     | A new feature                                                    |
+| `fix`      | A bug fix                                                        |
+| `refactor` | A code change that neither fixes a bug nor adds a feature        |
+| `test`     | Adding or updating tests                                         |
+| `style`    | Changes that don't affect meaning (whitespace, formatting, etc.) |
+| `docs`     | Documentation changes                                            |
+| `chore`    | Tooling, config, or maintenance work                             |
 
 ## License
 
