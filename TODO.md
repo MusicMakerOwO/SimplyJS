@@ -2,40 +2,6 @@
 
 ## Active backlog
 
-### Permissions
-- [x] Finish incorporating `src/Permissions/Resolver.ts`
-  - [x] `Member.hasPermission(permission): boolean`
-  - [x] `Member.permissions(): BitField<Permissions>`
-  - [x] `Member.hasPermissionsIn(channel): boolean`
-  - [x] `Member.permissionsIn(channel): BitField<Permissions>`
-  - Should permission functions be included on guilds and channels too?
-
-
-### Moderation
-- [x] Implement more ban controls
-  - [x] Guild ban manager
-    - `Guild.bans.add(userID, reason?)`
-      - [x] Update `Member.ban(reason?)` to call this new function 
-    - `Guild.bans.remove(userID, auditLogReason?)`
-    - `Guild.bans.fetch(userID)`
-  - [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
-- [x] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, named `AuditLogEntryCreate`
-- [x] `Guild.fetchAuditLogs()`, unknown args
-- [x] `MESSAGE_DELETE_BULK` event
-- [x] `Channel.bulkDeleteMessages(messages, reason?)` — accepts `Message[]` or ID strings
-- [x] `Channel.deleteMessage(message, reason?)`
-- Invites
-  - [x] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
-  - [x] `INVITE_CREATE` + `INVITE_DELETE` event handler
-  - [x] Create GuildInviteManager
-    - `Guild.invites.create(channel, options?)`
-      - https://docs.discord.com/developers/resources/channel#create-channel-invite
-    - `Guild.invites.delete(inviteCode, reason?)`
-    - `Guild.invites.fetch(inviteCode?)`
-      - Return all invites if no code provided
-      - Additional data is returned if bot has `MANAGE_GUILD` permission
-      - https://docs.discord.com/developers/resources/invite#invite-metadata-object
-
 ### Quality of Life
 - [ ] Harden gateway reconnect/session handling in `src/WSClient.ts`
   - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
@@ -91,35 +57,6 @@
 - [x] Create a mixin system for channel class inheritance
 - [ ] Start planning mixins for interactions
 
-## JSDoc documentation
-
-Structures — add JSDoc to all public methods in `src/Structures/`:
-- [x] `Guild.ts`: `leave()`, `modify()`
-- [x] `Channel.ts`: `send()`, `delete()`, `modify()`
-- [x] `Member.ts`: `addRole()`, `removeRole()`, `setRoles()`, `timeoutUntil()`, `kick()`, `ban()`, `setNickname()`
-- [x] `Role.ts`: `delete()`, `modify()`
-- [x] `Emoji.ts`: `delete()`, `modify()`
-- [x] `Sticker.ts`: `delete()`, `modify()`
-- [x] `Message.ts`: `reply()`, `delete()`, `update()`, `pin()`, `unpin()`, `react()`
-- [x] `User.ts`: `send()`
-
-Caches — add JSDoc to public methods in `src/Cache/`:
-- [x] `Roles.ts`: `create()`, `toSorted()`, `highest()`, `lowest()`, `everyone` getter
-
-Core runtime — add JSDoc to public exports in `src/`:
-- [x] `Client.ts`: class docs, `login()`, `destroy()`, `setStatus()`, `setStatusMessage()`
-- [x] `WSClient.ts`: class docs, main public methods
-- [x] `Rest.ts`: class docs, `get()`, `post()`, `patch()`, `delete()`, `put()`
-- [x] `EventDispatcher.ts`: `CreateDispatch()` function docs
-- [x] `Intents.ts`: `ResolveIntents()`, `HasIntent()` function docs
-
-Builders — add JSDoc to methods in `src/Builders/`:
-- [x] `EmbedBuilder.ts`: all setter methods, `from()`, `validate()`
-
-Contracts — add JSDoc to public abstract classes in `src/Contracts/`:
-- [x] `DiscordStructure.ts`: `APIActionableStructure`, `APIClientStructure`, `APIGuildStructure`
-- [x] `CacheStructure.ts`: `GlobalCache`, `GuildCache` abstract methods
-
 ## Discord gateway event implementation status
 
 Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events Discord sends that aren't modeled at all here (e.g. `INTERACTION_CREATE`, `VOICE_SERVER_UPDATE`, `USER_UPDATE`) are tracked separately under "Further planning".
@@ -151,7 +88,7 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 | GUILD_MEMBER_ADD                  | ✅           |
 | GUILD_MEMBER_UPDATE               | ✅           |
 | GUILD_MEMBER_REMOVE               | ✅           |
-| GUILD_AUDIT_LOG_ENTRY_CREATE      | ❌           |
+| GUILD_AUDIT_LOG_ENTRY_CREATE      | ✅           |
 | GUILD_BAN_ADD                     | ✅           |
 | GUILD_BAN_REMOVE                  | ✅           |
 | GUILD_EMOJIS_UPDATE               | ✅           |
@@ -266,3 +203,37 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 	- Add permission-resolvable input type for `create(...)`
 	- Add role position move API
 - [x] Create a manager class for `Channel.permission_overwrites`
+
+### Permissions
+- [x] Finish incorporating `src/Permissions/Resolver.ts`
+	- [x] `Member.hasPermission(permission): boolean`
+	- [x] `Member.permissions(): BitField<Permissions>`
+	- [x] `Member.hasPermissionsIn(channel): boolean`
+	- [x] `Member.permissionsIn(channel): BitField<Permissions>`
+	- Should permission functions be included on guilds and channels too?
+
+
+### Moderation
+- [x] Implement more ban controls
+	- [x] Guild ban manager
+		- `Guild.bans.add(userID, reason?)`
+			- [x] Update `Member.ban(reason?)` to call this new function
+		- `Guild.bans.remove(userID, auditLogReason?)`
+		- `Guild.bans.fetch(userID)`
+	- [x] `GUILD_BAN_ADD` and `GUILD_BAN_REMOVE` events handler
+- [x] Add `GUILD_AUDIT_LOG_ENTRY_CREATE` event, named `AuditLogEntryCreate`
+- [x] `Guild.fetchAuditLogs()`, unknown args
+- [x] `MESSAGE_DELETE_BULK` event
+- [x] `Channel.bulkDeleteMessages(messages, reason?)` — accepts `Message[]` or ID strings
+- [x] `Channel.deleteMessage(message, reason?)`
+- Invites
+	- [x] Create an `Invite` class (https://docs.discord.com/developers/resources/invite#invite-object)
+	- [x] `INVITE_CREATE` + `INVITE_DELETE` event handler
+	- [x] Create GuildInviteManager
+		- `Guild.invites.create(channel, options?)`
+			- https://docs.discord.com/developers/resources/channel#create-channel-invite
+		- `Guild.invites.delete(inviteCode, reason?)`
+		- `Guild.invites.fetch(inviteCode?)`
+			- Return all invites if no code provided
+			- Additional data is returned if bot has `MANAGE_GUILD` permission
+			- https://docs.discord.com/developers/resources/invite#invite-metadata-object
