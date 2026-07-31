@@ -5,14 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0-alpha]
 
 ### Added
 
 #### Permissions system
 - `ChannelPermissionManager` (`src/Managers/ChannelPermissionManager.ts`) — manages and calculates channel-level permission overrides
 - `Resolver` (`src/Permissions/Resolver.ts`) — calculates effective member permissions at both guild and channel levels with inheritance and override support
-- Comprehensive permission resolver tests covering all permission combinations and inheritance scenarios
+- `Member.permissions()` — resolves guild-level permissions live from the member's current roles (guild owner and `ADMINISTRATOR` always resolve to every permission)
+- `Member.permissionsIn(channel)` — resolves effective permissions inside a specific channel, applying `@everyone`/role/member overwrites on top of guild permissions
+- `Member.hasPermission(...permissions)` / `Member.hasPermissionsIn(channel, ...permissions)` — convenience checks against the resolved permission set
+- `Resolver` and `BitField` now re-exported from the package root (`src/index.ts`), along with `Constants`
+- Comprehensive permission resolver tests covering all permission combinations and inheritance scenarios, expanded to cover the new `Member` permission methods
+
+#### User avatars
+- `User.avatarURL(animated?)` — builds the CDN avatar URL, defaulting to animated `.webp` unless `animated: false` is passed
+- `User.defaultAvatarURL()` — computes the correct Discord default avatar (legacy discriminator modulo or new username-based index)
 
 #### Invites
 - `Invite` class (`src/Structures/Invite.ts`) — wraps the Discord invite object/metadata, exposing invite, inviter, target, and expiration details
@@ -29,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Messages
 - `Channel.deleteMessage(message, reason?)` and `Channel.bulkDeleteMessages(messages, reason?)` on the `Messageable` mixin — both accept `Message` instances or raw IDs
 - `bulkDeleteMessages()` de-duplicates IDs, falls back to a single delete for one message, and rejects empty or >100 message batches
+- `MessageDeleteBulk` gateway event handler (`src/Events/Messages.ts`) for `MESSAGE_DELETE_BULK`, emitting `ClientEvents.MessageDeleteBulk` with `{ ids, channel_id, guild_id }`
 - Test coverage for both delete paths, including audit log reason headers
 
 #### Audit logs
@@ -58,12 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Documentation
 - JSDoc documentation for `BitField.resolve()` method for improved IDE support and developer experience
+- JSDoc coverage added across the rest of the codebase (managers, mixins, structures, `Rest`, `WSClient`, types) for improved IDE support and developer experience
 
 ### Changed
 
 - Renamed `src/Cache/` directory to `src/Managers/` to better describe their role as cache managers with fetch/upsert operations
 - Moved channel structure classes (`BaseChannel`, `GuildTextChannel`, `GuildVoiceChannel`, etc.) into `src/Structures/Channels/`
+- Moved mixins out of `src/Structures/Mixins/` into a dedicated `src/Mixins/` root folder
+- Split the `JSONObject` / `JSONArray` helper types into two distinct definitions instead of one combined type
 - **BREAKING**: `Channel` structure split into individual type-specific classes (`GuildTextChannel`, `GuildVoiceChannel`, etc.). Code importing or type-checking `Channel` must update to use the appropriate subclass type
+- **BREAKING**: `Member.permissions` is no longer a raw permission bitfield string patched from the API — it's now a `Member.permissions()` method that resolves live permissions from the member's roles
 
 ## [1.0.0-alpha]
 
