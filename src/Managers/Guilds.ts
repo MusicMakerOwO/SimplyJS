@@ -3,6 +3,7 @@ import { GlobalCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordGuild } from "../Types/DiscordAPITypes.js";
 
+/** Global cache of every {@link Guild} the client is a member of. */
 export class GuildCache extends GlobalCache<string, Guild, DiscordGuild> {
 	constructor(client: Client) {
 		super(client);

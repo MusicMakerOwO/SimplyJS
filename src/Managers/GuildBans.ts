@@ -2,6 +2,10 @@ import { DiscordUser } from "../Types/index.js";
 import { Guild, User } from "../Structures/index.js";
 import { Client } from "../Client.js";
 
+/**
+ * Manages a guild's bans. This manager has no local cache — every method calls the REST API
+ * directly.
+ */
 export class GuildBanManager {
 	client: Client;
 	guild: Guild;
@@ -11,6 +15,13 @@ export class GuildBanManager {
 		this.guild = guild;
 	}
 
+	/**
+	 * Bans a user from the guild. Requires the `BAN_MEMBERS` permission.
+	 *
+	 * `delete_message_seconds` defaults to `0`, which keeps existing message history.
+	 * @param user The user to ban, or their id.
+	 * @param options Ban options including delete window and optional audit log reason.
+	 */
 	async create(user: User | DiscordUser | string, options: { delete_message_seconds?: number, reason?: string } = {}): Promise<void> {
 		const userID = typeof user === 'object' ? user.id : user;
 		await this.client.rest.put(
@@ -22,11 +33,25 @@ export class GuildBanManager {
 		);
 	}
 
+	/**
+	 * Removes a ban (unbans a user). Requires the `BAN_MEMBERS` permission.
+	 * @param reason Optional audit log reason.
+	 */
 	async delete(reason?: string): Promise<void> {
 		await this.client.rest.delete(`/guilds/${this.guild.id}/bans/${this.guild.id}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
 	}
 
+	/**
+	 * Fetches a single ban by user id.
+	 * @param id The banned user's id.
+	 * @returns The banned user and the ban reason, or `null` if no reason was given.
+	 */
 	async fetch(id: string): Promise<{ user: User, reason: string | null }>;
+	/**
+	 * Fetches a page of the guild's bans.
+	 * @param options Pagination options.
+	 * @returns A list of banned users with their ban reasons.
+	 */
 	async fetch(options?: {
 		/** Number of users to return (up to 1000, default 1000) */
 		limit?: number;

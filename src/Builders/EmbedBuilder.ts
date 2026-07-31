@@ -10,10 +10,12 @@ import {
 } from "../Types/MessageComponents.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 
+/** Throws if `value` exceeds `maxLength`, used to enforce Discord's per-field embed character limits */
 function AssertMaxLength(fieldName: string, value: string, maxLength: number): void {
 	if (value.length > maxLength) throw new Error(`${fieldName} must be ${maxLength} characters or fewer - Received ${value.length} characters`);
 }
 
+/** Validates each field's `name`/`value` against Discord's 256/1024 character limits */
 function AssertFieldLimits(fields: EmbedField[]): void {
 	for (const field of fields) {
 		AssertMaxLength("Field name", field.name, 256);
@@ -21,6 +23,7 @@ function AssertFieldLimits(fields: EmbedField[]): void {
 	}
 }
 
+/** Fluent builder for constructing a Discord message embed, validating field limits as they're set. */
 export class EmbedBuilder {
 	/**
 	 * Creates a builder from an existing embed payload

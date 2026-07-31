@@ -5,6 +5,9 @@ import { Messageable } from "../../Mixins/Channels/Messageable.js";
 import { Moveable } from "../../Mixins/Channels/Moveable.js";
 import { PermissionOverwrites } from "../../Mixins/Channels/PermissionOverwrites.js";
 
+/**
+ * A standard guild voice channel.
+ */
 export class GuildVoiceChannel extends PermissionOverwrites(Moveable(Messageable(BaseChannel))) {
 	declare type: typeof DiscordChannelTypes.GUILD_VOICE | typeof DiscordChannelTypes.GUILD_STAGE_VOICE
 
@@ -12,9 +15,13 @@ export class GuildVoiceChannel extends PermissionOverwrites(Moveable(Messageable
 	// es2022+), an emitted initializer would run after super() and wipe the value patch() just
 	// set during construction (patch() is invoked from BaseChannel's constructor, further up
 	// the super() chain than this class's own field declarations).
+	/** Bitrate (in bits) for the voice channel */
 	declare bitrate?: number
+	/** Maximum number of users allowed in the voice channel at once, `0` for unlimited */
 	declare user_limit?: number
+	/** Voice region id for the channel, or `null` to have Discord auto-select the region */
 	declare rtc_region?: string | null
+	/** Camera video quality, see {@link DiscordVideoQualityModes} */
 	declare video_quality_mode?: ObjectValues<typeof DiscordVideoQualityModes>
 	declare parent_id?: string | null
 

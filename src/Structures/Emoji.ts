@@ -4,6 +4,7 @@ import { User } from "./User.js";
 import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 
+/** A custom guild emoji, either a static image or, when `animated` is set, a GIF. */
 export class Emoji extends APIGuildStructure<DiscordEmoji> {
 	id!: string
 	name!: string
@@ -56,17 +57,21 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 	}
 
 	/**
-	 * Modifies the emoji's name or allowed roles
-	 * @param changes
+	 * Modifies the emoji's name or allowed roles. Requires the `MANAGE_GUILD_EXPRESSIONS`
+	 * permission and will error otherwise.
+	 * @param changes The fields to update; both are required by the underlying REST call.
 	 */
 	async modify(changes: {
+		/** New name for the emoji */
 		name: string;
+		/** Role ids (or role objects) allowed to use this emoji; pass an empty array to lift the restriction */
 		roles: string[] | {id: string}[]
 	}): Promise<void> {
 		const roleIDs = changes.roles.map(r => typeof r === 'string' ? r : r.id);
 		await this.client.rest.patch(`/guilds/${this.guild.id}/emojis/${this.id}`, { name: changes.name, roles: roleIDs });
 	}
 
+	/** Generate the emoji markup usable in message content: `Hello ${emoji.toString()}` -> `Hello <:frog:1234567890>` */
 	toString(): string {
 		return `<${this.animated ? 'a' : ''}:${this.name}:${this.id}>`;
 	}

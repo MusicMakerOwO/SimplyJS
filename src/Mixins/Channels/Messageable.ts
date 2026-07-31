@@ -12,16 +12,28 @@ type MessageableClass<T> = {
 	bulkDeleteMessages(messages: MessageResolvable[], reason?: string): Promise<string[]>;
 } & T;
 
+/** Extracts an ID from a {@link MessageResolvable}, passing plain string IDs through unchanged */
 function resolveMessageID(message: MessageResolvable): string {
 	return typeof message === "string"
 		? message
 		: message.id;
 }
 
+/**
+ * Mixes message-sending and message-deletion methods into a channel class. Applied to every
+ * channel type that can hold messages (text, voice, threads, etc).
+ * @param Base The channel class to extend.
+ * @returns A subclass of `Base` with `send()`, `deleteMessage()` and `bulkDeleteMessages()`.
+ */
 export function Messageable<TBase extends Constructor<BaseChannel>>(
 	Base: TBase,
 ): Constructor<MessageableClass<InstanceType<TBase>>> {
 	return class extends Base {
+		/**
+		 * Sends a message to this channel.
+		 * @param content Either plain text content or a full message payload.
+		 * @returns The created message.
+		 */
 		async send(content: string | MessagePayload): Promise<Message> {
 			const payload = CreateMessagePayload(content);
 			const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.id}/messages`, payload);

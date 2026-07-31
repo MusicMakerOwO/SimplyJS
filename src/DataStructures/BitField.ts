@@ -112,6 +112,7 @@ export class BitField<TFlags extends Record<string, bigint>> {
 		this.value = this.parseBit(value);
 	}
 
+	/** Normalizes a raw bigint/number/numeric-string bit value to a `bigint`, treating an empty string as `0` */
 	private parseBit(value: FlagValue | number): bigint {
 		return typeof value === "bigint"
 			? value

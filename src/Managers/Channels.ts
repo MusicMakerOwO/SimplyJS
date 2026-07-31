@@ -15,6 +15,7 @@ import { ObjectValues } from "../Types/HelperTypes.js";
 import { Channel } from "../Types/index.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
 
+/** Cache of a single guild's {@link Channel}s, including threads. */
 export class ChannelCache extends GuildCache<string, Channel, DiscordChannel> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);

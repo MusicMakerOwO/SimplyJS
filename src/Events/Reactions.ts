@@ -1,6 +1,10 @@
 import { ClientEvents, defineEvent, DiscordEmoji, DiscordMember, GatewayEvents } from "../Types/index.js";
 import { Guild } from "../Structures/index.js";
 
+/**
+ * Fires when a reaction is added to a message. `guild`, `channel`, and `user` fall back to a
+ * bare `{ id }` object when not present in the local cache.
+ */
 export const ReactionAdd = defineEvent({
 	name   : GatewayEvents.MessageReactionAdd,
 	handler: async (client, data: {
@@ -42,6 +46,11 @@ export const ReactionAdd = defineEvent({
 	}
 })
 
+		/**
+		 * Fires when a reaction is removed from a message. `guild`, `channel`, and `user` fall
+		 * back to a bare `{ id }` object when not present in the local cache. Discord does not
+		 * include member data on this event, so `member` is always `null`.
+		 */
 		export const ReactionRemove = defineEvent({
 			name: GatewayEvents.MessageReactionRemove,
 			handler: async (client, data: {

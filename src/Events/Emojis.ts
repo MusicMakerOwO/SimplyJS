@@ -3,6 +3,10 @@ import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordEmoji } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplicityTypes.js";
 
+/**
+ * Fires on a guild emoji sync; diffs the incoming emoji list against the cache to derive and
+ * emit individual `EmojiCreate`/`EmojiUpdate`/`EmojiDelete` events.
+ */
 export const EmojisUpdate = defineEvent({
 	name: GatewayEvents.GuildEmojisUpdate,
 	handler: (client, data: { guild_id: string, emojis: DiscordEmoji[] }) => {

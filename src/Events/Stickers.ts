@@ -3,6 +3,10 @@ import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordSticker } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplicityTypes.js";
 
+/**
+ * Fires on a guild sticker sync; diffs the incoming sticker list against the cache to derive and
+ * emit individual `StickerCreate`/`StickerUpdate`/`StickerDelete` events.
+ */
 export const StickersUpdate = defineEvent({
 	name: GatewayEvents.GuildStickersUpdate,
 	handler: (client, data: { guild_id: string, stickers: DiscordSticker[] }) => {

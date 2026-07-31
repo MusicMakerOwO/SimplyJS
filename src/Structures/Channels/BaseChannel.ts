@@ -10,10 +10,18 @@ import { GuildStageChannel } from "./GuildStageChannel.js";
 import { GuildVoiceChannel } from "./GuildVoiceChannel.js";
 import { GuildCategoryChannel } from "./GuildCategoryChannel.js";
 
+/**
+ * Base class for all guild channel types (text, voice, category, forum, thread, stage,
+ * announcement). Holds the properties and behavior common to every channel; concrete
+ * subclasses add their own type-specific properties and narrow `modify()`'s option shape.
+ *
+ * @see https://docs.discord.com/developers/resources/channel#channel-object
+ */
 export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 	id!: string
 	type!: ObjectValues<typeof DiscordChannelTypes>
 	name?: string | null
+	/** Channel flags bitfield (e.g. `PINNED`, `REQUIRE_TAG`) */
 	flags?: number
 	guild_id?: string
 
@@ -62,11 +70,26 @@ export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 			   this.type === DiscordChannelTypes.ANNOUNCEMENT_THREAD;
 	}
 
+	/**
+	 * Deletes this channel, or archives it if it's a thread. Requires the `MANAGE_CHANNELS`
+	 * permission (`MANAGE_THREADS` for threads).
+	 */
 	async delete(): Promise<void> {
 		await this.client.rest.delete(`/channels/${this.id}`);
 	}
 
-	// shared internal - concrete classes expose their own typed modify()
+	/**
+	 * Sends a `PATCH` to update this channel's settings. Requires the `MANAGE_CHANNELS`
+	 * permission (`MANAGE_THREADS` for threads).
+	 *
+	 * This base implementation just forwards whatever payload it's given — it exists so every
+	 * concrete channel's `modify()` has a single shared REST call to delegate to. Each concrete
+	 * channel class (`GuildTextChannel`, `GuildVoiceChannel`, `GuildForumChannel`,
+	 * `GuildThreadChannel`, `GuildCategoryChannel`, `GuildStageChannel`,
+	 * `GuildAnnouncementChannel`) overrides `modify()` with a narrower, type-specific options
+	 * object appropriate to that channel type, then calls this method to perform the request.
+	 * @param options The fields to change; omitted fields are left untouched.
+	 */
 	async modify(options: Partial<DiscordChannel>): Promise<void> {
 		await this.client.rest.patch(`/channels/${this.id}`, options);
 	}

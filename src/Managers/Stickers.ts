@@ -4,6 +4,7 @@ import { Client } from "../Client.js";
 import { DiscordSticker } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 
+/** Cache of a single guild's custom {@link Sticker}s. */
 export class StickerCache extends GuildCache<string, Sticker, DiscordSticker> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);

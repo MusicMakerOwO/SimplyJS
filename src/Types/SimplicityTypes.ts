@@ -23,6 +23,7 @@ import { GuildForumChannel } from "../Structures/Channels/GuildForumChannel.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
 import { GuildStageChannel } from "../Structures/Channels/GuildStageChannel.js";
 
+/** Every concrete channel structure the library can produce, falling back to `BaseChannel` for unhandled types */
 export type Channel =
 	| GuildAnnouncementChannel
 	| GuildTextChannel
@@ -41,21 +42,33 @@ export type MessageableChannel =
 	| GuildStageChannel
 	| GuildThreadChannel
 
+/** Payload for `MessageDelete`; Discord only sends identifiers, never the deleted message itself */
 export type MessageDeletePayload = {
+	/** ID of the deleted message */
 	id: string;
+	/** Channel the message was deleted from */
 	channel_id: string;
+	/** Guild the channel belongs to, or `null` for DM channels */
 	guild_id: string | null;
 };
 
+/** Payload for `MessageDeleteBulk`; Discord only sends identifiers, never the deleted messages themselves */
 export type MessageDeleteBulkPayload = {
+	/** IDs of the deleted messages */
 	ids: string[];
+	/** Channel the messages were deleted from */
 	channel_id: string;
+	/** Guild the channel belongs to, or `null` for DM channels */
 	guild_id: string | null;
 };
 
+/** Payload for `InviteDelete`; Discord only sends the invite's location and code, never the invite itself */
 export type InviteDeletePayload = {
+	/** Channel the invite pointed to */
 	channel_id: string;
+	/** Guild the invite belonged to, omitted for group DM invites */
 	guild_id?: string;
+	/** The invite code that was deleted */
 	code: string;
 };
 

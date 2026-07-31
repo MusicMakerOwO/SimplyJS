@@ -189,11 +189,13 @@ export class TTLCache<K, V> implements Iterable<[K, V]> {
 		return this.entries();
 	}
 
+	/** Converts a TTL into an absolute expiry timestamp, or `null` for `Infinity` (never expires) */
 	#resolveExpiresAt(ttl: number): number | null {
 		if (ttl === Infinity) return null;
 		return Date.now() + ttl;
 	}
 
+	/** Looks up a raw entry, lazily evicting and firing the expiry callback if it has expired */
 	#getEntry(key: K): TTLCacheEntry<V> | undefined {
 		const entry = this.#entries.get(key);
 		if (!entry) return undefined;
@@ -206,6 +208,7 @@ export class TTLCache<K, V> implements Iterable<[K, V]> {
 		return undefined;
 	}
 
+	/** Sweeps every entry, evicting and firing the expiry callback for anything already expired */
 	#purgeExpired(now = Date.now()): void {
 		let purgedAny = false;
 
@@ -220,10 +223,12 @@ export class TTLCache<K, V> implements Iterable<[K, V]> {
 		if (purgedAny) this.#scheduleCleanup();
 	}
 
+	/** Tests whether an entry's `expiresAt` has passed; entries with a `null` expiry never expire */
 	#isExpired(entry: TTLCacheEntry<V>, now = Date.now()): boolean {
 		return entry.expiresAt !== null && entry.expiresAt <= now;
 	}
 
+	/** (Re)schedules a single timer to fire at the next-soonest expiry across all entries, then reschedules itself */
 	#scheduleCleanup(): void {
 		this.#clearCleanupTimer();
 
@@ -244,12 +249,17 @@ export class TTLCache<K, V> implements Iterable<[K, V]> {
 		}, Math.max(0, nextExpiration - Date.now())).unref();
 	}
 
+	/** Clears any pending cleanup timer, if one is scheduled */
 	#clearCleanupTimer(): void {
 		if (this.#cleanupTimer === null) return;
 		clearTimeout(this.#cleanupTimer);
 		this.#cleanupTimer = null;
 	}
 
+	/**
+	 * Validates a TTL value.
+	 * @throws {RangeError} When `ttl` is negative, `NaN`, or otherwise not finite (`Infinity` is allowed).
+	 */
 	static #normalizeTTL(ttl: number): number {
 		if (ttl === Infinity) return ttl;
 		if (!Number.isFinite(ttl) || ttl < 0) {

@@ -84,6 +84,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		}
 	}
 
+	/** The member's user id, proxied from {@link Member.user} for convenience */
 	get id(): string {
 		return this.user.id;
 	}

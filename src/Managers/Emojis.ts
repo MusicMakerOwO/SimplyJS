@@ -4,6 +4,7 @@ import { Client } from "../Client.js";
 import { DiscordEmoji } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 
+/** Cache of a single guild's custom {@link Emoji}s. */
 export class EmojiCache extends GuildCache<string, Emoji, DiscordEmoji> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);

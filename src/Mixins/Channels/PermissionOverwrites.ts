@@ -3,9 +3,17 @@ import { ChannelPermissionManager } from "../../Managers/ChannelPermissionManage
 import { Constructor, DiscordChannel } from "../../Types/index.js";
 
 type PermissionOverwritesClass<T> = {
+	/** Manager for this channel's per-role and per-member permission overwrites */
 	permission_overwrites?: ChannelPermissionManager;
 } & T;
 
+/**
+ * Mixes a `permission_overwrites` manager into a channel class, created on first `patch()`
+ * and updated in place on subsequent ones so existing references stay valid. Applied to
+ * channel types that support permission overwrites.
+ * @param Base The channel class to extend.
+ * @returns A subclass of `Base` with a `permission_overwrites` property.
+ */
 export function PermissionOverwrites<TBase extends Constructor<BaseChannel>>(
 	Base: TBase,
 ): Constructor<PermissionOverwritesClass<InstanceType<TBase>>> {

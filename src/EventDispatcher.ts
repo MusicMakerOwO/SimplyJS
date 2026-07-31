@@ -6,18 +6,19 @@ import { EventHandler, JSONObject } from "./Types/Internal.js";
 import * as AvailableEvents from "./Events/index.js";
 
 type GatewayEventName = ObjectValues<typeof GatewayEvents>;
+/** Signature of the function returned by {@link CreateDispatch}, routing a named gateway event to its handler */
 export type DispatchFunction = (
 	client: Client,
 	event: GatewayEventName,
 	data: JSONObject
 ) => void;
 
+/** Handler invoked for a single gateway event, receiving the raw event data payload */
 export type EventCallback<T extends JSONObject = JSONObject> = (client: Client, data: T) => Awaitable<void>
 
 /**
  * Creates a dispatch function for handling events. This function contains a mapping of all events and names, this cannot be changed at runtime.
- * @param eventOverrides
- * @constructor
+ * @param eventOverrides Per-event handlers to use instead of the library's built-in ones from `./Events`, keyed by gateway event name.
  */
 export function CreateDispatch(
 	eventOverrides: Partial<Record<GatewayEventName, EventCallback>> = {}

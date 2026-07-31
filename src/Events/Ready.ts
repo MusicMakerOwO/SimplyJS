@@ -24,6 +24,13 @@ type ReadyPayload = {
 	}
 };
 
+/**
+ * Fires once the client is ready for normal use.
+ *
+ * Emitted after the raw `READY` payload is processed and either all guilds listed in it have
+ * arrived via `GuildCreate`, or {@link READY_GUILD_FALLBACK_TIMEOUT_MS} elapses, whichever
+ * comes first.
+ */
 export const Ready = defineEvent({
 	name   : GatewayEvents.Ready,
 	handler: (client, data: ReadyPayload): void => {

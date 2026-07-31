@@ -2,6 +2,10 @@ import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata, DiscordChan
 import { BaseChannel } from "./BaseChannel.js";
 import { Messageable } from "../../Mixins/Channels/Messageable.js";
 
+/**
+ * A thread channel (public, private, or announcement). Threads inherit permission overwrites
+ * from their parent channel rather than declaring their own.
+ */
 export class GuildThreadChannel extends Messageable(BaseChannel) {
 	declare type: typeof DiscordChannelTypes.ANNOUNCEMENT_THREAD | typeof DiscordChannelTypes.PUBLIC_THREAD | typeof DiscordChannelTypes.PRIVATE_THREAD
 
@@ -9,14 +13,22 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 	// es2022+), an emitted initializer would run after super() and wipe the value patch() just
 	// set during construction (patch() is invoked from BaseChannel's constructor, further up
 	// the super() chain than this class's own field declarations).
+	/** Id of the user who created the thread */
 	declare owner_id?: string
+	/** Id of the channel the thread was created in */
 	declare parent_id?: string | null
 	declare last_message_id?: string | null
+	/** Number of messages in the thread, not counting the initial message or deleted messages */
 	declare message_count?: number
+	/** Approximate number of members in the thread; Discord stops counting past `50`, so this is not exact for larger threads */
 	declare member_count?: number
+	/** Thread-specific state: archive status, auto-archive duration, lock status, and timestamps */
 	declare thread_metadata?: DiscordThreadMetadata
+	/** Thread membership data for the current user, only present when the current user has joined the thread */
 	declare member?: DiscordThreadMember
+	/** Total number of messages ever sent in the thread, including deleted ones; unlike `message_count` this never decreases */
 	declare total_message_sent?: number
+	/** Ids of the forum/media tags applied to this thread */
 	declare applied_tags?: string[]
 	declare rate_limit_per_user?: number
 	// no permission_overwrites - threads inherit from parent

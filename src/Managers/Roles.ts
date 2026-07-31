@@ -8,6 +8,7 @@ import { DiscordPermissions } from "../Constants.js";
 import { JSONObject } from "../Types/index.js";
 import { SerializeBitFieldValue } from "../Utils.js";
 
+/** Cache of a single guild's {@link Role}s. */
 export class RoleCache extends GuildCache<string, Role, DiscordRole> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);

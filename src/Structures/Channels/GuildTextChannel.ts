@@ -4,6 +4,9 @@ import { Messageable } from "../../Mixins/Channels/Messageable.js";
 import { Moveable } from "../../Mixins/Channels/Moveable.js";
 import { PermissionOverwrites } from "../../Mixins/Channels/PermissionOverwrites.js";
 
+/**
+ * A standard guild text channel.
+ */
 export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(BaseChannel))) {
 	declare type: typeof DiscordChannelTypes.GUILD_TEXT | typeof DiscordChannelTypes.GUILD_ANNOUNCEMENT
 
@@ -14,9 +17,12 @@ export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(
 	declare topic?: string | null
 	declare nsfw?: boolean
 	declare last_message_id?: string | null
+	/** Slowmode duration in seconds that members must wait between sending messages, `0` for no slowmode */
 	declare rate_limit_per_user?: number
 	declare parent_id?: string | null
+	/** ISO timestamp of the last pinned message, or `null` if none are pinned; not guaranteed to be accurate */
 	declare last_pin_timestamp?: string | null
+	/** Default auto-archive duration, in minutes, applied to newly created threads in this channel */
 	declare default_auto_archive_duration?: number
 
 	patch(data: DiscordChannel): void {

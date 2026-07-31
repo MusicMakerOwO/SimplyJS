@@ -3,6 +3,7 @@ import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordMember, DiscordUser } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplicityTypes.js";
 
+/** Fires when a member joins a guild; ignored if the guild isn't cached */
 export const MemberCreate = defineEvent({
 	name: GatewayEvents.GuildMemberAdd,
 	handler: (client, data: DiscordMember & { guild_id: string }): void => {
@@ -13,6 +14,7 @@ export const MemberCreate = defineEvent({
 	}
 });
 
+/** Fires when a member leaves or is removed from a guild; ignored if the guild isn't cached */
 export const MemberDelete = defineEvent({
 	name: GatewayEvents.GuildMemberRemove,
 	handler: (client, data: { user: DiscordUser, guild_id: string }): void => {
@@ -24,6 +26,7 @@ export const MemberDelete = defineEvent({
 	}
 });
 
+/** Fires when guild member data (nickname, roles, etc) changes; ignored if the guild isn't cached */
 export const MemberUpdate = defineEvent({
 	name: GatewayEvents.GuildMemberUpdate,
 	handler: (client, data: DiscordMember & { guild_id: string }): void => {

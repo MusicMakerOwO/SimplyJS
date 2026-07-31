@@ -14,6 +14,7 @@ import { BitField, type FlagInput } from "../DataStructures/BitField.js";
  */
 export type PermissionResolvable = FlagInput<typeof DiscordPermissions>;
 
+/** Every permission bit OR'd together, returned in place of a resolved bitfield for `ADMINISTRATOR` members */
 const ALL_PERMISSIONS: bigint = Object.values(DiscordPermissions).reduce( (x, a) => x | a );
 
 /**

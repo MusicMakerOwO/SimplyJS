@@ -11,6 +11,7 @@ import { UserCache } from "./Managers/Users.js";
 import { ActivityType, ClientActivity, Status } from "./Types/DiscordAPITypes.js";
 
 type ClientOptions = {
+	/** Bot token used to authenticate both the REST client and the gateway websocket */
 	token: string;
 	/**
 	 * Dictates what events your bot is subscribed to
@@ -29,9 +30,14 @@ type ClientOptions = {
 		| ObjectValues<typeof GatewayIntents>[]
 		| (keyof typeof GatewayIntents)[];
 
+	/** Options forwarded to the underlying {@link WSClient} (jitter, event overrides, etc) */
 	ws?: WSOptions
 }
 
+/**
+ * The entry point for interacting with Discord: owns the REST client, the gateway websocket,
+ * and the top-level caches. Extends `EventEmitter` to surface gateway events by name.
+ */
 export class Client extends EventEmitter<ClientEventMap> {
 	/** Exposed for interacting directly with Discord's WebSocket. Authorization is handled automatically for you */
 	socket: WSClient;
@@ -115,6 +121,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 		this.#updatePressence();
 	}
 
+	/** Sends the current `status`/`activity` to Discord via a gateway `Presence Update` payload */
 	#updatePressence() {
 		const payload = {
 			op: GatewayOpCodes.PresenceUpdate,

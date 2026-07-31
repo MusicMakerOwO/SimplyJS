@@ -2,6 +2,10 @@ import { Guild, Invite } from "../Structures/index.js";
 import { Client } from "../Client.js";
 import { DiscordInvite } from "../Types/index.js";
 
+/**
+ * Manages a guild's invites. This manager has no local cache — every method calls the REST API
+ * directly.
+ */
 export class GuildInviteManager {
 	client: Client;
 	guild: Guild;
@@ -11,6 +15,14 @@ export class GuildInviteManager {
 		this.guild = guild;
 	}
 
+	/**
+	 * Creates an invite for a channel in this guild. Requires the `CREATE_INSTANT_INVITE`
+	 * permission.
+	 * @param channel_id The id of the channel (must belong to this guild) to create the invite for.
+	 * @param options Invite creation options.
+	 * @returns The created invite.
+	 * @throws {Error} When `channel_id` does not refer to a channel cached on this guild.
+	 */
 	async create(channel_id: string, options: {
 		/** duration of invite in seconds before expiry, or 0 for never. between 0 and 604800 (7 days) */
 		max_age: number;
@@ -34,11 +46,24 @@ export class GuildInviteManager {
 		return new Invite(this.client, response);
 	}
 
+	/**
+	 * Deletes (revokes) an invite. Requires the `MANAGE_GUILD` permission, or `MANAGE_CHANNELS`
+	 * plus ownership of the invite.
+	 * @param code The invite code to delete.
+	 * @param reason Optional audit log reason.
+	 */
 	async delete(code: string, reason?: string): Promise<void> {
 		await this.client.rest.delete(`/guilds/${this.guild.id}/invites/${code}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
 	}
 
+	/**
+	 * Fetches a single invite by code.
+	 * @param code The invite code to fetch.
+	 */
 	async fetch(code: string): Promise<Invite>;
+	/**
+	 * Fetches every invite for this guild. Requires the `MANAGE_GUILD` permission.
+	 */
 	async fetch(): Promise<Invite[]>;
 	async fetch(code?: string): Promise<Invite | Invite[]> {
 		if (typeof code === 'string') {

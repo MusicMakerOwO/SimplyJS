@@ -5,9 +5,13 @@ import { Client } from "./Client.js";
 import { CreateDispatch, DispatchFunction, EventCallback } from "./EventDispatcher.js";
 import { GatewayEventName, JSONObject } from "./Types/Internal.js";
 
+/** Events emitted by {@link WSClient}, separate from the Discord gateway events dispatched via `dispatch()`. */
 export type WSEvents = {
+	/** Fired for every raw gateway payload received, before any dispatch handling */
 	"RAW": [data: unknown];
+	/** Fired each time a heartbeat is sent to the gateway */
 	"HEARTBEAT": [];
+	/** Fired when the gateway acknowledges a heartbeat */
 	"HEARTBEAT_ACK": [];
 }
 
@@ -30,22 +34,35 @@ export type WSOptions = {
 	 */
 	intents?: number;
 
+	/**
+	 * Per-event handler overrides, keyed by gateway event name, used in place of the library's
+	 * built-in handler for that event. Passed straight through to {@link CreateDispatch}.
+	 */
 	eventOverrides?: Partial<Record<GatewayEventName, EventCallback>>
 }
 
+/**
+ * Manages the raw Discord gateway websocket connection: identifying, heartbeating, and
+ * dispatching incoming payloads to event handlers. One `WSClient` backs each {@link Client}.
+ */
 export class WSClient extends EventEmitter<WSEvents> {
 	#token: string | null = null;
 	#socket: WebSocket | null;
 	#sequence: number | null;
 
+	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeat_interval: number;
+	/** Randomization factor (0–1) applied to `heartbeat_interval` for the first heartbeat delay */
 	jitter: number;
+	/** Gateway intents bitfield sent on `IDENTIFY`, controlling which events Discord sends */
 	intents: number;
 
 	/** Whether Discord authentication has completed */
 	ready: boolean;
 
+	/** The {@link Client} this websocket belongs to, passed to dispatched event handlers */
 	client: Client;
+	/** Handler that routes incoming gateway events to their registered callbacks */
 	dispatch: DispatchFunction;
 
 	constructor(client: Client, options: WSOptions) {
@@ -94,6 +111,10 @@ export class WSClient extends EventEmitter<WSEvents> {
 		this.#socket!.send(JSON.stringify(msg));
 	}
 
+	/**
+	 * Parses an incoming gateway frame, tracks the sequence number, handles `HELLO` locally, and
+	 * otherwise forwards named dispatch events to {@link dispatch}.
+	 */
 	#handleMessage(rawData: string): void {
 		const data = JSON.parse(rawData) as GatewayPayload;
 		this.emit("RAW", data);
@@ -117,6 +138,10 @@ export class WSClient extends EventEmitter<WSEvents> {
 		this.dispatch(this.client, data.t, data.d as JSONObject);
 	}
 
+	/**
+	 * Handles the gateway's `HELLO` payload: starts the heartbeat interval (scaled by `jitter`)
+	 * and sends the `IDENTIFY` payload to begin authentication.
+	 */
 	#handleHello(data: unknown): void {
 		if (!this.#isHelloPayload(data)) return;
 
@@ -148,12 +173,14 @@ export class WSClient extends EventEmitter<WSEvents> {
 		});
 	}
 
+	/** Type guard confirming a `HELLO` payload carries a numeric `heartbeat_interval` */
 	#isHelloPayload(data: unknown): data is { heartbeat_interval: number } {
 		if (typeof data !== "object" || data === null) return false;
 		if (!("heartbeat_interval" in data)) return false;
 		return typeof data.heartbeat_interval === "number";
 	}
 
+	/** Guards against sending before {@link setToken} and {@link initialize} have both run */
 	#checkInitialization(): void {
 		if (!this.#token) throw new Error("Token not provided");
 		if (!this.#socket) throw new Error("Rest client not initialized");

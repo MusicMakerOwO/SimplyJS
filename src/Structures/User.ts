@@ -11,6 +11,10 @@ import { MessagePayload } from "../Types/Internal.js";
 import { CreateMessagePayload, Message } from "./Message.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
 
+/**
+ * A Discord user account. Represents the global identity behind a {@link Member} in a guild,
+ * or the other party in a direct message.
+ */
 export class User extends APIClientStructure<DiscordUser> {
 	/** Cached DM channel used by `send()` after the first create/open call */
 	#dmChannel: DiscordChannel | undefined;
@@ -127,6 +131,12 @@ export class User extends APIClientStructure<DiscordUser> {
 		return `<@${this.id}>`;
 	}
 
+	/**
+	 * Builds the URL for this user's default avatar, used as a fallback when no custom
+	 * `avatar` is set. The index is derived from the user id (or discriminator, for
+	 * legacy-format accounts) so it is stable per-user.
+	 * @returns The default avatar image URL.
+	 */
 	defaultAvatarURL(): string {
 		const index = this.discriminator === "0"
 			? (BigInt(this.id) >> 22n) % 6n
@@ -135,6 +145,13 @@ export class User extends APIClientStructure<DiscordUser> {
 		return `https://cdn.discordapp.com/embeds/avatar/${index}.png`;
 	}
 
+	/**
+	 * Builds the URL for this user's custom avatar, or falls back to
+	 * {@link User.defaultAvatarURL} when none is set.
+	 * @param animated Whether to request the animated `.webp` variant instead of `.png`.
+	 * @default true
+	 * @returns The avatar image URL.
+	 */
 	avatarURL(animated?: boolean): string {
 		if (!this.avatar) return this.defaultAvatarURL();
 		return (animated ?? true) // nullish collation, only overrides `undefined`

@@ -9,6 +9,7 @@ import { User } from "./User.js";
 import { Client } from "../Client.js";
 import { Guild } from "./Guild.js";
 
+/** A custom guild sticker, or a standard sticker from a purchasable sticker pack. */
 export class Sticker extends APIGuildStructure<DiscordSticker> {
 	id!: string
 	/** Sticker pack id for standard stickers, when present */

@@ -31,6 +31,11 @@ export type PartialInviteRole = Pick<DiscordRole, 'id' | 'name' | 'position' | '
  */
 export type AnyInviteData = DiscordInvite | GatewayInvite;
 
+/**
+ * A guild invite. Normalizes the differing REST and gateway payload shapes (see
+ * {@link AnyInviteData}) down to id-based fields, resolving `guild`, `channel` and
+ * `roles` from cache lazily via the partial data kept for uncached targets.
+ */
 export class Invite extends APIClientStructure<AnyInviteData> {
 
 	/** the invite code (unique ID) */
@@ -197,10 +202,16 @@ export class Invite extends APIClientStructure<AnyInviteData> {
 		return this.uses !== undefined;
 	}
 
+	/**
+	 * Revokes this invite. Requires the `MANAGE_GUILD` permission, or `MANAGE_CHANNELS` for the
+	 * invite's channel, and will error otherwise.
+	 * @param reason Optional audit log reason.
+	 */
 	async delete(reason?: string): Promise<void> {
 		return await this.client.rest.delete(`/invites/${this.code}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
 	}
 
+	/** Generate the shareable invite URL: `Join here: ${invite.toString()}` -> `Join here: https://discord.gg/abc123` */
 	toString(): string {
 		return `https://discord.gg/${this.code}`
 	}

@@ -6,11 +6,26 @@ const DEFAULT_RETRY_COUNT = 3;
 const TRANSIENT_HTTP_STATUS = new Set([500, 502, 503, 504]);
 const EMPTY_RESPONSE_STATUS = new Set([204, 205, 304]);
 
+/**
+ * Derives a coarse per-route cache key from a method and route, before Discord has told us
+ * which rate limit bucket the route actually belongs to.
+ *
+ * Used as a fallback lookup key in {@link Rest.routeToBucket} and as the initial rate limit cache
+ * key until a `X-RateLimit-Bucket` header is observed for that route.
+ */
 function PerRouteCacheKey(method: string, route: string): string {
 	const [category = "global", id = "global"] = route.split("/").filter(Boolean);
 	return `${method.toUpperCase()}:${category}/${id}`;
 }
 
+/**
+ * Extracts the "major parameter" (channel, guild, or webhook id) from a route.
+ *
+ * Discord scopes rate limit buckets per major resource, not just per bucket hash - two routes can
+ * share a bucket hash yet still rate limit independently per channel/guild/webhook. Mixing this
+ * into the rate limit cache key keeps requests against different resources from blocking each
+ * other. Routes with no major resource (or one not tracked here) collapse to `"global"`.
+ */
 function MajorResourceKey(route: string): string {
 	const [resource, id, token] = route.split("/").filter(Boolean);
 
@@ -60,14 +75,36 @@ export type RestOptions = {
 	perRouteRateLimits?: boolean;
 };
 
+/**
+ * HTTP client for the Discord REST API. Handles authentication, retries on transient server
+ * errors, and rate limit tracking/backoff (globally or per-route, see {@link RestOptions.perRouteRateLimits}).
+ */
 export class Rest {
 	#token: string | null = null;
 
+	/** If `false`, throws on `429` responses instead of waiting and retrying */
 	retryAfterRateLimit: boolean;
+	/** Multiplier applied to every computed rate limit wait time */
 	rateLimitDurationMultiplier: number;
+	/** Whether per-route rate limit tracking is enabled, see {@link RestOptions.perRouteRateLimits} */
 	perRouteRateLimits: boolean;
 
+	/**
+	 * TTL cache of rate limit wait keys (see {@link routeToBucket}) to the milliseconds to wait
+	 * before the limit resets. Checked before every request and set whenever a `429` is received,
+	 * so subsequent requests sharing the same key sleep out the window instead of hitting Discord.
+	 */
 	routeRateLimits: TTLCache<string, number>;
+	/**
+	 * Maps a per-route cache key (method + first two path segments) to the actual Discord
+	 * rate-limit bucket hash returned in the `X-RateLimit-Bucket` response header.
+	 *
+	 * Discord's real rate limits are keyed by bucket hash, not by route shape: routes that look
+	 * different can share a bucket, and routes that look the same can be split across several.
+	 * The bucket hash for a route is only known after the first response, so the first request
+	 * to a route falls back to the route-shaped key; once a bucket is learned, later requests key
+	 * off `bucket:<hash>:<major resource>` instead, matching Discord's actual limit grouping.
+	 */
 	routeToBucket: Map<string, string>;
 
 	constructor(options: RestOptions = {}) {
@@ -88,6 +125,7 @@ export class Rest {
 		if (!this.#token) throw new Error("Rest client not authenticated");
 	}
 
+	/** Resolves after the given delay, or immediately for a non-positive value */
 	async #sleep(milliseconds: number): Promise<void> {
 		if (milliseconds <= 0) return;
 		await new Promise<void>((resolve) => {
@@ -95,6 +133,7 @@ export class Rest {
 		});
 	}
 
+	/** Parses a response body as a Discord error payload, or `null` if empty or not valid JSON */
 	#parseResponseBody(rawBody: string): DiscordErrorResponse | null {
 		if (rawBody.length === 0) return null;
 		try {
@@ -104,6 +143,7 @@ export class Rest {
 		}
 	}
 
+	/** Computes the {@link routeRateLimits} lookup key for a request, using a learned bucket when available */
 	#resolveRateLimitCacheKey(method: RestMethod, route: string): string {
 		if (!this.perRouteRateLimits) return "global";
 
@@ -114,6 +154,10 @@ export class Rest {
 		return `bucket:${bucket}:${MajorResourceKey(route)}`;
 	}
 
+	/**
+	 * Records the route's rate-limit bucket hash from the response, if present, and returns the
+	 * bucket-scoped cache key so the caller can key off it going forward.
+	 */
 	#rememberBucket(method: RestMethod, route: string, response: Response): string | null {
 		if (!this.perRouteRateLimits) return null;
 
@@ -124,6 +168,11 @@ export class Rest {
 		return `bucket:${bucket}:${MajorResourceKey(route)}`;
 	}
 
+	/**
+	 * Determines how long to wait after a `429`, preferring the response body's `retry_after`,
+	 * then the `X-RateLimit-Reset-After`/`Retry-After` headers, then the `X-RateLimit-Reset`
+	 * epoch timestamp, falling back to a flat one second if none are present.
+	 */
 	#resolveRateLimitWaitMilliseconds(response: Response, body: DiscordErrorResponse | null): number {
 		const fromBody = body?.retry_after;
 		if (typeof fromBody === "number" && Number.isFinite(fromBody)) {
@@ -159,6 +208,7 @@ export class Rest {
 		return 1000;
 	}
 
+	/** Builds an `Error` describing a failed request, preferring the parsed Discord error message and code */
 	#createApiError(response: Response, rawBody: string, parsedBody: DiscordErrorResponse | null): Error {
 		const message =
 			parsedBody?.message && parsedBody.message.length > 0
@@ -169,6 +219,13 @@ export class Rest {
 		return new Error(`Discord API Error: ${message} (${code})`);
 	}
 
+	/**
+	 * Core request implementation shared by `get()`/`post()`/`patch()`/`delete()`/`put()`.
+	 *
+	 * Sleeps out any known rate limit window before sending, retries transient `5xx` responses
+	 * with exponential backoff, and on `429` records the wait time before retrying (or throwing
+	 * immediately if {@link retryAfterRateLimit} is `false` or retries are exhausted).
+	 */
 	async #request<T>(
 		method: RestMethod,
 		route: string,

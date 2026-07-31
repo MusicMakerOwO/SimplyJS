@@ -11,6 +11,7 @@ export const MessageCreate = defineEvent({
 	}
 });
 
+/** Fires when a single message is deleted; Discord only sends identifiers, not the deleted message */
 export const MessageDelete = defineEvent({
 	name: GatewayEvents.MessageDelete,
 	handler: (client, data: {
@@ -22,6 +23,7 @@ export const MessageDelete = defineEvent({
 	}
 });
 
+/** Fires when multiple messages are deleted at once; Discord only sends identifiers, not the deleted messages */
 export const MessageDeleteBulk = defineEvent({
 	name: GatewayEvents.MessageDeleteBulk,
 	handler: (client, data: {
