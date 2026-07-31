@@ -2034,4 +2034,157 @@ describe("User.send() DM flow", () => {
 			expect(route).not.toContain("?");
 		});
 	});
+
+	// ---------------------------------------------------------------------------
+	// User avatars
+	// ---------------------------------------------------------------------------
+
+	describe("User.defaultAvatar()", () => {
+		let client: Client;
+
+		beforeEach(() => {
+			client = makeClient();
+		});
+
+		it("returns correct URL for users with discriminator 0", () => {
+			const user = makeUser(client, "123456789");
+			user.discriminator = "0";
+
+			const url = user.defaultAvatarURL();
+			expect(url).toMatch(/^https:\/\/cdn\.discordapp\.com\/embeds\/avatar\/\d+\.png$/);
+		});
+
+		it("uses (id >> 22) % 6 for discriminator 0", () => {
+			const user = makeUser(client, "123456789");
+			user.discriminator = "0";
+
+			const url = user.defaultAvatarURL();
+			const index = (BigInt("123456789") >> 22n) % 6n;
+			expect(url).toBe(`https://cdn.discordapp.com/embeds/avatar/${index}.png`);
+		});
+
+		it("uses id % 5 for users with non-zero discriminator", () => {
+			const user = makeUser(client, "987654321");
+			user.discriminator = "1234";
+
+			const url = user.defaultAvatarURL();
+			const index = BigInt("987654321") % 5n;
+			expect(url).toBe(`https://cdn.discordapp.com/embeds/avatar/${index}.png`);
+		});
+
+		it("returns indices 0-5 for discriminator 0", () => {
+			const indices = new Set<bigint>();
+
+			for (let i = 0; i < 50; i++) {
+				const user = makeUser(client, String(1000000000 + i));
+				user.discriminator = "0";
+
+				const url = user.defaultAvatarURL();
+				const match = url.match(/\/(\d+)\.png$/);
+				if (match) {
+					indices.add(BigInt(match[1]));
+				}
+			}
+
+			const sorted = Array.from(indices).sort();
+			expect(Math.max(...sorted.map(n => Number(n)))).toBeLessThan(6);
+			expect(Math.min(...sorted.map(n => Number(n)))).toBeGreaterThanOrEqual(0);
+		});
+
+		it("returns indices 0-4 for non-zero discriminator", () => {
+			const indices = new Set<bigint>();
+
+			for (let i = 0; i < 50; i++) {
+				const user = makeUser(client, String(2000000000 + i));
+				user.discriminator = "5";
+
+				const url = user.defaultAvatarURL();
+				const match = url.match(/\/(\d+)\.png$/);
+				if (match) {
+					indices.add(BigInt(match[1]));
+				}
+			}
+
+			const sorted = Array.from(indices).sort();
+			expect(Math.max(...sorted.map(n => Number(n)))).toBeLessThan(5);
+			expect(Math.min(...sorted.map(n => Number(n)))).toBeGreaterThanOrEqual(0);
+		});
+	});
+
+	describe("User.avatarURL()", () => {
+		let client: Client;
+
+		beforeEach(() => {
+			client = makeClient();
+		});
+
+		it("returns default avatar when avatar is null", () => {
+			const user = makeUser(client, "777777777");
+			user.avatar = null;
+
+			const url = user.avatarURL();
+			expect(url).toBe(user.defaultAvatarURL());
+		});
+
+		it("returns webp with animated=true when animated is true", () => {
+			const user = makeUser(client, "111111111");
+			user.avatar = "a_1234567890abcdef";
+
+			const url = user.avatarURL(true);
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.webp?size=1024&animated=true`);
+		});
+
+		it("returns webp with animated=true when animated is undefined (default)", () => {
+			const user = makeUser(client, "111111111");
+			user.avatar = "a_1234567890abcdef";
+
+			const url = user.avatarURL();
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.webp?size=1024&animated=true`);
+		});
+
+		it("returns png when animated is false", () => {
+			const user = makeUser(client, "222222222");
+			user.avatar = "1234567890abcdef";
+
+			const url = user.avatarURL(false);
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/222222222/1234567890abcdef.png?size=1024`);
+		});
+
+		it("includes correct user ID in URL", () => {
+			const user = makeUser(client, "333333333");
+			user.avatar = "abcdef1234567890";
+
+			const url = user.avatarURL();
+			expect(url).toContain("/avatars/333333333/");
+		});
+
+		it("includes correct avatar hash in URL", () => {
+			const user = makeUser(client, "444444444");
+			user.avatar = "a_xyzabc123def456";
+
+			const url = user.avatarURL();
+			expect(url).toContain("/a_xyzabc123def456.");
+		});
+
+		it("includes size parameter", () => {
+			const user = makeUser(client, "555555555");
+			user.avatar = "1234567890abcdef";
+
+			const url = user.avatarURL();
+			expect(url).toContain("size=1024");
+		});
+
+		it("returns different formats based on animated parameter", () => {
+			const user = makeUser(client, "666666666");
+			user.avatar = "1234567890abcdef";
+
+			const webpUrl = user.avatarURL(true);
+			const pngUrl = user.avatarURL(false);
+
+			expect(webpUrl).toContain(".webp");
+			expect(webpUrl).toContain("animated=true");
+			expect(pngUrl).toContain(".png");
+			expect(pngUrl).not.toContain("animated=");
+		});
+	});
 });

@@ -127,6 +127,21 @@ export class User extends APIClientStructure<DiscordUser> {
 		return `<@${this.id}>`;
 	}
 
+	defaultAvatarURL(): string {
+		const index = this.discriminator === "0"
+			? (BigInt(this.id) >> 22n) % 6n
+			: BigInt(this.id) % 5n
+
+		return `https://cdn.discordapp.com/embeds/avatar/${index}.png`;
+	}
+
+	avatarURL(animated?: boolean): string {
+		if (!this.avatar) return this.defaultAvatarURL();
+		return (animated ?? true) // nullish collation, only overrides `undefined`
+			? `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.webp?size=1024&animated=true`
+			: `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.png?size=1024`
+	}
+
 	/** Send a direct message to the user, might fail if they have DMs closed or have blocked the bot */
 	async send(content: string | MessagePayload): Promise<Message> {
 		const payload = CreateMessagePayload(content);
