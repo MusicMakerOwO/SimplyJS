@@ -2,6 +2,7 @@ import { Awaitable, ObjectValues } from "./HelperTypes.js";
 import { GatewayEvents } from "./DiscordGateway.js";
 import { Client } from "../Client.js";
 import { AllowedMentions, Embed, MessageReference } from "./MessageComponents.js";
+import { MessageComponent } from "./Components.js";
 
 /** Raw gateway event name, as sent in the `t` field of a dispatch payload */
 export type GatewayEventName = ObjectValues<typeof GatewayEvents>;
@@ -48,9 +49,8 @@ export type MessagePayload = {
 	allowed_mentions?: AllowedMentions;
 	/** Reference to another message, used for replies */
 	message_reference?: MessageReference;
-	// TODO Components and interactions coming in a later update
-	/** Message components (buttons, select menus, etc), currently untyped pending component support */
-	components?: JSONObject[];
+	/** Message components (buttons, select menus, etc) */
+	components?: MessageComponent[];
 	/** IDs of stickers to attach to the message */
 	sticker_ids?: string[];
 }

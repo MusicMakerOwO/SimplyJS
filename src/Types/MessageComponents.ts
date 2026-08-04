@@ -9,6 +9,7 @@ import {
 } from "./DiscordAPITypes.js";
 import { JSONObject } from "./Internal.js";
 import { MessageComponent } from "./Components.js";
+import { MessageInteraction } from "./Interactions.js";
 
 export const EmbedTypes = {
 	/** generic embed rendered from embed attributes */
@@ -524,8 +525,7 @@ export type DiscordMessage = {
 	// TODO Interactions coming in a later update
 	interaction_metadata?: JSONObject;
 	/** Deprecated in favor of interaction_metadata; sent if the message is a response to an interaction */
-	// TODO Interactions coming in a later update
-	interaction?: JSONObject;
+	interaction?: MessageInteraction;
 	/** the thread that was started from this message, includes thread member object */
 	thread?: DiscordChannel;
 	/** sent if the message contains components like buttons, action rows, or other interactive components */

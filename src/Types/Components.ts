@@ -1,4 +1,4 @@
-import { ObjectValues } from "./HelperTypes.js";
+import { ObjectValues, Prettify } from "./HelperTypes.js";
 import { DiscordChannelTypes } from "./DiscordAPITypes.js";
 
 /**
@@ -90,31 +90,34 @@ type BaseComponent<TType extends ComponentType> = {
 };
 
 /** Non-interactive button styles, which require `custom_id` and receive an interaction when clicked */
-type BaseButton = BaseComponent<typeof ComponentTypes.BUTTON> & {
+type BaseButton = {
+	type: typeof ComponentTypes.BUTTON;
 	/** text that appears on the button, max 80 characters */
-	label?: string;
+	label: string;
 	/** emoji displayed on the button */
 	emoji?: ComponentEmoji;
 	/** whether the button is disabled, defaults to false */
 	disabled?: boolean;
 };
 
-export type InteractiveButton = BaseButton & {
+export type InteractiveButton = Prettify< BaseButton & {
 	style: typeof ButtonStyles.PRIMARY | typeof ButtonStyles.SECONDARY | typeof ButtonStyles.SUCCESS | typeof ButtonStyles.DANGER;
 	/** developer-defined identifier, max 100 characters, must be unique per message/modal */
 	custom_id: string;
-};
+} >;
 
-export type LinkButton = BaseButton & {
+export type LinkButton = Prettify< BaseButton & {
 	style: typeof ButtonStyles.LINK;
 	/** url the button opens, max 512 characters; no interaction is sent when clicked */
 	url: string;
-};
+} >;
 
-export type PremiumButton = BaseButton & {
+export type PremiumButton = {
+	type: typeof ComponentTypes.BUTTON
 	style: typeof ButtonStyles.PREMIUM;
 	/** id of the SKU the button purchases; no interaction is sent when clicked */
 	sku_id: string;
+	disabled?: boolean;
 };
 
 /**
@@ -227,7 +230,6 @@ export const TextInputStyles = {
 	/** multi-line input */
 	PARAGRAPH: 2
 } as const;
-export type TextInputStyle = ObjectValues<typeof TextInputStyles>;
 
 /**
  * Free-form text field, modal-only. Must be nested inside a {@link Label}.
@@ -238,7 +240,7 @@ export type TextInput = BaseComponent<typeof ComponentTypes.TEXT_INPUT> & {
 	/** developer-defined identifier, max 100 characters, must be unique per modal */
 	custom_id: string;
 	/** whether the input is single-line or multi-line */
-	style: TextInputStyle;
+	style: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH;
 	/** minimum input length, 0-4000 */
 	min_length?: number;
 	/** maximum input length, 1-4000 */

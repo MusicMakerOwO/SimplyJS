@@ -34,7 +34,7 @@ describe("CreateMessagePayload", () => {
 	});
 
 	it("accepts a payload with only components", () => {
-		const payload = CreateMessagePayload({ components: [{ type: 1 }] });
+		const payload = CreateMessagePayload({ components: [{ type: 1, components: [] }] });
 
 		expect(payload.components).toHaveLength(1);
 	});
