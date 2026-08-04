@@ -1,3 +1,5 @@
+export * from "./ApplicationCommand.js";
+export * from "./Components.js";
 export * from "./DiscordAPITypes.js";
 export * from "./DiscordGateway.js";
 export * from "./DiscordOAuth.js";

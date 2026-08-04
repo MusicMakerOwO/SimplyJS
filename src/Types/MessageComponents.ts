@@ -8,6 +8,7 @@ import {
 	DiscordUser
 } from "./DiscordAPITypes.js";
 import { JSONObject } from "./Internal.js";
+import { MessageComponent } from "./Components.js";
 
 export const EmbedTypes = {
 	/** generic embed rendered from embed attributes */
@@ -528,8 +529,7 @@ export type DiscordMessage = {
 	/** the thread that was started from this message, includes thread member object */
 	thread?: DiscordChannel;
 	/** sent if the message contains components like buttons, action rows, or other interactive components */
-	// TODO Components coming in a later update
-	components?: JSONObject[];
+	components?: MessageComponent[];
 	/** sent if the message contains stickers */
 	sticker_items?: StickerItem[];
 	/** Deprecated the stickers sent with the message */
