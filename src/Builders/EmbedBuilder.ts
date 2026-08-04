@@ -24,7 +24,7 @@ function AssertFieldLimits(fields: EmbedField[]): void {
 }
 
 /** Fluent builder for constructing a Discord message embed, validating field limits as they're set. */
-export class EmbedBuilder {
+export class EmbedBuilder implements Embed {
 	/**
 	 * Creates a builder from an existing embed payload
 	 */
