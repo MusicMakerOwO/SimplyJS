@@ -2,6 +2,33 @@
 
 ## Active backlog
 
+- [x] Interaction collectors (buttons, select menus, modals)
+- [x] Slash command builder and all the options
+- [ ] `client.registerCommands(...)`
+- [x] Create a mixin system for channel class inheritance
+- [x] Start planning mixins for interactions
+- [x] Add component and interaction payload support
+	- Define interaction structures in `src/Structures/` (InteractionMessage, InteractionCommandOption, etc.)
+	- Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
+	- Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
+- [ ] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
+- [ ] Add collectors, name pending
+  - Temporary filtered event listeners that await matching events over a time period and auto-cleanup
+  - Useful for interactions like "wait for the next message from this user"
+lol
+- [ ] Add examples showcasing interactions
+  - [ ] Creating/Registering commands
+  - [ ] Responding to commands
+  - [ ] Responding to other components (buttons, select menus, modals)
+  - [ ] Using an interaction handler
+  - [ ] Introduce the idea of button args
+    - split `interaction.customId` on `_`
+    - Allows for state management on buttons themselves, without collectors
+  - [ ] Introduce collectors
+     - BE SURE TO WARN THAT COLLECTORS DO NOT PERSIST AFTER RESTART. This is the #1 trouble point for beginners, they assume the button will always exist. This is the point of handlers and button args, they are permanant due to attached to the button directly
+     - Pagination is a great example
+
+
 ### Quality of Life
 - [ ] Harden gateway reconnect/session handling in `src/WSClient.ts`
   - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
@@ -43,19 +70,10 @@
 ## Further planning
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
-  - Current gaps: VoiceStateUpdate, PresenceUpdate, TypingStart, MessageReactionAdd/Remove, GuildMemberAdd, scheduled events, threads, integrations, webhooks, invites, and many others
-- [ ] Add component and interaction payload support
-  - Define interaction structures in `src/Structures/` (InteractionMessage, InteractionCommandOption, etc.)
-  - Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
-  - Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
+  - Current gaps: VoiceStateUpdate, PresenceUpdate, TypingStart, MessageReactionAdd/Remove, scheduled events, threads, integrations, webhooks, and many others
 - [ ] Model application team types in `src/Types/DiscordAPITypes.ts`
   - Replace the current `team?: Record<string, JSONObject>[]` placeholder with typed team and team-member models
   - Thread the new types through any application metadata consumers once they exist
-- [ ] Interaction collectors (buttons, select menus, modals)
-- [ ] Slash command builder and all the options
-- [ ] `client.registerCommands(...)`
-- [x] Create a mixin system for channel class inheritance
-- [ ] Start planning mixins for interactions
 
 ## Discord gateway event implementation status
 
@@ -63,70 +81,71 @@ Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events 
 
 | Discord event                     | Implemented |
 |-----------------------------------|-------------|
-| READY                             | ✅           |
-| GUILD_CREATE                      | ✅           |
-| GUILD_UPDATE                      | ✅           |
-| GUILD_DELETE                      | ✅           |
-| GUILD_ROLE_CREATE                 | ✅           |
-| GUILD_ROLE_UPDATE                 | ✅           |
-| GUILD_ROLE_DELETE                 | ✅           |
-| CHANNEL_CREATE                    | ✅           |
-| CHANNEL_UPDATE                    | ✅           |
-| CHANNEL_DELETE                    | ✅           |
-| CHANNEL_PINS_UPDATE               | ❌           |
-| THREAD_CREATE                     | ❌           |
-| THREAD_UPDATE                     | ❌           |
-| THREAD_DELETE                     | ❌           |
-| THREAD_LIST_SYNC                  | ❌           |
-| THREAD_MEMBER_UPDATE              | ❌           |
-| THREAD_MEMBERS_UPDATE             | ❌           |
-| STAGE_INSTANCE_CREATE             | ❌           |
-| STAGE_INSTANCE_UPDATE             | ❌           |
-| STAGE_INSTANCE_DELETE             | ❌           |
-| VOICE_CHANNEL_STATUS_UPDATE       | ❌           |
-| VOICE_CHANNEL_START_TIME_UPDATE   | ❌           |
-| GUILD_MEMBER_ADD                  | ✅           |
-| GUILD_MEMBER_UPDATE               | ✅           |
-| GUILD_MEMBER_REMOVE               | ✅           |
-| GUILD_AUDIT_LOG_ENTRY_CREATE      | ✅           |
-| GUILD_BAN_ADD                     | ✅           |
-| GUILD_BAN_REMOVE                  | ✅           |
-| GUILD_EMOJIS_UPDATE               | ✅           |
-| GUILD_STICKERS_UPDATE             | ✅           |
-| GUILD_SOUNDBOARD_SOUND_CREATE     | ❌           |
-| GUILD_SOUNDBOARD_SOUND_UPDATE     | ❌           |
-| GUILD_SOUNDBOARD_SOUND_DELETE     | ❌           |
-| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ❌           |
-| GUILD_INTEGRATIONS_UPDATE         | ❌           |
-| INTEGRATION_CREATE                | ❌           |
-| INTEGRATION_UPDATE                | ❌           |
-| INTEGRATION_DELETE                | ❌           |
-| WEBHOOKS_UPDATE                   | ❌           |
-| INVITE_CREATE                     | ✅           |
-| INVITE_DELETE                     | ✅           |
-| VOICE_CHANNEL_EFFECT_SEND         | ❌           |
-| VOICE_STATE_UPDATE                | ❌           |
-| PRESENCE_UPDATE                   | ❌           |
-| MESSAGE_CREATE                    | ✅           |
-| MESSAGE_UPDATE                    | ✅           |
-| MESSAGE_DELETE                    | ✅           |
-| MESSAGE_DELETE_BULK               | ✅           |
-| MESSAGE_REACTION_ADD              | ✅           |
-| MESSAGE_REACTION_REMOVE           | ✅           |
-| MESSAGE_REACTION_REMOVE_ALL       | ❌           |
-| MESSAGE_REACTION_REMOVE_EMOJI     | ❌           |
-| TYPING_START                      | ❌           |
-| GUILD_SCHEDULED_EVENT_CREATE      | ❌           |
-| GUILD_SCHEDULED_EVENT_UPDATE      | ❌           |
-| GUILD_SCHEDULED_EVENT_DELETE      | ❌           |
-| GUILD_SCHEDULED_EVENT_USER_ADD    | ❌           |
-| GUILD_SCHEDULED_EVENT_USER_REMOVE | ❌           |
-| AUTO_MODERATION_RULE_CREATE       | ❌           |
-| AUTO_MODERATION_RULE_UPDATE       | ❌           |
-| AUTO_MODERATION_RULE_DELETE       | ❌           |
-| AUTO_MODERATION_ACTION_EXECUTION  | ❌           |
-| MESSAGE_POLL_VOTE_ADD             | ❌           |
-| MESSAGE_POLL_VOTE_REMOVE          | ❌           |
+| READY                             | ✅          |
+| GUILD_CREATE                      | ✅          |
+| GUILD_UPDATE                      | ✅          |
+| GUILD_DELETE                      | ✅          |
+| GUILD_ROLE_CREATE                 | ✅          |
+| GUILD_ROLE_UPDATE                 | ✅          |
+| GUILD_ROLE_DELETE                 | ✅          |
+| CHANNEL_CREATE                    | ✅          |
+| CHANNEL_UPDATE                    | ✅          |
+| CHANNEL_DELETE                    | ✅          |
+| CHANNEL_PINS_UPDATE               | ❌          |
+| THREAD_CREATE                     | ❌          |
+| THREAD_UPDATE                     | ❌          |
+| THREAD_DELETE                     | ❌          |
+| THREAD_LIST_SYNC                  | ❌          |
+| THREAD_MEMBER_UPDATE              | ❌          |
+| THREAD_MEMBERS_UPDATE             | ❌          |
+| STAGE_INSTANCE_CREATE             | ❌          |
+| STAGE_INSTANCE_UPDATE             | ❌          |
+| STAGE_INSTANCE_DELETE             | ❌          |
+| VOICE_CHANNEL_STATUS_UPDATE       | ❌          |
+| VOICE_CHANNEL_START_TIME_UPDATE   | ❌          |
+| GUILD_MEMBER_ADD                  | ✅          |
+| GUILD_MEMBER_UPDATE               | ✅          |
+| GUILD_MEMBER_REMOVE               | ✅          |
+| GUILD_AUDIT_LOG_ENTRY_CREATE      | ✅          |
+| GUILD_BAN_ADD                     | ✅          |
+| GUILD_BAN_REMOVE                  | ✅          |
+| GUILD_EMOJIS_UPDATE               | ✅          |
+| GUILD_STICKERS_UPDATE             | ✅          |
+| GUILD_SOUNDBOARD_SOUND_CREATE     | ❌          |
+| GUILD_SOUNDBOARD_SOUND_UPDATE     | ❌          |
+| GUILD_SOUNDBOARD_SOUND_DELETE     | ❌          |
+| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ❌          |
+| GUILD_INTEGRATIONS_UPDATE         | ❌          |
+| INTEGRATION_CREATE                | ❌          |
+| INTEGRATION_UPDATE                | ❌          |
+| INTEGRATION_DELETE                | ❌          |
+| WEBHOOKS_UPDATE                   | ❌          |
+| INVITE_CREATE                     | ✅          |
+| INVITE_DELETE                     | ✅          |
+| VOICE_CHANNEL_EFFECT_SEND         | ❌          |
+| VOICE_STATE_UPDATE                | ❌          |
+| PRESENCE_UPDATE                   | ❌          |
+| MESSAGE_CREATE                    | ✅          |
+| MESSAGE_UPDATE                    | ✅          |
+| MESSAGE_DELETE                    | ✅          |
+| MESSAGE_DELETE_BULK               | ✅          |
+| MESSAGE_REACTION_ADD              | ✅          |
+| MESSAGE_REACTION_REMOVE           | ✅          |
+| MESSAGE_REACTION_REMOVE_ALL       | ❌          |
+| MESSAGE_REACTION_REMOVE_EMOJI     | ❌          |
+| TYPING_START                      | ❌          |
+| GUILD_SCHEDULED_EVENT_CREATE      | ❌          |
+| GUILD_SCHEDULED_EVENT_UPDATE      | ❌          |
+| GUILD_SCHEDULED_EVENT_DELETE      | ❌          |
+| GUILD_SCHEDULED_EVENT_USER_ADD    | ❌          |
+| GUILD_SCHEDULED_EVENT_USER_REMOVE | ❌          |
+| AUTO_MODERATION_RULE_CREATE       | ❌          |
+| AUTO_MODERATION_RULE_UPDATE       | ❌          |
+| AUTO_MODERATION_RULE_DELETE       | ❌          |
+| AUTO_MODERATION_ACTION_EXECUTION  | ❌          |
+| MESSAGE_POLL_VOTE_ADD             | ❌          |
+| MESSAGE_POLL_VOTE_REMOVE          | ❌          |
+| INTERACTION_CREATE                | ✅          |
 
 ## Completed (verified in current codebase)
 
