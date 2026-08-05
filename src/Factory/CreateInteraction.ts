@@ -10,17 +10,7 @@ import { ButtonInteraction } from "../Structures/Interactions/ButtonInteraction.
 import { SelectMenuInteraction } from "../Structures/Interactions/SelectMenuInteraction.js";
 import { AutocompleteInteraction } from "../Structures/Interactions/AutocompleteInteraction.js";
 import { ModalInteraction } from "../Structures/Interactions/ModalInteraction.js";
-
-/** Union of every concrete interaction class this factory can produce. */
-export type AnyInteraction =
-	| PingInteraction
-	| SlashCommandInteraction
-	| UserContextMenuInteraction
-	| MessageContextMenuInteraction
-	| ButtonInteraction
-	| SelectMenuInteraction
-	| AutocompleteInteraction
-	| ModalInteraction;
+import { AnyInteraction } from "../Types/index.js";
 
 /**
  * Constructs the correct concrete interaction subclass for a raw interaction payload, based on
@@ -29,7 +19,7 @@ export type AnyInteraction =
  * @param data The raw interaction payload.
  * @returns The constructed interaction instance.
  */
-export function CreateInteraction(client: Client, data: DiscordInteraction): AnyInteraction {
+export function CreateInteraction(client: Client, data: DiscordInteraction): AnyInteraction | PingInteraction {
 	switch (data.type) {
 		case InteractionTypes.PING:
 			return new PingInteraction(client, data);
