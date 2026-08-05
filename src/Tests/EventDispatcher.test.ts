@@ -5,6 +5,16 @@ import { GatewayEvents, GatewayIntents } from "../Types/DiscordGateway.js";
 import { EventRequiredIntent } from "../Intents.js";
 import { DiscordUser } from "../Types/DiscordAPITypes.js";
 import { EventHandler, GatewayEventName, JSONObject } from "../Types/Internal.js";
+import { InteractionTypes } from "../Types/Interactions.js";
+import { ApplicationCommandTypes } from "../Types/ApplicationCommand.js";
+import { ComponentTypes } from "../Types/Components.js";
+import { SlashCommandInteraction } from "../Structures/Interactions/SlashCommandInteraction.js";
+import { UserContextMenuInteraction } from "../Structures/Interactions/UserContextMenuInteraction.js";
+import { MessageContextMenuInteraction } from "../Structures/Interactions/MessageContextMenuInteraction.js";
+import { ButtonInteraction } from "../Structures/Interactions/ButtonInteraction.js";
+import { SelectMenuInteraction } from "../Structures/Interactions/SelectMenuInteraction.js";
+import { AutocompleteInteraction } from "../Structures/Interactions/AutocompleteInteraction.js";
+import { ModalInteraction } from "../Structures/Interactions/ModalInteraction.js";
 
 import * as AvailableEvents from "../Events/index.js";
 import { ClientEvents } from "../Types/index.js";
@@ -43,6 +53,100 @@ function createReadyPayload(user: DiscordUser): JSONObject {
 			flags: 0
 		}
 	};
+}
+
+function commonInteractionFields<T extends object>(overrides: T) {
+	return {
+		id: "interaction-1",
+		application_id: "app-1",
+		token: "interaction-token",
+		version: 1 as const,
+		app_permissions: "0",
+		entitlements: [],
+		authorizing_integration_owners: {},
+		attachment_size_limit: 25_000_000,
+		...overrides,
+	};
+}
+
+function slashCommandPayload(): JSONObject {
+	return commonInteractionFields({
+		data: { id: "command-1", name: "greet", type: ApplicationCommandTypes.CHAT_INPUT },
+		type: InteractionTypes.APPLICATION_COMMAND,
+	});
+}
+
+function userContextPayload(): JSONObject {
+	return commonInteractionFields({
+		data: {
+			id: "command-2", name: "Inspect User", type: ApplicationCommandTypes.USER,
+			target_id: "user-2", resolved: { users: { "user-2": createUser("user-2") } },
+		},
+		type: InteractionTypes.APPLICATION_COMMAND,
+	});
+}
+
+function messageContextPayload(): JSONObject {
+	return commonInteractionFields({
+		data: {
+			id: "command-3", name: "Inspect Message", type: ApplicationCommandTypes.MESSAGE,
+			target_id: "msg-1",
+			resolved: {
+				messages: {
+					"msg-1": {
+						id: "msg-1", channel_id: "channel-1", author: createUser(), content: "hi",
+						timestamp: "2024-01-01T00:00:00.000Z", edited_timestamp: null, tts: false,
+						mention_everyone: false, mentions: [], mention_roles: [], attachments: [],
+						embeds: [], pinned: false, type: 0,
+					},
+				},
+			},
+		},
+		type: InteractionTypes.APPLICATION_COMMAND,
+	});
+}
+
+function autocompletePayload(): JSONObject {
+	return commonInteractionFields({
+		data: {
+			id: "command-1", name: "greet", type: ApplicationCommandTypes.CHAT_INPUT,
+			options: [{ name: "name", type: 3, value: "jo", focused: true }],
+		},
+		type: InteractionTypes.APPLICATION_COMMAND_AUTOCOMPLETE,
+	});
+}
+
+function buttonPayload(): JSONObject {
+	return commonInteractionFields({
+		data: { custom_id: "confirm", component_type: ComponentTypes.BUTTON },
+		message: {
+			id: "msg-1", channel_id: "channel-1", author: createUser(), content: "hi",
+			timestamp: "2024-01-01T00:00:00.000Z", edited_timestamp: null, tts: false,
+			mention_everyone: false, mentions: [], mention_roles: [], attachments: [],
+			embeds: [], pinned: false, type: 0,
+		},
+		type: InteractionTypes.MESSAGE_COMPONENT,
+	});
+}
+
+function selectMenuPayload(): JSONObject {
+	return commonInteractionFields({
+		data: { custom_id: "pick-role", component_type: ComponentTypes.STRING_SELECT, values: ["role-a"] },
+		message: {
+			id: "msg-1", channel_id: "channel-1", author: createUser(), content: "hi",
+			timestamp: "2024-01-01T00:00:00.000Z", edited_timestamp: null, tts: false,
+			mention_everyone: false, mentions: [], mention_roles: [], attachments: [],
+			embeds: [], pinned: false, type: 0,
+		},
+		type: InteractionTypes.MESSAGE_COMPONENT,
+	});
+}
+
+function modalSubmitPayload(): JSONObject {
+	return commonInteractionFields({
+		data: { custom_id: "feedback-modal", components: [] },
+		type: InteractionTypes.MODAL_SUBMIT,
+	});
 }
 
 describe("EventDispatcher", () => {
@@ -189,5 +293,89 @@ describe("EventDispatcher", () => {
 			GatewayIntents.GuildMessages,
 			GatewayIntents.DirectMessages
 		]);
+	});
+
+	describe("INTERACTION_CREATE", () => {
+		function dispatchInteraction(payload: JSONObject) {
+			const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+			const dispatch = CreateDispatch();
+			const emitSpy = vi.spyOn(client, "emit");
+
+			dispatch(client, GatewayEvents.InteractionCreate, payload);
+
+			return emitSpy;
+		}
+
+		it("requires no intent - it's a global event like READY", () => {
+			expect(EventRequiredIntent[GatewayEvents.InteractionCreate]).toBe(0);
+		});
+
+		it("always emits InteractionCreate regardless of interaction type", () => {
+			const emitSpy = dispatchInteraction(slashCommandPayload());
+
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.InteractionCreate, expect.any(SlashCommandInteraction));
+		});
+
+		it("emits SlashCommandUsed alongside InteractionCreate for a CHAT_INPUT command", () => {
+			const emitSpy = dispatchInteraction(slashCommandPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SlashCommandUsed, expect.any(SlashCommandInteraction));
+		});
+
+		it("emits UserContextMenuUsed alongside InteractionCreate for a USER command", () => {
+			const emitSpy = dispatchInteraction(userContextPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.UserContextMenuUsed, expect.any(UserContextMenuInteraction));
+		});
+
+		it("emits MessageContextMenuUsed alongside InteractionCreate for a MESSAGE command", () => {
+			const emitSpy = dispatchInteraction(messageContextPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessageContextMenuUsed, expect.any(MessageContextMenuInteraction));
+		});
+
+		it("emits AutocompleteUsed alongside InteractionCreate for an autocomplete request", () => {
+			const emitSpy = dispatchInteraction(autocompletePayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutocompleteUsed, expect.any(AutocompleteInteraction));
+		});
+
+		it("emits ButtonUsed alongside InteractionCreate for a button component", () => {
+			const emitSpy = dispatchInteraction(buttonPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ButtonUsed, expect.any(ButtonInteraction));
+		});
+
+		it("emits SelectMenuUsed alongside InteractionCreate for a select menu component", () => {
+			const emitSpy = dispatchInteraction(selectMenuPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SelectMenuUsed, expect.any(SelectMenuInteraction));
+		});
+
+		it("emits ModalSubmitted alongside InteractionCreate for a modal submission", () => {
+			const emitSpy = dispatchInteraction(modalSubmitPayload());
+
+			expect(emitSpy).toHaveBeenCalledTimes(2);
+			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ModalSubmitted, expect.any(ModalInteraction));
+		});
+
+		it("emits the same interaction instance for both InteractionCreate and the discriminated event", () => {
+			const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+			const dispatch = CreateDispatch();
+			const emitSpy = vi.spyOn(client, "emit");
+
+			dispatch(client, GatewayEvents.InteractionCreate, buttonPayload());
+
+			const genericCall = emitSpy.mock.calls.find(([event]) => event === ClientEvents.InteractionCreate);
+			const specificCall = emitSpy.mock.calls.find(([event]) => event === ClientEvents.ButtonUsed);
+
+			expect(genericCall?.[1]).toBe(specificCall?.[1]);
+		});
 	});
 });
