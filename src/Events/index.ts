@@ -18,4 +18,5 @@ export { StickersUpdate } from "./Stickers.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
 export { GuildBanAdd, GuildBanRemove } from "./Bans.js";
 export { AuditLogEntryCreate } from "./AuditLogs.js";
+export { InteractionCreate } from "./Interactions.js";
 export { Ready } from "./Ready.js";
