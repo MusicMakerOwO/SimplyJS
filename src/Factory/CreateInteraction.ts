@@ -1,5 +1,5 @@
 import { Client } from "../Client.js";
-import { Interaction, InteractionTypes } from "../Types/Interactions.js";
+import { DiscordInteraction, InteractionTypes } from "../Types/Interactions.js";
 import { ApplicationCommandTypes } from "../Types/ApplicationCommand.js";
 import { ComponentTypes } from "../Types/Components.js";
 import { PingInteraction } from "../Structures/Interactions/PingInteraction.js";
@@ -29,7 +29,7 @@ export type AnyInteraction =
  * @param data The raw interaction payload.
  * @returns The constructed interaction instance.
  */
-export function CreateInteraction(client: Client, data: Interaction): AnyInteraction {
+export function CreateInteraction(client: Client, data: DiscordInteraction): AnyInteraction {
 	switch (data.type) {
 		case InteractionTypes.PING:
 			return new PingInteraction(client, data);

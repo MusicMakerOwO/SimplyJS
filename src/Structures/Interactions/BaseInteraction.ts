@@ -1,6 +1,6 @@
 import { Client } from "../../Client.js";
 import { APIClientStructure } from "../../Contracts/DiscordStructure.js";
-import { Interaction, InteractionType } from "../../Types/Interactions.js";
+import { DiscordInteraction, InteractionType } from "../../Types/Interactions.js";
 import { InteractionContextType } from "../../Types/ApplicationCommand.js";
 import { DiscordChannel, DiscordGuild } from "../../Types/DiscordAPITypes.js";
 import { JSONObject } from "../../Types/Internal.js";
@@ -14,7 +14,7 @@ import { User } from "../User.js";
  *
  * @see https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-object
  */
-export class BaseInteraction extends APIClientStructure<Interaction> {
+export class BaseInteraction extends APIClientStructure<DiscordInteraction> {
 	id!: string
 	applicationId!: string
 	type!: InteractionType
@@ -45,12 +45,12 @@ export class BaseInteraction extends APIClientStructure<Interaction> {
 	// TODO Monetization support
 	entitlements!: JSONObject[]
 
-	constructor(client: Client, data: Interaction) {
+	constructor(client: Client, data: DiscordInteraction) {
 		super(client);
 		this.patch(data);
 	}
 
-	patch(data: Interaction): void {
+	patch(data: DiscordInteraction): void {
 		this.id = data.id;
 		this.applicationId = data.application_id;
 		this.type = data.type;

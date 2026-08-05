@@ -707,6 +707,14 @@ export const GatewayEvents = {
 	 * Required intents: `GatewayIntents.GuildMessagePolls` or `GatewayIntents.DirectMessagePolls`
 	 */
 	MessagePollVoteRemove: "MESSAGE_POLL_VOTE_REMOVE",
+	/**
+	 * User used a slash command, button, select menu, submitted a modal, or context menu
+	 *
+	 * @note
+	 * Interactions are always recieved regardless of your intents.
+	 * Intents may affect access to certain properties such as `Interaction.member`
+	 */
+	InteractionCreate: "INTERACTION_CREATE"
 } as const;
 
 export type GatewayInvite = {

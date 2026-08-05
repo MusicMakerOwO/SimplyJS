@@ -177,7 +177,7 @@ export type ModalSubmitInteraction = BaseInteraction<typeof InteractionTypes.MOD
  *
  * @see https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-object
  */
-export type Interaction =
+export type DiscordInteraction =
 	| PingInteraction
 	| ApplicationCommandInteraction
 	| MessageComponentInteraction
@@ -338,7 +338,7 @@ export type PremiumRequiredResponse = BaseInteractionResponse<typeof Interaction
 export type LaunchActivityResponse = BaseInteractionResponse<typeof InteractionCallbackTypes.LAUNCH_ACTIVITY>;
 
 /**
- * The payload sent back to Discord to respond to an {@link Interaction}.
+ * The payload sent back to Discord to respond to an {@link DiscordInteraction}.
  *
  * @see https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-response-object
  */
