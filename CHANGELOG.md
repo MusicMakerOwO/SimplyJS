@@ -5,7 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0-alpha]
+## [Unreleased]
+
+### Added
+
+#### Slash commands
+- `SlashCommandBuilder` (`src/Builders/SlashCommandBuilder.ts`) — fluent builder for application (slash) commands, including subcommands, subcommand groups, and all Discord option types with per-type validation
+- `ApplicationCommand` type definitions (`src/Types/ApplicationCommand.ts`) — full typings for application command payloads and option shapes
+
+#### Message components
+- `ActionRowBuilder` (`src/Builders/ActionRowBuilder.ts`) — container builder for buttons and select menus
+- `ButtonBuilder` / `SKUButtonBuilder` (`src/Builders/ButtonBuilder.ts`, `src/Builders/SKUButtonBuilder.ts`) — link/interaction and SKU (premium) button builders
+- `StringSelectBuilder`, `UserSelectBuilder`, `RoleSelectBuilder`, `ChannelSelectBuilder`, `MentionableSelectBuilder` (`src/Builders/*SelectBuilder.ts`) — all Discord select menu types, sharing common option/constraint logic via `BaseSelectBuilder` / `EntitySelectBuilder`
+- `ModalBuilder`, `LabelBuilder`, `TextInputBuilder` (`src/Builders/ModalBuilder.ts`, `src/Builders/LabelBuilder.ts`, `src/Builders/TextInputBuilder.ts`) — modal construction with labeled text input fields
+- `Components` type definitions (`src/Types/Components.ts`) — full typings for all message component kinds
+- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`) for construction, validation, and JSON serialization of every builder
+
+#### Interactions
+- `BaseInteraction` (`src/Structures/Interactions/BaseInteraction.ts`) and per-type interaction classes — `PingInteraction`, `SlashCommandInteraction`, `AutocompleteInteraction`, `MessageComponentInteraction`, `SelectMenuInteraction`, `ButtonInteraction`, `ModalInteraction`, `UserContextMenuInteraction`, `MessageContextMenuInteraction`
+- `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types
+- `CreateInteraction()` factory (`src/Factory/CreateInteraction.ts`) — builds the correct interaction class from a raw gateway payload; returns `AnyInteraction | PingInteraction`
+- `InteractionCreate` gateway event handler (`src/Events/Interactions.ts`) for `INTERACTION_CREATE`, emitting `ClientEvents.InteractionCreate`
+- `DiscordInteraction` type (`src/Types/Interactions.ts`, renamed from `Interaction` to match the `Discord*` naming convention used by other API types)
+- Test coverage for interaction classes, mixins, and the `InteractionCreate` event handler (`src/Tests/Interactions.test.ts`)
+
+### Changed
+
+- `EmbedBuilder` now implements `Embed` directly for improved type safety
+- Audit log type updated to properly reference the new slash command types
+
+## [1.1.0-alpha] - 2026 July 31
 
 ### Added
 
@@ -78,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: `Channel` structure split into individual type-specific classes (`GuildTextChannel`, `GuildVoiceChannel`, etc.). Code importing or type-checking `Channel` must update to use the appropriate subclass type
 - **BREAKING**: `Member.permissions` is no longer a raw permission bitfield string patched from the API — it's now a `Member.permissions()` method that resolves live permissions from the member's roles
 
-## [1.0.0-alpha]
+## [1.0.0-alpha] - 2026 July 22
 
 ### Added
 
@@ -177,5 +206,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TTLCache.test.ts` — TTL cache expiry, overwrite rescheduling, `touch()`, infinite lifetime, callback, and validation coverage
 - `WSClient.lifecycle.test.ts` — `WSClient` connect, heartbeat, and destroy lifecycle
 - `StructureActions.test.ts` — comprehensive regression suite for all structure action methods (50 tests): `Guild.leave()` / `Guild.modify()`, `Channel.send()` / `Channel.delete()` / `Channel.modify()`, `Role.delete()` / `Role.modify()`, `Emoji.delete()` / `Emoji.modify()` with role normalization, `Sticker.delete()` / `Sticker.modify()` with tags normalization, `Member` timeout/kick/ban/role management with audit log headers, `Message` reply/delete/update/pin/react with authorship guards, and `User.send()` DM lazy creation + caching; includes hardcoded API-format body assertions to catch parameter transformations
-
-### Changed
