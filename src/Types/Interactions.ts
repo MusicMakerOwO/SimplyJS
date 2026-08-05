@@ -137,8 +137,8 @@ type BaseInteraction<TType extends InteractionType> = {
 	guild_locale?: string;
 	/**
 	 * for monetized apps, any entitlements for the invoking user, representing access to SKUs
-	 * @todo replace with a typed `Entitlement` once monetization support lands
 	 */
+	// TODO Monetization support
 	entitlements: JSONObject[];
 	/** mapping of installation contexts that the interaction was authorized for to related user/guild ids */
 	authorizing_integration_owners: AuthorizingIntegrationOwners;
