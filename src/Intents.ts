@@ -17,6 +17,7 @@ import { ObjectValues } from "./Types/HelperTypes.js";
  */
 export const EventRequiredIntent = {
 	[GatewayEvents.Ready]: 0, // no intents, global
+	[GatewayEvents.InteractionCreate]: 0, // no intents, global
 	[GatewayEvents.GuildCreate]: GatewayIntents.Guilds,
 	[GatewayEvents.GuildUpdate]: GatewayIntents.Guilds,
 	[GatewayEvents.GuildDelete]: GatewayIntents.Guilds,

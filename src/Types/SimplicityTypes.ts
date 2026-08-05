@@ -22,6 +22,15 @@ import { GuildCategoryChannel } from "../Structures/Channels/GuildCategoryChanne
 import { GuildForumChannel } from "../Structures/Channels/GuildForumChannel.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
 import { GuildStageChannel } from "../Structures/Channels/GuildStageChannel.js";
+import {
+	AutocompleteInteraction,
+	ButtonInteraction,
+	MessageContextMenuInteraction,
+	ModalInteraction,
+	SelectMenuInteraction,
+	SlashCommandInteraction,
+	UserContextMenuInteraction
+} from "../Structures/index.js";
 
 /** Every concrete channel structure the library can produce, falling back to `BaseChannel` for unhandled types */
 export type Channel =
@@ -41,6 +50,20 @@ export type MessageableChannel =
 	| GuildVoiceChannel
 	| GuildStageChannel
 	| GuildThreadChannel
+
+/**
+ * Every concrete interaction structure the library can produce for a gateway `INTERACTION_CREATE`
+ * dispatch. Excludes `PingInteraction` - that variant only occurs over an HTTP interactions
+ * endpoint, never on the gateway.
+ */
+export type AnyInteraction =
+	| SlashCommandInteraction
+	| UserContextMenuInteraction
+	| MessageContextMenuInteraction
+	| ButtonInteraction
+	| SelectMenuInteraction
+	| AutocompleteInteraction
+	| ModalInteraction
 
 /** Payload for `MessageDelete`; Discord only sends identifiers, never the deleted message itself */
 export type MessageDeletePayload = {
@@ -232,6 +255,52 @@ export const ClientEvents = {
 	 */
 	AuditLogEntryCreate: "AuditLogEntryCreate",
 
+	/**
+	 * Fired when an interaction is created (slash command, button, select menu, modal, etc.).
+	 * Also emitted, alongside `InteractionCreate`, is one of `SlashCommandUsed`,
+	 * `UserContextMenuUsed`, `MessageContextMenuUsed`, `ButtonUsed`, `SelectMenuUsed`,
+	 * `AutocompleteUsed`, or `ModalSubmitted` - whichever matches the interaction's concrete
+	 * type - so consumers don't have to discriminate the union themselves.
+	 * Listener arguments: `interaction` ({@link AnyInteraction}).
+	 */
+	InteractionCreate: "InteractionCreate",
+
+	/**
+	 * Fired when a slash (chat input) command is used.
+	 * Listener arguments: `interaction` ({@link SlashCommandInteraction}).
+	 */
+	SlashCommandUsed: "SlashCommandUsed",
+	/**
+	 * Fired when a user context menu command is used.
+	 * Listener arguments: `interaction` ({@link UserContextMenuInteraction}).
+	 */
+	UserContextMenuUsed: "UserContextMenuUsed",
+	/**
+	 * Fired when a message context menu command is used.
+	 * Listener arguments: `interaction` ({@link MessageContextMenuInteraction}).
+	 */
+	MessageContextMenuUsed: "MessageContextMenuUsed",
+	/**
+	 * Fired when a button is clicked.
+	 * Listener arguments: `interaction` ({@link ButtonInteraction}).
+	 */
+	ButtonUsed: "ButtonUsed",
+	/**
+	 * Fired when a select menu is used.
+	 * Listener arguments: `interaction` ({@link SelectMenuInteraction}).
+	 */
+	SelectMenuUsed: "SelectMenuUsed",
+	/**
+	 * Fired when a command's autocomplete input is focused and needs suggestions.
+	 * Listener arguments: `interaction` ({@link AutocompleteInteraction}).
+	 */
+	AutocompleteUsed: "AutocompleteUsed",
+	/**
+	 * Fired when a modal form is submitted.
+	 * Listener arguments: `interaction` ({@link ModalInteraction}).
+	 */
+	ModalSubmitted: "ModalSubmitted",
+
 } as const;
 
 export type ClientEventMap = {
@@ -295,4 +364,13 @@ export type ClientEventMap = {
 	[ClientEvents.GuildBanRemove]: [guild: Guild, user: User];
 
 	[ClientEvents.AuditLogEntryCreate]: [guild: Guild, entry: DiscordAuditLogEntry];
+
+	[ClientEvents.InteractionCreate]: [interaction: AnyInteraction]
+	[ClientEvents.SlashCommandUsed]: [interaction: SlashCommandInteraction];
+	[ClientEvents.UserContextMenuUsed]: [interaction: UserContextMenuInteraction];
+	[ClientEvents.MessageContextMenuUsed]: [interaction: MessageContextMenuInteraction];
+	[ClientEvents.ButtonUsed]: [interaction: ButtonInteraction];
+	[ClientEvents.SelectMenuUsed]: [interaction: SelectMenuInteraction];
+	[ClientEvents.AutocompleteUsed]: [interaction: AutocompleteInteraction];
+	[ClientEvents.ModalSubmitted]: [interaction: ModalInteraction];
 };
