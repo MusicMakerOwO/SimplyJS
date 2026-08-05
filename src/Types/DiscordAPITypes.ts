@@ -1,6 +1,7 @@
 import { ObjectValues } from "./HelperTypes.js";
 import { DiscordOAuth2Scopes } from "./DiscordOAuth.js";
 import { JSONObject } from "./Internal.js";
+import { ApplicationCommand } from "./ApplicationCommand.js";
 
 export type DiscordUser = {
 	/** the user's id */
@@ -929,8 +930,7 @@ export const DiscordGuildInviteFlags = {
 
 export type DiscordAuditLog = {
 	/** List of application commands referenced in the audit log */
-	// TODO Interactions :(
-	application_commands: JSONObject[];
+	application_commands: ApplicationCommand[];
 	/** List of audit log entries, sorted from most to least recent */
 	audit_log_entries: DiscordAuditLogEntry[];
 	/** List of auto moderation rules referenced in the audit log */
