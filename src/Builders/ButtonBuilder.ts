@@ -1,78 +1,85 @@
-import { ButtonStyles, ComponentEmoji, ComponentTypes, InteractiveButton, LinkButton } from "../Types/Components.js";
+import { ButtonStyles, ComponentEmoji, ComponentTypes, InteractiveButton } from "../Types/Components.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 
-/**
- * Style of a non-premium button.
- *
- * @note For SKU/premium buttons, use a dedicated SKU button builder instead - their shape (just
- * a `sku_id`, no label/emoji/custom_id/url) is different enough that it doesn't fit this builder.
- */
-export type NonPremiumButtonStyle = Exclude<ObjectValues<typeof ButtonStyles>, typeof ButtonStyles.PREMIUM>;
+/** Style of a button that sends an interaction when clicked, ie. every non-premium style except LINK */
+export type InteractiveButtonStyle = Exclude<ObjectValues<typeof ButtonStyles>, typeof ButtonStyles.LINK | typeof ButtonStyles.PREMIUM>;
 
-/** Runtime checks shared by `ButtonBuilder#validate` and the static `ButtonBuilder.validate` */
-function validateButtonShape(button: { style: NonPremiumButtonStyle; label?: string; custom_id?: string; url?: string }): void {
-	if (!button.label || button.label.length === 0) throw new Error("Button must have a label");
-	if (button.label.length > 80) throw new Error(`Button label must be 80 characters or fewer - Received ${button.label.length} characters`);
-
-	if (button.style === ButtonStyles.LINK) {
-		if (!button.url) throw new Error("Link buttons must have a url");
-		if (button.url.length > 512) throw new Error(`Button url must be 512 characters or fewer - Received ${button.url.length} characters`);
-		if (button.custom_id) throw new Error("Link buttons cannot have a custom_id");
-	} else {
-		if (!button.custom_id) throw new Error("Non-link buttons must have a custom_id");
-		if (button.custom_id.length > 100) throw new Error(`Button custom_id must be 100 characters or fewer - Received ${button.custom_id.length} characters`);
-		if (button.url) throw new Error("Non-link buttons cannot have a url");
-	}
+/** Label check shared by every button builder - every button style but PREMIUM carries a label */
+export function validateButtonLabel(label: string | undefined): void {
+	if (!label || label.length === 0) throw new Error("Button must have a label");
+	if (label.length > 80) throw new Error(`Button label must be 80 characters or fewer - Received ${label.length} characters`);
 }
 
-/** Fluent builder for interactive (styled) and link buttons, validating limits as they're set. */
-export class ButtonBuilder {
-	/**
-	 * Creates a builder from an existing button payload
-	 */
-	static from(value: InteractiveButton | LinkButton): ButtonBuilder {
-		const button = new ButtonBuilder();
+/** Runtime checks shared by `ButtonBuilder#validate` and the static `ButtonBuilder.validate` */
+function validateInteractiveButtonShape(button: { label?: string; custom_id?: string; url?: string }): void {
+	validateButtonLabel(button.label);
 
-		button.setStyle(value.style);
+	if (!button.custom_id) throw new Error("Non-link buttons must have a custom_id");
+	if (button.custom_id.length > 100) throw new Error(`Button custom_id must be 100 characters or fewer - Received ${button.custom_id.length} characters`);
+	if (button.url) throw new Error("Non-link buttons cannot have a url");
+}
+
+/**
+ * Fluent builder for an interactive button - one of the four styled buttons that sends an
+ * interaction when clicked. For the other two kinds see `LinkButtonBuilder` (opens a url) and
+ * `SKUButtonBuilder` (purchases a SKU).
+ *
+ * The builder *is* an {@link InteractiveButton} payload, so anywhere a button object is accepted a
+ * builder can be passed instead, and anywhere a builder is accepted a plain object works just as
+ * well - use whichever reads better:
+ *
+ * ```ts
+ * new ButtonBuilder().setStyle(ButtonStyles.DANGER).setLabel("Delete").setCustomID("delete");
+ * // is the same thing as
+ * { type: ComponentTypes.BUTTON, style: ButtonStyles.DANGER, label: "Delete", custom_id: "delete" };
+ * ```
+ *
+ * @note Fields are typed as always-present so the builder lines up with the payload type, but
+ * they're only populated once you set them - call {@link ButtonBuilder#validate} to check.
+ */
+export class ButtonBuilder implements InteractiveButton {
+	/**
+	 * Creates a builder from an existing interactive button payload
+	 */
+	static from(value: InteractiveButton): ButtonBuilder {
+		const button = new ButtonBuilder(value.style);
+
 		button.setLabel(value.label);
+		button.setCustomID(value.custom_id);
 		if (value.emoji) button.setEmoji(value.emoji);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);
-		if ("custom_id" in value) button.setCustomID(value.custom_id);
-		if ("url" in value) button.setURL(value.url);
 
 		return button;
 	}
 
 	/**
-	 * Validates a button payload against Discord's constraints
+	 * Validates an interactive button payload against Discord's constraints
 	 */
-	static validate(button: InteractiveButton | LinkButton): void {
-		validateButtonShape(button);
+	static validate(button: InteractiveButton): void {
+		validateInteractiveButtonShape(button);
 	}
 
 	readonly type = ComponentTypes.BUTTON;
 	/** The button's style, defaults to PRIMARY */
-	style: NonPremiumButtonStyle;
-	/** Text that appears on the button, max 80 characters */
-	label?: string;
+	style: InteractiveButtonStyle;
+	/** Text that appears on the button, max 80 characters - only populated once set, see {@link ButtonBuilder#validate} */
+	label!: string;
 	/** Emoji displayed on the button */
 	emoji?: ComponentEmoji;
 	/** Whether the button is disabled, defaults to false */
 	disabled?: boolean;
-	/** Developer-defined identifier, max 100 characters, must be unique per message/modal - required unless `style` is LINK */
-	custom_id?: string;
-	/** Url the button opens, max 512 characters - only valid when `style` is LINK */
-	url?: string;
+	/** Developer-defined identifier, max 100 characters, must be unique per message - only populated once set, see {@link ButtonBuilder#validate} */
+	custom_id!: string;
 
-	constructor() {
-		this.style = ButtonStyles.PRIMARY;
+	constructor(style: InteractiveButtonStyle = ButtonStyles.PRIMARY) {
+		this.style = style;
 	}
 
 	/**
-	 * Sets the button's style. Switching to/from LINK does not clear a previously set
-	 * `custom_id`/`url` - set the relevant one explicitly when changing styles.
+	 * Sets the button's style. LINK and PREMIUM aren't accepted here - they have their own
+	 * builders, since they carry a `url`/`sku_id` instead of a `custom_id`.
 	 */
-	setStyle(style: NonPremiumButtonStyle): this {
+	setStyle(style: InteractiveButtonStyle): this {
 		this.style = style;
 		return this;
 	}
@@ -105,7 +112,7 @@ export class ButtonBuilder {
 	}
 
 	/**
-	 * Sets the button's custom_id, used for non-link button styles
+	 * Sets the button's custom_id
 	 */
 	setCustomID(customId: string): this {
 		if (customId.length === 0 || customId.length > 100) {
@@ -116,23 +123,9 @@ export class ButtonBuilder {
 	}
 
 	/**
-	 * Sets the button's url, used for the LINK style
-	 */
-	setURL(url: string): this {
-		if (url.length === 0 || url.length > 512) {
-			throw new Error(`Button url must be between 1 and 512 characters long - Received ${url.length} characters`);
-		}
-		if (this.style !== ButtonStyles.LINK) {
-			throw new Error(`Button style must be Link (5) to add a URL`);
-		}
-		this.url = url;
-		return this;
-	}
-
-	/**
 	 * Validates this builder's current state against Discord's constraints
 	 */
 	validate(): void {
-		validateButtonShape(this);
+		validateInteractiveButtonShape(this);
 	}
 }
