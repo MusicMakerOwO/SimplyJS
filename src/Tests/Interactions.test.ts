@@ -8,6 +8,7 @@ import { CreateInteraction } from "../Factory/CreateInteraction.js";
 import { BaseInteraction } from "../Structures/Interactions/BaseInteraction.js";
 import { PingInteraction } from "../Structures/Interactions/PingInteraction.js";
 import { SlashCommandInteraction } from "../Structures/Interactions/SlashCommandInteraction.js";
+import { SlashCommandOptions } from "../Managers/SlashCommandOptions.js";
 import { UserContextMenuInteraction } from "../Structures/Interactions/UserContextMenuInteraction.js";
 import { MessageContextMenuInteraction } from "../Structures/Interactions/MessageContextMenuInteraction.js";
 import { ButtonInteraction } from "../Structures/Interactions/ButtonInteraction.js";
@@ -561,13 +562,14 @@ describe("SlashCommandInteraction", () => {
 		expect(interaction.commandType).toBe(ApplicationCommandTypes.CHAT_INPUT);
 	});
 
-	it("defaults options to an empty array when none are provided", () => {
+	it("defaults options to an empty SlashCommandOptions when none are provided", () => {
 		const interaction = new SlashCommandInteraction(client, slashCommandData());
 
-		expect(interaction.options).toEqual([]);
+		expect(interaction.options).toBeInstanceOf(SlashCommandOptions);
+		expect(interaction.options.getString("name")).toBeNull();
 	});
 
-	it("carries the raw resolved option tree through unchanged", () => {
+	it("exposes resolved options through typed accessors", () => {
 		const interaction = new SlashCommandInteraction(client, slashCommandData({
 			data: {
 				id: "command-1",
@@ -577,9 +579,7 @@ describe("SlashCommandInteraction", () => {
 			},
 		}));
 
-		expect(interaction.options).toEqual([
-			{ name: "name", type: ApplicationCommandOptionTypes.STRING, value: "Jo" },
-		]);
+		expect(interaction.options.getString("name")).toBe("Jo");
 	});
 
 	it("sets commandGuildId only when the command is guild-registered", () => {
