@@ -1,21 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { ActionRowBuilder } from "../Builders/ActionRowBuilder.js";
 import { ButtonBuilder } from "../Builders/ButtonBuilder.js";
 import { ChannelSelectBuilder } from "../Builders/ChannelSelectBuilder.js";
 import { LabelBuilder } from "../Builders/LabelBuilder.js";
+import { LinkButtonBuilder } from "../Builders/LinkButtonBuilder.js";
 import { MentionableSelectBuilder } from "../Builders/MentionableSelectBuilder.js";
 import { ModalBuilder } from "../Builders/ModalBuilder.js";
+import { ResolveButton, ValidateButton } from "../Builders/ResolveButton.js";
 import { RoleSelectBuilder } from "../Builders/RoleSelectBuilder.js";
 import { SKUButtonBuilder } from "../Builders/SKUButtonBuilder.js";
 import { StringSelectBuilder } from "../Builders/StringSelectBuilder.js";
 import { TextInputBuilder } from "../Builders/TextInputBuilder.js";
 import { UserSelectBuilder } from "../Builders/UserSelectBuilder.js";
 import {
+	ActionRow,
+	Button,
 	ButtonStyles,
 	ChannelSelect,
 	ComponentTypes,
+	InteractiveButton,
 	Label,
+	LinkButton,
 	MentionableSelect,
+	PremiumButton,
 	RoleSelect,
 	StringSelect,
 	TextInput,
@@ -36,7 +43,11 @@ describe("ButtonBuilder", () => {
 		expect(builder.style).toBe(ButtonStyles.PRIMARY);
 	});
 
-	it("hydrates an interactive button from payload using static from", () => {
+	it("takes its style from the constructor", () => {
+		expect(new ButtonBuilder(ButtonStyles.DANGER).style).toBe(ButtonStyles.DANGER);
+	});
+
+	it("hydrates a builder from payload using static from", () => {
 		const payload = { type: ComponentTypes.BUTTON, style: ButtonStyles.DANGER, label: "Delete", custom_id: "delete" } as const;
 
 		const builder = ButtonBuilder.from(payload);
@@ -44,17 +55,6 @@ describe("ButtonBuilder", () => {
 		expect(builder.style).toBe(ButtonStyles.DANGER);
 		expect(builder.label).toBe("Delete");
 		expect(builder.custom_id).toBe("delete");
-		expect(builder.url).toBeUndefined();
-	});
-
-	it("hydrates a link button from payload using static from", () => {
-		const payload = { type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "https://example.com" } as const;
-
-		const builder = ButtonBuilder.from(payload);
-
-		expect(builder.style).toBe(ButtonStyles.LINK);
-		expect(builder.url).toBe("https://example.com");
-		expect(builder.custom_id).toBeUndefined();
 	});
 
 	it("carries emoji and disabled through static from", () => {
@@ -63,13 +63,13 @@ describe("ButtonBuilder", () => {
 			style: ButtonStyles.SECONDARY,
 			label: "Reply",
 			custom_id: "reply",
-			emoji: { name: "👍" },
+			emoji: { name: "\u{1F44D}" },
 			disabled: true
 		} as const;
 
 		const builder = ButtonBuilder.from(payload);
 
-		expect(builder.emoji).toEqual({ name: "👍" });
+		expect(builder.emoji).toEqual({ name: "\u{1F44D}" });
 		expect(builder.disabled).toBe(true);
 	});
 
@@ -95,28 +95,17 @@ describe("ButtonBuilder", () => {
 		expect(() => new ButtonBuilder().setCustomID("a".repeat(101))).toThrow(/Button custom_id must be between 1 and 100 characters long/);
 	});
 
-	it("sets url within the allowed length", () => {
-		const url = `https://example.com/${"a".repeat(490)}`;
-		const builder = new ButtonBuilder().setStyle(ButtonStyles.LINK).setURL(url);
-
-		expect(builder.url).toBe(url);
-	});
-
-	it("throws when url is empty or exceeds 512 characters", () => {
-		expect(() => new ButtonBuilder().setStyle(ButtonStyles.LINK).setURL("")).toThrow(/Button url must be between 1 and 512 characters long/);
-		expect(() => new ButtonBuilder().setStyle(ButtonStyles.LINK).setURL(`https://example.com/${"a".repeat(600)}`)).toThrow(
-			/Button url must be between 1 and 512 characters long/
-		);
-	});
-
-	it("throws when setting url on a non-link style", () => {
-		expect(() => new ButtonBuilder().setURL("https://example.com")).toThrow(/Button style must be Link \(5\) to add a URL/);
+	it("rejects the link and premium styles at the type level", () => {
+		// @ts-expect-error link buttons have their own builder
+		expect(new ButtonBuilder(ButtonStyles.LINK).style).toBe(ButtonStyles.LINK);
+		// @ts-expect-error premium buttons have their own builder
+		expect(() => new ButtonBuilder().setStyle(ButtonStyles.PREMIUM)).not.toThrow();
 	});
 
 	it("sets emoji, disabled, and style via their setters", () => {
-		const builder = new ButtonBuilder().setEmoji({ name: "🔥" }).setDisabled().setStyle(ButtonStyles.SUCCESS);
+		const builder = new ButtonBuilder().setEmoji({ name: "\u{1F525}" }).setDisabled().setStyle(ButtonStyles.SUCCESS);
 
-		expect(builder.emoji).toEqual({ name: "🔥" });
+		expect(builder.emoji).toEqual({ name: "\u{1F525}" });
 		expect(builder.disabled).toBe(true);
 		expect(builder.style).toBe(ButtonStyles.SUCCESS);
 	});
@@ -134,14 +123,8 @@ describe("ButtonBuilder", () => {
 	});
 
 	describe("validate", () => {
-		it("passes for a fully-populated interactive button", () => {
+		it("passes for a fully-populated button", () => {
 			const builder = new ButtonBuilder().setStyle(ButtonStyles.PRIMARY).setLabel("Click me").setCustomID("click");
-
-			expect(() => builder.validate()).not.toThrow();
-		});
-
-		it("passes for a fully-populated link button", () => {
-			const builder = new ButtonBuilder().setStyle(ButtonStyles.LINK).setLabel("Docs").setURL("https://example.com");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -152,39 +135,142 @@ describe("ButtonBuilder", () => {
 			expect(() => builder.validate()).toThrow(/Button must have a label/);
 		});
 
-		it("throws when a non-link style is missing custom_id", () => {
+		it("throws when custom_id is missing", () => {
 			const builder = new ButtonBuilder().setLabel("Click me");
 
 			expect(() => builder.validate()).toThrow(/Non-link buttons must have a custom_id/);
 		});
 
-		it("throws when a non-link style has a url set", () => {
+		it("throws when a url is set", () => {
 			const builder = new ButtonBuilder().setLabel("Click me").setCustomID("click");
-			builder.url = "https://example.com";
+			// only reachable from a hand-written payload - the builder has no setURL
+			Object.assign(builder, { url: "https://example.com" });
 
 			expect(() => builder.validate()).toThrow(/Non-link buttons cannot have a url/);
 		});
 
-		it("throws when a link style is missing url", () => {
-			const builder = new ButtonBuilder().setStyle(ButtonStyles.LINK).setLabel("Docs");
+		it("is assignable to the payload type it mirrors", () => {
+			const button: InteractiveButton = new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomID("delete");
+
+			expectTypeOf(button).toExtend<Button>();
+			// a builder stands in for a payload, and a payload can be read back into a builder
+			expect(() => ButtonBuilder.validate(button)).not.toThrow();
+			expect(ButtonBuilder.from(button).custom_id).toBe("delete");
+		});
+
+		it("static validate matches instance validate behavior", () => {
+			const payload = { type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, label: "Click me", custom_id: "click" } as const;
+
+			expect(() => ButtonBuilder.validate(payload)).not.toThrow();
+		});
+	});
+});
+
+describe("LinkButtonBuilder", () => {
+	it("defaults type to BUTTON and fixes style to LINK", () => {
+		const builder = new LinkButtonBuilder();
+
+		expect(builder.type).toBe(ComponentTypes.BUTTON);
+		expect(builder.style).toBe(ButtonStyles.LINK);
+	});
+
+	it("hydrates a builder from payload using static from", () => {
+		const payload = { type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "https://example.com" } as const;
+
+		const builder = LinkButtonBuilder.from(payload);
+
+		expect(builder.label).toBe("Docs");
+		expect(builder.url).toBe("https://example.com");
+	});
+
+	it("sets url within the allowed length", () => {
+		const url = `https://example.com/${"a".repeat(490)}`;
+		const builder = new LinkButtonBuilder().setURL(url);
+
+		expect(builder.url).toBe(url);
+	});
+
+	it("throws when url is empty or exceeds 512 characters", () => {
+		expect(() => new LinkButtonBuilder().setURL("")).toThrow(/Button url must be between 1 and 512 characters long/);
+		expect(() => new LinkButtonBuilder().setURL(`https://example.com/${"a".repeat(600)}`)).toThrow(
+			/Button url must be between 1 and 512 characters long/
+		);
+	});
+
+	it("throws when label is empty or exceeds 80 characters", () => {
+		expect(() => new LinkButtonBuilder().setLabel("")).toThrow(/Button label must be between 1 and 80 characters long/);
+		expect(() => new LinkButtonBuilder().setLabel("a".repeat(81))).toThrow(/Button label must be between 1 and 80 characters long/);
+	});
+
+	it("sets emoji and disabled via their setters", () => {
+		const builder = new LinkButtonBuilder().setEmoji({ name: "\u{1F525}" }).setDisabled();
+
+		expect(builder.emoji).toEqual({ name: "\u{1F525}" });
+		expect(builder.disabled).toBe(true);
+	});
+
+	describe("validate", () => {
+		it("passes for a fully-populated link button", () => {
+			const builder = new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com");
+
+			expect(() => builder.validate()).not.toThrow();
+		});
+
+		it("throws when label is missing", () => {
+			const builder = new LinkButtonBuilder().setURL("https://example.com");
+
+			expect(() => builder.validate()).toThrow(/Button must have a label/);
+		});
+
+		it("throws when url is missing", () => {
+			const builder = new LinkButtonBuilder().setLabel("Docs");
 
 			expect(() => builder.validate()).toThrow(/Link buttons must have a url/);
 		});
 
-		it("throws when a link style has a custom_id set", () => {
-			const builder = new ButtonBuilder().setStyle(ButtonStyles.LINK).setLabel("Docs").setURL("https://example.com");
-			builder.custom_id = "click";
+		it("throws when a custom_id is set", () => {
+			const builder = new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com");
+			// only reachable from a hand-written payload - the builder has no setCustomID
+			Object.assign(builder, { custom_id: "click" });
 
 			expect(() => builder.validate()).toThrow(/Link buttons cannot have a custom_id/);
 		});
 
-		it("static validate matches instance validate behavior", () => {
-			const interactive = { type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, label: "Click me", custom_id: "click" } as const;
-			const link = { type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "https://example.com" } as const;
+		it("is assignable to the payload type it mirrors", () => {
+			const button: LinkButton = new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com");
 
-			expect(() => ButtonBuilder.validate(interactive)).not.toThrow();
-			expect(() => ButtonBuilder.validate(link)).not.toThrow();
+			expectTypeOf(button).toExtend<Button>();
+			expect(() => LinkButtonBuilder.validate(button)).not.toThrow();
+			expect(LinkButtonBuilder.from(button).url).toBe("https://example.com");
 		});
+
+		it("static validate matches instance validate behavior", () => {
+			const payload = { type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "https://example.com" } as const;
+
+			expect(() => LinkButtonBuilder.validate(payload)).not.toThrow();
+		});
+	});
+});
+
+describe("ResolveButton", () => {
+	it("builds the matching builder for each style family", () => {
+		expect(ResolveButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.DANGER, label: "Delete", custom_id: "delete" })).toBeInstanceOf(
+			ButtonBuilder
+		);
+		expect(ResolveButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "https://example.com" })).toBeInstanceOf(
+			LinkButtonBuilder
+		);
+		expect(ResolveButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.PREMIUM, sku_id: "1234567890" })).toBeInstanceOf(SKUButtonBuilder);
+	});
+
+	it("validates any button style, builder or payload alike", () => {
+		expect(() => ValidateButton(new ButtonBuilder().setLabel("Click me").setCustomID("click"))).not.toThrow();
+		expect(() => ValidateButton(new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com"))).not.toThrow();
+		expect(() => ValidateButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.PREMIUM, sku_id: "1234567890" })).not.toThrow();
+
+		expect(() => ValidateButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.LINK, label: "Docs", url: "" })).toThrow(
+			/Link buttons must have a url/
+		);
 	});
 });
 
@@ -246,6 +332,14 @@ describe("SKUButtonBuilder", () => {
 			const builder = new SKUButtonBuilder();
 
 			expect(() => builder.validate()).toThrow(/SKU button must have a sku_id/);
+		});
+
+		it("is assignable to the payload type it mirrors", () => {
+			const button: PremiumButton = new SKUButtonBuilder().setSkuID("1234567890");
+
+			expectTypeOf(button).toExtend<Button>();
+			expect(() => SKUButtonBuilder.validate(button)).not.toThrow();
+			expect(SKUButtonBuilder.from(button).sku_id).toBe("1234567890");
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -873,9 +967,36 @@ describe("ActionRowBuilder", () => {
 			expect(() => builder.validate()).toThrow(/Button must have a label/);
 		});
 
-		it("static validate matches instance validate behavior", () => {
+		it("cascades validation into raw component payloads too", () => {
+			const invalidButton: InteractiveButton = { type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, label: "", custom_id: "click" };
+			const builder = new ActionRowBuilder().addComponents(invalidButton);
+
+			expect(() => builder.validate()).toThrow(/Button must have a label/);
+		});
+
+		it("accepts builders and raw payloads in the same row", () => {
+			const builder = new ActionRowBuilder().addComponents(makeButton("from-builder"), {
+				type: ComponentTypes.BUTTON,
+				style: ButtonStyles.LINK,
+				label: "Docs",
+				url: "https://example.com"
+			});
+
+			expect(() => builder.validate()).not.toThrow();
+			expect(builder.components).toHaveLength(2);
+		});
+
+		it("is assignable to the ActionRow payload type", () => {
+			const row: ActionRow = new ActionRowBuilder().addComponents(makeButton());
+
+			expectTypeOf(row).toExtend<ActionRow>();
+			expect(row.type).toBe(ComponentTypes.ACTION_ROW);
+		});
+
+		it("static validate accepts a bare component list or a whole row", () => {
 			expect(() => ActionRowBuilder.validate([makeButton()])).not.toThrow();
 			expect(() => ActionRowBuilder.validate([])).toThrow(/Action row must have at least 1 component/);
+			expect(() => ActionRowBuilder.validate({ type: ComponentTypes.ACTION_ROW, components: [makeButton()] })).not.toThrow();
 		});
 	});
 });

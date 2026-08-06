@@ -1,4 +1,4 @@
-import { ComponentTypes, Label } from "../Types/Components.js";
+import { ComponentTypes, Label, LabelChild } from "../Types/Components.js";
 import { ChannelSelectBuilder } from "./ChannelSelectBuilder.js";
 import { MentionableSelectBuilder } from "./MentionableSelectBuilder.js";
 import { RoleSelectBuilder } from "./RoleSelectBuilder.js";
@@ -6,14 +6,14 @@ import { StringSelectBuilder } from "./StringSelectBuilder.js";
 import { TextInputBuilder } from "./TextInputBuilder.js";
 import { UserSelectBuilder } from "./UserSelectBuilder.js";
 
-/** Any builder that can be wrapped by a {@link LabelBuilder}, modal-only. */
-export type LabelChildBuilder =
-	| TextInputBuilder
-	| StringSelectBuilder
-	| UserSelectBuilder
-	| RoleSelectBuilder
-	| MentionableSelectBuilder
-	| ChannelSelectBuilder;
+/**
+ * Anything that can be wrapped by a {@link LabelBuilder}, modal-only - a raw {@link LabelChild}
+ * payload or any of the matching builders, which are assignable to it.
+ *
+ * @deprecated Prefer {@link LabelChild} directly - this alias only exists for the previous
+ * builder-only spelling and resolves to the same type.
+ */
+export type LabelChildBuilder = LabelChild;
 
 /** Runtime checks of the label/description text, shared by both the raw-payload and builder validation paths */
 function validateLabelText(label: { label?: string; description?: string }): void {
@@ -25,15 +25,15 @@ function validateLabelText(label: { label?: string; description?: string }): voi
 	}
 }
 
-/** Runtime checks for a builder instance - shape plus cascading into the wrapped component's own `validate` */
-function validateLabelShape(label: { label?: string; description?: string; component?: { validate(): void } }): void {
+/** Runtime checks for a label - shape plus cascading into the wrapped component's own checks */
+function validateLabelShape(label: { label?: string; description?: string; component?: LabelChild }): void {
 	validateLabelText(label);
 	if (!label.component) throw new Error("Label must have a component");
-	label.component.validate();
+	validateLabelChild(label.component);
 }
 
 /** Builds the appropriate builder for a raw {@link Label}'s `component`, based on its type */
-function buildLabelChild(component: Label["component"]): LabelChildBuilder {
+function buildLabelChild(component: LabelChild): LabelChildBuilder {
 	switch (component.type) {
 		case ComponentTypes.TEXT_INPUT: return TextInputBuilder.from(component);
 		case ComponentTypes.STRING_SELECT: return StringSelectBuilder.from(component);
@@ -45,7 +45,7 @@ function buildLabelChild(component: Label["component"]): LabelChildBuilder {
 }
 
 /** Validates a raw {@link Label}'s `component` using the appropriate builder's static `validate` */
-function validateLabelChild(component: Label["component"]): void {
+function validateLabelChild(component: LabelChild): void {
 	switch (component.type) {
 		case ComponentTypes.TEXT_INPUT: return TextInputBuilder.validate(component);
 		case ComponentTypes.STRING_SELECT: return StringSelectBuilder.validate(component);
@@ -58,9 +58,10 @@ function validateLabelChild(component: Label["component"]): void {
 
 /**
  * Fluent builder for a modal-only label - associates a label (and optional description) with a
- * single interactive component (text input or select menu).
+ * single interactive component (text input or select menu). The builder *is* a {@link Label}
+ * payload, and `component` is typed as a payload too, so a builder or a plain object both work.
  */
-export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
+export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
 	/**
 	 * Creates a builder from an existing label payload, inferring the right builder for `component`
 	 */
@@ -83,12 +84,12 @@ export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
 	}
 
 	readonly type = ComponentTypes.LABEL;
-	/** Label text, max 45 characters */
-	label?: string;
+	/** Label text, max 45 characters - only populated once set, see {@link LabelBuilder#validate} */
+	label!: string;
 	/** Additional description text, max 100 characters */
 	description?: string;
-	/** The component this label describes */
-	component?: T;
+	/** The component this label describes - only populated once set, see {@link LabelBuilder#validate} */
+	component!: T;
 
 	/**
 	 * Sets the label's text

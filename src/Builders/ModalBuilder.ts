@@ -1,11 +1,11 @@
-import { ComponentTypes } from "../Types/Components.js";
+import { ComponentTypes, Label, LabelChild } from "../Types/Components.js";
 import { InteractionCallbackModal } from "../Types/Interactions.js";
-import { LabelBuilder, LabelChildBuilder } from "./LabelBuilder.js";
+import { LabelBuilder } from "./LabelBuilder.js";
 
 const MAX_COMPONENTS = 5;
 
 /** Runtime checks shared by `ModalBuilder#validate` and the static `ModalBuilder.validate` */
-function validateModalShape(modal: { custom_id?: string; title?: string; components?: { validate(): void }[] }): void {
+function validateModalShape(modal: { custom_id?: string; title?: string; components?: Label[] }): void {
 	if (!modal.custom_id || modal.custom_id.length === 0) throw new Error("Modal must have a custom_id");
 	if (modal.custom_id.length > 100) throw new Error(`Modal custom_id must be 100 characters or fewer - Received ${modal.custom_id.length} characters`);
 
@@ -15,14 +15,15 @@ function validateModalShape(modal: { custom_id?: string; title?: string; compone
 	if (!modal.components || modal.components.length === 0) throw new Error("Modal must have at least 1 component");
 	if (modal.components.length > MAX_COMPONENTS) throw new Error(`Modal cannot have more than ${MAX_COMPONENTS} components`);
 
-	for (const component of modal.components) component.validate();
+	for (const component of modal.components) LabelBuilder.validate(component);
 }
 
 /**
  * Fluent builder for a modal. Fields are automatically wrapped in a {@link LabelBuilder} - there's
- * no action row to build or manage, unlike a message's buttons/selects.
+ * no action row to build or manage, unlike a message's buttons/selects. The builder *is* a modal
+ * payload, and its components are typed as payloads, so labels can be builders or plain objects.
  */
-export class ModalBuilder {
+export class ModalBuilder implements InteractionCallbackModal {
 	/**
 	 * Creates a builder from an existing modal payload
 	 *
@@ -54,23 +55,21 @@ export class ModalBuilder {
 		validateModalShape({
 			custom_id: modal.custom_id,
 			title: modal.title,
-			components: modal.components.map(component => ({
-				validate: () => {
-					if (component.type !== ComponentTypes.LABEL) {
-						throw new Error("ModalBuilder only supports Label-wrapped fields, not action rows");
-					}
-					LabelBuilder.validate(component);
+			components: modal.components.map(component => {
+				if (component.type !== ComponentTypes.LABEL) {
+					throw new Error("ModalBuilder only supports Label-wrapped fields, not action rows");
 				}
-			}))
+				return component;
+			})
 		});
 	}
 
-	/** Developer-defined identifier, max 100 characters */
-	custom_id?: string;
-	/** Title of the modal, max 45 characters */
-	title?: string;
+	/** Developer-defined identifier, max 100 characters - only populated once set, see {@link ModalBuilder#validate} */
+	custom_id!: string;
+	/** Title of the modal, max 45 characters - only populated once set, see {@link ModalBuilder#validate} */
+	title!: string;
 	/** 1-5 fields making up the modal, each wrapped in a label */
-	components: LabelBuilder[] = [];
+	components: Label[] = [];
 
 	/**
 	 * Sets the modal's custom_id
@@ -95,9 +94,9 @@ export class ModalBuilder {
 	}
 
 	/**
-	 * Replaces the modal's field list, each already wrapped in a {@link LabelBuilder}
+	 * Replaces the modal's field list, each already wrapped in a label
 	 */
-	setComponents(components: LabelBuilder[]): this {
+	setComponents(components: Label[]): this {
 		this.components = components;
 		return this;
 	}
@@ -105,7 +104,7 @@ export class ModalBuilder {
 	/**
 	 * Appends a field, wrapping `component` in a {@link LabelBuilder} automatically
 	 */
-	addField(labelText: string, component: LabelChildBuilder, config?: { description?: string }): this {
+	addField(labelText: string, component: LabelChild, config?: { description?: string }): this {
 		const label = new LabelBuilder().setLabel(labelText).setComponent(component);
 		if (config?.description !== undefined) label.setDescription(config.description);
 
