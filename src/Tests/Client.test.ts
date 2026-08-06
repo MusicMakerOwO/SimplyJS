@@ -4,6 +4,7 @@ import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { GatewayOpCodes } from "../Types/DiscordGateway.js";
 import { ActivityType, Status } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
+import { JSONArray } from "../Types/index.js";
 
 describe("Client methods", () => {
     let client: Client;
@@ -74,5 +75,75 @@ describe("Client methods", () => {
         const [payload] = sendSpy.mock.calls[0]! as [Record<string, unknown>];
         expect(payload.op).toBe(GatewayOpCodes.PresenceUpdate);
         expect(((payload.d as Record<string, unknown>).activities as unknown[])[0]).toEqual(client.activity);
+    });
+
+    describe("Command registration", () => {
+        it("registerPublicCommands() calls rest.put with correct global endpoint", async () => {
+            const mockCommands = [
+                { name: "ping", description: "Responds with pong" }
+            ];
+            const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue(mockCommands);
+
+            const result = await client.registerPublicCommands(mockCommands);
+
+            expect(restPutSpy).toHaveBeenCalledWith(
+                `/applications/${client.id}/commands`,
+                mockCommands
+            );
+            expect(result).toEqual(mockCommands);
+        });
+
+        it("registerPublicCommands() allows empty array to clear all commands", async () => {
+            const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue([]);
+
+            await client.registerPublicCommands([]);
+
+            expect(restPutSpy).toHaveBeenCalledWith(
+                `/applications/${client.id}/commands`,
+                []
+            );
+        });
+
+        it("registerGuildCommands() calls rest.put with correct guild-scoped endpoint", async () => {
+            const guildID = "guild-123";
+            const mockCommands = [
+                { name: "guild-only", description: "Guild command" }
+            ];
+            const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue(mockCommands);
+
+            const result = await client.registerGuildCommands(guildID, mockCommands);
+
+            expect(restPutSpy).toHaveBeenCalledWith(
+                `/applications/${client.id}/guilds/${guildID}/commands`,
+                mockCommands
+            );
+            expect(result).toEqual(mockCommands);
+        });
+
+        it("registerGuildCommands() requires guildID parameter (cannot be accidentally omitted)", async () => {
+            const mockCommands = [
+                { name: "test", description: "Test" }
+            ];
+            const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue(mockCommands);
+
+            // This should fail at compile time, but verify at runtime that guildID is used
+            await client.registerGuildCommands("guild-456", mockCommands);
+
+            const [endpoint] = restPutSpy.mock.calls[0]! as [string, JSONArray];
+            expect(endpoint).toContain("guilds/guild-456/commands");
+            expect(endpoint).not.toContain("undefined");
+        });
+
+        it("registerGuildCommands() allows empty array to clear guild commands", async () => {
+            const guildID = "guild-789";
+            const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue([]);
+
+            await client.registerGuildCommands(guildID, []);
+
+            expect(restPutSpy).toHaveBeenCalledWith(
+                `/applications/${client.id}/guilds/${guildID}/commands`,
+                []
+            );
+        });
     });
 });

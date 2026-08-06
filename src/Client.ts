@@ -9,6 +9,7 @@ import type { ClientEventMap } from "./Types/SimplicityTypes.js";
 import { User } from "./Structures/User.js";
 import { UserCache } from "./Managers/Users.js";
 import { ActivityType, ClientActivity, Status } from "./Types/DiscordAPITypes.js";
+import { ApplicationCommand, JSONArray } from "./Types/index.js";
 
 type ClientOptions = {
 	/** Bot token used to authenticate both the REST client and the gateway websocket */
@@ -57,6 +58,9 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** The client's current activity, this is only intended for internal use via state tracking */
 	activity: ClientActivity | null;
 
+	/** User ID resolved from the provided token */
+	id: string;
+
 	constructor(options: ClientOptions) {
 		super();
 
@@ -76,6 +80,8 @@ export class Client extends EventEmitter<ClientEventMap> {
 
 		this.status = Status.ONLINE;
 		this.activity = null;
+
+		this.id = Buffer.from(options.token.split('.')[0], 'base64').toString('ascii');
 	}
 
 	/** Start the WebSocket connection, promise resolves when authorization finishes */
@@ -133,5 +139,22 @@ export class Client extends EventEmitter<ClientEventMap> {
 			}
 		}
 		this.socket.send(payload);
+	}
+
+	/**
+	 * Replaces all public commands with this new list. These commands are available to every guild.
+	 * @note If you want to delete all commands pass an empty array `[]`
+	 */
+	async registerPublicCommands(commands: ApplicationCommand[]): Promise<ApplicationCommand[]> {
+		return await this.rest.put<ApplicationCommand[]>(`/applications/${this.id}/commands`, commands as unknown as JSONArray);
+	}
+
+	/**
+	 * Replaces all guild commands with this new list. These commands are available only to that specified guild.
+	 * The bot must be in the server to manage commands.
+	 * @note If you want to delete all commands pass an empty array `[]`
+	 */
+	async registerGuildCommands(guildID: string, commands: ApplicationCommand[]): Promise<ApplicationCommand[]> {
+		return await this.rest.put<ApplicationCommand[]>(`/applications/${this.id}/guilds/${guildID}/commands`, commands as unknown as JSONArray);
 	}
 }
