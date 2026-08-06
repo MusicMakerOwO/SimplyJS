@@ -32,8 +32,8 @@ export class SKUButtonBuilder {
 
 	readonly type = ComponentTypes.BUTTON;
 	readonly style = ButtonStyles.PREMIUM;
-	/** Id of the SKU the button purchases */
-	sku_id?: string;
+	/** Id of the SKU the button purchases - only populated once set, see {@link SKUButtonBuilder#validate} */
+	sku_id!: string;
 	/** Whether the button is disabled, defaults to false */
 	disabled?: boolean;
 

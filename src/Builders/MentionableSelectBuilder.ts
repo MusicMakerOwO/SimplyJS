@@ -2,7 +2,7 @@ import { ComponentTypes, MentionableSelect } from "../Types/Components.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
 /** Fluent builder for a select menu that picks from a server's users and roles, validating limits as they're set. */
-export class MentionableSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.MENTIONABLE_SELECT> {
+export class MentionableSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.MENTIONABLE_SELECT> implements MentionableSelect {
 	/**
 	 * Creates a builder from an existing mentionable select payload
 	 */

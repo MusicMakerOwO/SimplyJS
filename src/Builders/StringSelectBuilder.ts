@@ -20,7 +20,7 @@ function validateStringSelectOptions(options: SelectOption[] | undefined, label:
 }
 
 /** Fluent builder for a string select menu, validating limits as they're set. */
-export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes.STRING_SELECT> {
+export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes.STRING_SELECT> implements StringSelect {
 	/**
 	 * Creates a builder from an existing string select payload
 	 */
@@ -48,8 +48,8 @@ export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes
 
 	readonly type = ComponentTypes.STRING_SELECT;
 	protected readonly selectLabel = "String select";
-	/** Choices in the select, max 25 */
-	options?: SelectOption[];
+	/** Choices in the select, max 25 - only populated once set, see {@link StringSelectBuilder#validate} */
+	options!: SelectOption[];
 
 	/**
 	 * Replaces the select's option list

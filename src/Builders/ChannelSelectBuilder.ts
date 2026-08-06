@@ -4,7 +4,7 @@ import { ObjectValues } from "../Types/HelperTypes.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
 /** Fluent builder for a select menu that picks from a server's channels, validating limits as they're set. */
-export class ChannelSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.CHANNEL_SELECT> {
+export class ChannelSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.CHANNEL_SELECT> implements ChannelSelect {
 	/**
 	 * Creates a builder from an existing channel select payload
 	 */

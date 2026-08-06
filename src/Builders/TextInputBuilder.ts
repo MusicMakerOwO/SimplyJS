@@ -29,7 +29,7 @@ function validateTextInputShape(input: {
 }
 
 /** Fluent builder for a modal text input, validating limits as they're set. */
-export class TextInputBuilder {
+export class TextInputBuilder implements TextInput {
 	/**
 	 * Creates a builder from an existing text input payload
 	 */
@@ -55,10 +55,10 @@ export class TextInputBuilder {
 	}
 
 	readonly type = ComponentTypes.TEXT_INPUT;
-	/** Developer-defined identifier, max 100 characters, must be unique per modal */
-	custom_id?: string;
-	/** Whether the input is single-line or multi-line */
-	style?: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH;
+	/** Developer-defined identifier, max 100 characters, must be unique per modal - only populated once set, see {@link TextInputBuilder#validate} */
+	custom_id!: string;
+	/** Whether the input is single-line or multi-line - only populated once set, see {@link TextInputBuilder#validate} */
+	style!: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH;
 	/** Minimum input length, 0-4000 */
 	min_length?: number;
 	/** Maximum input length, 1-4000 */

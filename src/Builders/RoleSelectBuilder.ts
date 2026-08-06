@@ -2,7 +2,7 @@ import { ComponentTypes, RoleSelect } from "../Types/Components.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
 /** Fluent builder for a select menu that picks from a server's roles, validating limits as they're set. */
-export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.ROLE_SELECT> {
+export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.ROLE_SELECT> implements RoleSelect {
 	/**
 	 * Creates a builder from an existing role select payload
 	 */

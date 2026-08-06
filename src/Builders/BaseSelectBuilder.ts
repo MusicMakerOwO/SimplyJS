@@ -36,8 +36,8 @@ export function validateBaseSelectShape(
  */
 export abstract class BaseSelectBuilder<TType extends ComponentType> {
 	abstract readonly type: TType;
-	/** Developer-defined identifier, max 100 characters, must be unique per message/modal */
-	custom_id?: string;
+	/** Developer-defined identifier, max 100 characters, must be unique per message/modal - only populated once set, see `validate` */
+	custom_id!: string;
 	/** Placeholder text shown when nothing is selected, max 150 characters */
 	placeholder?: string;
 	/** Minimum number of items that must be chosen, 0-25, defaults to 1 */
