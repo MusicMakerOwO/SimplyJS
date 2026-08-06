@@ -273,6 +273,11 @@ export type InteractionCallbackMessages = {
 	attachments?: (Pick<Attachment, "id"> & Partial<Omit<Attachment, "id">>)[];
 	/** details about the poll to include with the message */
 	poll?: PollCreateRequest;
+	/**
+	 * Only the invoking user can see this response.
+	 * The response will be automatically removed if the user resarts their client.
+	 */
+	ephemeral?: boolean;
 };
 
 /**

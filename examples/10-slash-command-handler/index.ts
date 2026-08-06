@@ -3,8 +3,6 @@ import { FullClient } from "./types.js";
 
 import * as Commands from "./commands";
 
-// Run `register.ts` first (and again whenever the commands change)
-// Discord discourages registering commands on every boot
 const client = new Client({
 	token: process.env.TOKEN!,
 	intents: ["Guilds"]

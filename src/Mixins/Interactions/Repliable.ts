@@ -3,12 +3,13 @@ import { Message } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { InteractionCallbackMessages, InteractionCallbackTypes } from "../../Types/Interactions.js";
+import { MessageFlags } from "../../Types/index.js";
 
 /** Message flag bit for an ephemeral (invoking-user-only) response */
 const EPHEMERAL_FLAG = 1 << 6;
 
 /** Full reply payload, or a plain string shorthand for `{ content }` */
-export type InteractionReplyPayload = string | InteractionCallbackMessages;
+export type InteractionReplyPayload = InteractionCallbackMessages | string;
 
 function resolveReplyPayload(input: InteractionReplyPayload): InteractionCallbackMessages {
 	return typeof input === "string" ? { content: input } : input;
@@ -38,6 +39,11 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async reply(content: InteractionReplyPayload): Promise<void> {
+			const payload = resolveReplyPayload(content);
+			if (typeof content === 'object' && content.ephemeral) {
+				payload.flags ??= 0;
+				payload.flags |= MessageFlags.EPHEMERAL;
+			}
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
 				data: resolveReplyPayload(content),
