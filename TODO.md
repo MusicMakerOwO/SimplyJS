@@ -4,24 +4,24 @@
 
 - [x] Interaction collectors (buttons, select menus, modals)
 - [x] Slash command builder and all the options
-- [ ] `client.registerCommands(...)`
+- [x] `client.registerCommands(...)`
 - [x] Create a mixin system for channel class inheritance
 - [x] Start planning mixins for interactions
 - [x] Add component and interaction payload support
 	- Define interaction structures in `src/Structures/` (InteractionMessage, InteractionCommandOption, etc.)
 	- Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
 	- Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
-- [ ] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
+- [x] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
 - [ ] Add collectors, name pending
   - Temporary filtered event listeners that await matching events over a time period and auto-cleanup
   - Useful for interactions like "wait for the next message from this user"
 lol
 - [ ] Add examples showcasing interactions
-  - [ ] Creating/Registering commands
-  - [ ] Responding to commands
-  - [ ] Responding to other components (buttons, select menus, modals)
-  - [ ] Using an interaction handler
-  - [ ] Introduce the idea of button args
+  - [x] Creating/Registering commands
+  - [x] Responding to commands
+  - [x] Responding to other components (buttons, select menus, modals)
+  - [x] Using an interaction handler
+  - [x] Introduce the idea of button args
     - split `interaction.customId` on `_`
     - Allows for state management on buttons themselves, without collectors
   - [ ] Introduce collectors
@@ -45,7 +45,6 @@ lol
   - [ ] Reacting to a message and demonstrating emoji handling
   - [x] Fetching guilds, users, channels, and members from caches
   - [x] Basic moderation example using member actions (`timeout`, `kick`, `ban`)
-  - [ ] Role management example: create, modify, and inspect role order
   - [ ] Event logging example that prints a few common gateway events
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
