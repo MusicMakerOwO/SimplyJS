@@ -3,6 +3,8 @@ import { FullClient } from "./types.js";
 
 import * as Commands from "./commands";
 
+// `as FullClient` widens the type so we're allowed to hang a `commands` property off the
+// client below. See types.d.ts - it's plain Client plus the one field we're about to add.
 const client = new Client({
 	token: process.env.TOKEN!,
 	intents: ["Guilds", "GuildMessages", "MessageContent"]
@@ -44,6 +46,8 @@ client.on(ClientEvents.MessageCreate, async (message) => {
 	if (!command) return;
 
 	// Basic logs :D
+	// message.user is whoever sent the message. Discord's own API calls this field "author";
+	// SimplyJS names it `user` so it matches the User object you get everywhere else.
 	console.log(`@${message.user.username} > ${PREFIX}${command} ${args.join(' ')}`);
 
 	// find the handler, using command name as key

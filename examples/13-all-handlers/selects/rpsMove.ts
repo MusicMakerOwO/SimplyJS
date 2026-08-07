@@ -16,7 +16,10 @@ export default {
 		else if (BEATS[playerMove] === botMove) result = 'You win!';
 		else result = 'You lose!';
 
-		// Rebuilds the same select as commands/rps.ts so another round can be played right away.
+		// Rebuilds the same select as commands/rps.ts so another round can be played right
+		// away. A component that isn't sent back is gone, so anything meant to stay usable
+		// has to be re-attached on every update. Worth extracting into a shared builder
+		// function once the same menu appears in more than two places.
 		const move = new StringSelectBuilder()
 			.setCustomID('rps_move')
 			.setPlaceholder('Choose your move')

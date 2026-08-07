@@ -8,6 +8,8 @@ export default {
 		if (!member) return message.reply("Couldn't find that member");
 
 		try {
+			// ban() takes an options object rather than kick()'s plain string, because a ban
+			// can also purge the user's recent messages
 			await member.ban({ reason: args.join(' ') || undefined });
 			await message.reply(`Banned **${member.user.username}**`);
 		} catch (error) {

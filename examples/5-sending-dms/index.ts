@@ -2,6 +2,8 @@ import { Client, ClientEvents } from "../../dist/index.js";
 
 const client = new Client({
 	token: process.env.TOKEN!,
+	// "DirectMessages" is here so the bot can *receive* replies in DMs. Sending one needs no
+	// intent at all - intents only ever gate incoming events, never outgoing requests.
 	intents: ["Guilds", "GuildMessages", "DirectMessages", "MessageContent"]
 });
 
@@ -36,16 +38,20 @@ client.on(ClientEvents.MessageCreate, async (message) => {
 	// "!announce some news" -> sends a standalone message in the current channel,
 	// as opposed to reply() which attaches to the triggering message
 	if (command === 'announce') {
+		// Same nullable channel as in 3-prefix-commands, guarded with an early return here
+		// instead of a `!`. Either is fine; this one can't be wrong if the cache misses.
 		if (!message.channel) return;
 		await message.channel.send(args.join(' ') || "📢");
 		return;
 	}
 
-	// "!reply" -> replies with a ping (default)
-	// "!reply silent" -> replies without pinging the original author
+	// A reply always shows the "replying to" bar. `ping` controls the separate question of
+	// whether the author also gets a notification for it, and defaults to false.
+	// "!reply" -> replies quietly, no notification
+	// "!reply loud" -> replies and pings the original author
 	if (command === 'reply') {
-		const silent = args[0] === 'silent';
-		await message.reply("This is a reply!", { ping: silent ? true : false });
+		const loud = args[0] === 'loud';
+		await message.reply("This is a reply!", { ping: loud });
 		return;
 	}
 });

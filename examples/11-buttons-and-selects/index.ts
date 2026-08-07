@@ -63,9 +63,16 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 });
 
 // Buttons and select menus dispatch exactly like slash commands - look the interaction up
-// by its identifier and run the matching handler. Discord doesn't error if a component
-// interaction is never acknowledged, but the button/select just spins forever on the
-// user's end, so every handler below always replies, updates, or defers.
+// by its identifier and run the matching handler. A component interaction has the same 3
+// second deadline as a slash command: leave one unacknowledged and the user watches the
+// button hang and then fail, so every handler below always replies, updates, or defers.
+//
+// The reason this works at all is that a customId is just a string you chose, which Discord
+// stores on the message and hands back on every click. It isn't tied to the process that
+// created it, so these handlers keep working on buttons posted days ago, or before the last
+// restart. That's the advantage over waiting on a click inline: there's no in-memory state to
+// lose. The one real expiry is the interaction token, which is good for 15 minutes from the
+// click, so a reply has to happen inside that window.
 client.on(ClientEvents.ButtonUsed, async (interaction) => {
 	const button = client.buttons.get(interaction.customId);
 	if (!button) {

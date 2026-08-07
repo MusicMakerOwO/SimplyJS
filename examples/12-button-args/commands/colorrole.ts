@@ -3,6 +3,9 @@ import { CommandHandler } from "../types.js";
 
 // Assumes a role named "Red"/"Blue"/"Green"/"Yellow" already exists in the server -
 // see buttons/color.ts for what happens when clicked.
+// InteractiveButtonStyle is the subset of ButtonStyles that can carry a customId. Link and
+// premium buttons can't, since clicking them doesn't send the bot an interaction, so the type
+// rules them out here rather than letting it fail at runtime.
 const COLORS: { label: string; style: InteractiveButtonStyle }[] = [
 	{ label: 'Red', style: ButtonStyles.DANGER },
 	{ label: 'Blue', style: ButtonStyles.PRIMARY },

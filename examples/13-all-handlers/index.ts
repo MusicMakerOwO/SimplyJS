@@ -37,7 +37,21 @@ for (const select of Object.values(Selects) as SelectHandler[]) {
 	client.selects.set(select.customId, select);
 }
 
-// Event handler, see examples/8-event-handler for more details
+// Event handler, see examples/8-event-handler for the same idea in isolation.
+//
+// This is where all four handler kinds meet: the interaction routing that lived directly in
+// index.ts in examples 10 and 11 has moved into events/, so this file now only builds caches
+// and wires things up. Adding a command, button, select or event never means touching it.
+//
+// One difference from 8-event-handler worth knowing before you copy either: there, `execute`
+// took the event payload as spread arguments. Here it takes the whole argument list as a
+// single array, so the handlers destructure it with `[interaction]`. That's what lets one
+// EventHandler type cover every event without the generic gymnastics, at the cost of a less
+// natural signature. Pick one shape and keep it, they don't mix.
+//
+// TypeScript can't correlate `name` with `execute`'s argument types once handlers are
+// collected into a single array, so `any` is needed at this registration boundary even
+// though every individual handler file is fully type-safe.
 for (const event of Object.values(Events) as EventHandler<keyof ClientEventMap>[]) {
 	client.on(event.name, (...args: any[]) => event.execute(client, args as ClientEventMap[keyof ClientEventMap]));
 }

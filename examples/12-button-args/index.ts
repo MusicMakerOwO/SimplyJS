@@ -54,6 +54,11 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 // here recovers both pieces. Since Discord round-trips whatever customId a button was built
 // with, that string can double as a routing key *and* a place to stash small bits of state,
 // so neither a temporary collector nor a database is needed to remember it between clicks.
+//
+// Two limits come with the trick. Discord caps a customId at 100 characters and SimplyJS
+// throws when you cross it, so this stores identifiers and counters, not user-typed text.
+// And since `:` is the separator, no arg may contain one - anything user-supplied needs
+// escaping or a different delimiter, or it will split into the wrong number of pieces.
 client.on(ClientEvents.ButtonUsed, async (interaction) => {
 	const [id, ...args] = interaction.customId.split(':');
 

@@ -21,6 +21,14 @@ export interface FullClient extends Client {
 	selects: Map<string, SelectHandler>;
 }
 
+/**
+ * Events take `FullClient` rather than plain `Client` because the routing handlers in
+ * events/ need to reach `client.commands`, `client.buttons` and `client.selects`. The
+ * individual command and button handlers don't, so they stay on the narrower type.
+ *
+ * `event` is the entire argument list as one array, which is why handlers destructure it as
+ * `[interaction]`. 8-event-handler spreads the arguments instead; see ../index.ts.
+ */
 export interface EventHandler<T extends keyof ClientEventMap> {
 	name: T;
 	execute: (client: FullClient, event: ClientEventMap[T]) => Promise<void>

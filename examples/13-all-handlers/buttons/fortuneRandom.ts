@@ -1,8 +1,8 @@
 import { ButtonHandler } from "../types.js";
 
-// Duplicates selects/fortuneCategory.ts's fortune list rather than sharing it - picking the
-// category is the only difference between the two handlers, everything about revealing the
-// fortune afterward is deliberately kept separate and identical.
+// This list is copied from selects/fortuneCategory.ts so each handler reads top to bottom on
+// its own. In a real bot pull it into a shared module and import it from both: two copies of
+// the same data will drift the moment someone adds a fortune to one of them.
 const FORTUNES: Record<string, string[]> = {
 	love: [
 		'A meaningful connection is closer than you think.',

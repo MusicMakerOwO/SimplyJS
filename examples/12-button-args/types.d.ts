@@ -7,7 +7,7 @@ export interface CommandHandler {
 }
 
 export interface ButtonHandler {
-	/** Base id matched against the customId, once its args have been split off - see `customId.ts` */
+	/** Base id matched against the customId, once its args have been split off - see `index.ts` */
 	id: string;
 	execute: (client: Client, interaction: ButtonInteraction, ...args: string[]) => Promise<void>;
 }

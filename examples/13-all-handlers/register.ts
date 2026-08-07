@@ -6,8 +6,14 @@ const client = new Client({
 	intents: []
 });
 
+// Only commands get registered. Buttons, selects and events are all runtime-side: Discord
+// only ever needs to be told about the things a user can type.
 const commands = Object.values(Commands).map(command => command.data);
 
-client.registerPublicCommands(commands).then(() => {
-	console.log('Slash commands registered!');
-});
+// Global registration, so allow up to an hour for changes to appear.
+// registerGuildCommands(commands, guildID) is instant and the better one to develop against.
+client.registerPublicCommands(commands)
+	.then(() => {
+		console.log('Slash commands registered!');
+	})
+	.catch(console.error);

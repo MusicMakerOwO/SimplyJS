@@ -6,10 +6,11 @@ export default {
 	async execute(client, interaction) {
 		const result = Math.floor(Math.random() * 6) + 1;
 
+		// Only `content` is passed, and update() leaves out anything it isn't given, so the
+		// Roll button survives and the user can roll again. Passing `components: []` is what
+		// would strip it, the way the fortune handlers end their panel.
 		await interaction.update({
-			content: `You rolled a **${result}**!`,
-			// The old button stays around since we do not overwrite it
-			// If you want to clear the old buttons set `components: []`
+			content: `You rolled a **${result}**!`
 		});
 	}
 } as ButtonHandler;

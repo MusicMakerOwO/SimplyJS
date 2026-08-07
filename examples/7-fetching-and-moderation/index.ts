@@ -5,6 +5,10 @@ import * as Commands from "./commands";
 
 const client = new Client({
 	token: process.env.TOKEN!,
+	// "GuildMembers" is the second privileged intent, alongside MessageContent. Both have to
+	// be enabled under Bot > Privileged Gateway Intents in the Developer Portal. Without it
+	// the member cache stays empty and never fills, so !members reports zero and every
+	// lookup falls through to a REST fetch. As with MessageContent, nothing errors.
 	intents: ["Guilds", "GuildMessages", "GuildMembers", "MessageContent"]
 }) as FullClient;
 

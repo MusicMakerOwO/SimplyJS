@@ -3,6 +3,8 @@ import { resolveMember } from "../resolveMember";
 
 export default {
 	// "!give-role @user Moderator" -> matches by role name (case-insensitive) or id
+	// The command is invoked as "!give-role": what users type is this `name`, never the
+	// filename or the export alias in commands/index.ts.
 	name: 'give-role',
 	async execute(client, message, args) {
 		const member = await resolveMember(client, message.guild_id!, args.shift());

@@ -19,6 +19,9 @@ export default {
 			.setLabel('Cancel')
 			.setCustomID('close_cancel');
 
+		// Both buttons fit in one row, unlike commands/ticket.ts where a select forced a
+		// second row. DANGER colours the confirm button red, which is the only signal a user
+		// gets that it's the destructive one.
 		await interaction.reply({
 			content: 'Are you sure you want to close this ticket? This cannot be undone.',
 			components: [new ActionRowBuilder().addComponents(confirm, cancel)]

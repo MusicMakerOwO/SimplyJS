@@ -13,6 +13,11 @@ export default {
 		// Rebuilds the same three buttons as commands/counter.ts, just with `next` baked into
 		// their customIds instead of the starting count - that's the only place this counter's
 		// value is stored, there's no in-memory or database state to keep in sync.
+		//
+		// The tradeoff of keeping state in the message: two people clicking at the same time
+		// both read the count from the buttons they were shown, so one of the increments is
+		// lost. Fine for a counter anyone can play with, not fine for anything that has to be
+		// exact - that wants a real store keyed by message id.
 		await interaction.update({
 			content: `Count: **${next}**`,
 			components: [

@@ -13,6 +13,9 @@ const ROLE_NAMES: Record<string, string> = {
 export default {
 	id: 'color',
 	async execute(client, interaction, colorArg) {
+		// Careful here: it's interaction.guildId, but message.guild_id back in the prefix
+		// examples. Interactions expose camelCase, messages mirror Discord's raw snake_case
+		// payload.
 		const guild = interaction.guildId ? client.guilds.get(interaction.guildId) : undefined;
 		const member = interaction.member;
 		const roleName = ROLE_NAMES[colorArg];
@@ -29,6 +32,12 @@ export default {
 		}
 
 		// Toggle: clicking a color you already have takes it back off.
+		// member.roles is a plain array of role ids, not a cache like guild.roles - the
+		// member only stores which roles it has, the guild owns the roles themselves.
+		//
+		// These replies post a new visible message on every click, which gets noisy fast in a
+		// public channel. A real picker would use an ephemeral reply so only the clicker sees
+		// the confirmation.
 		if (member.roles.includes(role.id)) {
 			await member.removeRole(role.id);
 			await interaction.reply(`Removed the **${roleName}** role.`);

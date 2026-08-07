@@ -14,9 +14,18 @@ export default {
 			.setDescription('Pick a category below, or cancel if you opened this by mistake.')
 			.setColor('#5865F2');
 
+		// "String" select because the options are values we made up. Discord also offers
+		// user, role, channel and mentionable selects, which populate themselves from the
+		// server instead of from a list you write out.
+		//
+		// Note the casing: it's .setCustomID() when building, but interaction.customId when
+		// reading it back in selects/ticketCategory.ts. Easy one to get caught by.
 		const category = new StringSelectBuilder()
 			.setCustomID('ticket_category')
 			.setPlaceholder('Select a category')
+			// addOption(label, value): the label is what the user sees, the value is what
+			// comes back on the interaction. Keeping values short and machine-friendly makes
+			// the handler easier to write, and lets the label change without breaking it.
 			.addOption('Bug Report', 'bug', { description: "Something isn't working" })
 			.addOption('Billing', 'billing', { description: 'Payment or subscription issue' })
 			.addOption('Feedback', 'feedback', { description: 'A suggestion or idea' });
