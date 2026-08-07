@@ -1,10 +1,19 @@
+// Typecheck-only config for the examples. The library has its own tsconfig at the repo root;
+// this one exists so `tsc -p examples` can check the example code against the built dist/
+// without dragging in the library's build settings.
 {
 	"compilerOptions": {
 		"noEmit": true,
 		"rootDir": ".",
+		// Matches the library's target. Without it TypeScript falls back to ES5 and rejects
+		// the `#private` fields in dist/index.d.ts with TS18028, so checking the examples
+		// fails on library code before any example is even looked at.
+		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
 		"strict": true
 	},
-	"include": ["./**/*.ts", "../../dist"],
+	// dist/ isn't listed here on purpose - the examples import it directly, so TypeScript
+	// follows those imports and picks up the declarations on its own.
+	"include": ["./**/*.ts"]
 }
