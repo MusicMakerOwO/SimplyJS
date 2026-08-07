@@ -12,18 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Slash commands
 - `SlashCommandBuilder` (`src/Builders/SlashCommandBuilder.ts`) — fluent builder for application (slash) commands, including subcommands, subcommand groups, and all Discord option types with per-type validation
 - `ApplicationCommand` type definitions (`src/Types/ApplicationCommand.ts`) — full typings for application command payloads and option shapes
+- `SlashCommandOptions` (`src/Managers/SlashCommandOptions.ts`) — typed accessors (`getString`, `getInteger`, `getNumber`, `getBoolean`, `getUser`, `getMember`, `getRole`, `getChannel`, `getMentionable`, `getAttachment`) for a slash command interaction's resolved options, including nested subcommand/group values
+- `Client.registerPublicCommands(commands)` / `Client.registerGuildCommands(guildId, commands)` — replace all global or guild-scoped slash commands via REST
 
 #### Message components
-- `ActionRowBuilder` (`src/Builders/ActionRowBuilder.ts`) — container builder for buttons and select menus
-- `ButtonBuilder` / `SKUButtonBuilder` (`src/Builders/ButtonBuilder.ts`, `src/Builders/SKUButtonBuilder.ts`) — link/interaction and SKU (premium) button builders
+- `ActionRowBuilder` (`src/Builders/ActionRowBuilder.ts`) — container builder for buttons and select menus, generic over the component payload type so builders and plain objects can be mixed freely
+- `ButtonBuilder`, `LinkButtonBuilder`, `SKUButtonBuilder` (`src/Builders/ButtonBuilder.ts`, `src/Builders/LinkButtonBuilder.ts`, `src/Builders/SKUButtonBuilder.ts`) — one builder per button style family (interactive, link, and SKU/premium), each only exposing the fields valid for its style
+- `ResolveButton()` / `ValidateButton()` (`src/Builders/ResolveButton.ts`) — build or validate the correct button builder for a payload whose style isn't known up front
 - `StringSelectBuilder`, `UserSelectBuilder`, `RoleSelectBuilder`, `ChannelSelectBuilder`, `MentionableSelectBuilder` (`src/Builders/*SelectBuilder.ts`) — all Discord select menu types, sharing common option/constraint logic via `BaseSelectBuilder` / `EntitySelectBuilder`
 - `ModalBuilder`, `LabelBuilder`, `TextInputBuilder` (`src/Builders/ModalBuilder.ts`, `src/Builders/LabelBuilder.ts`, `src/Builders/TextInputBuilder.ts`) — modal construction with labeled text input fields
 - `Components` type definitions (`src/Types/Components.ts`) — full typings for all message component kinds
-- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`) for construction, validation, and JSON serialization of every builder
+- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`, `src/Tests/SlashCommandOptions.test.ts`) for construction, validation, and JSON serialization of every builder
 
 #### Interactions
 - `BaseInteraction` (`src/Structures/Interactions/BaseInteraction.ts`) and per-type interaction classes — `PingInteraction`, `SlashCommandInteraction`, `AutocompleteInteraction`, `MessageComponentInteraction`, `SelectMenuInteraction`, `ButtonInteraction`, `ModalInteraction`, `UserContextMenuInteraction`, `MessageContextMenuInteraction`
 - `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types
+- `MessageFlags` constants (`src/Types/DiscordAPITypes.ts`) and an `ephemeral` shorthand on `reply()`/`update()` payloads, for responses only the invoking user can see
 - `CreateInteraction()` factory (`src/Factory/CreateInteraction.ts`) — builds the correct interaction class from a raw gateway payload; returns `AnyInteraction | PingInteraction`
 - `InteractionCreate` gateway event handler (`src/Events/Interactions.ts`) for `INTERACTION_CREATE`, emitting `ClientEvents.InteractionCreate`
 - `DiscordInteraction` type (`src/Types/Interactions.ts`, renamed from `Interaction` to match the `Discord*` naming convention used by other API types)
@@ -33,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `EmbedBuilder` now implements `Embed` directly for improved type safety
 - Audit log type updated to properly reference the new slash command types
+- `ActionRowBuilder`, `LabelBuilder`, and `ModalBuilder` are now generic over their component payload types rather than builder types, so raw payload objects and builders can be mixed freely within them
+- All builders now implement their corresponding JSON payload interface directly, for improved type safety
+- Minimum supported Node version raised from 18 to 20, matching what the test suite actually requires
+
+### Fixed
+
+- Most builders (`ActionRowBuilder`, `ButtonBuilder`, all select menu builders, `ModalBuilder`, etc.) are now exported from the package root — previously only `EmbedBuilder` and `SlashCommandBuilder` were reachable
 
 ## [1.1.0-alpha] - 2026 July 31
 
