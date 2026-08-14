@@ -14,10 +14,17 @@ Example of the current public barrel:
 
 ```ts
 export * from "./Builders/index.js";
-export * from "./Cache/index.js";
+export * from "./Managers/index.js";
 export * from "./Events/index.js";
 export * from "./Structures/index.js";
 export * from "./Types/index.js";
+
+export * from "./Client.js";
+export * from "./Collector.js";
+export * from "./Constants.js";
+export * from "./EventDispatcher.js";
+export * from "./Rest.js";
+export * from "./WSClient.js";
 ```
 
 ## 2) Module and import style
@@ -79,6 +86,36 @@ The repo already centralizes helpers like `Awaitable`, `DeepPartial`, and `Objec
 ### Prefer exact object shapes for payload helpers
 
 `src/Types/Internal.ts` defines `JSONObject`, `JSONValue`, and `MessagePayload` so request and event signatures stay explicit.
+
+### Naming convention: camelCase everywhere, except raw Discord payloads
+
+All library-facing identifiers — class properties, method/constructor parameters, public option objects, event payloads — use `camelCase`. `Id` suffixes (not `ID`) are used consistently, e.g. `guildId`, `channelId`, `setCustomId()`.
+
+`snake_case` is reserved exclusively for values typed directly against Discord's documented wire format: the raw payload/response types in `src/Types/DiscordAPITypes.ts`, `DiscordGateway.ts`, `DiscordOAuth.ts`, `Internal.ts`, and similar files that mirror Discord's REST/gateway JSON field-for-field. Do not camelCase those — they exist to match Discord's docs exactly, so a reader can diff them against the API reference.
+
+The boundary between the two shows up in every structure's `patch()` method: reads off the raw `data` object stay snake_case, writes onto `this` are camelCase.
+
+```ts
+// data is typed against the raw Discord payload (snake_case); this.* is the library surface (camelCase)
+this.ownerId = data.owner_id;
+if ("afk_channel_id" in data && data.afk_channel_id !== undefined) this.afkChannelId = data.afk_channel_id;
+```
+
+The same boundary applies in reverse for outgoing REST calls: public method options are camelCase, and get mapped to a snake_case body immediately before the request, rather than passed through directly.
+
+```ts
+async modify(changes: {
+	afkChannelId?: string | null;
+	systemChannelId?: string | null
+}): Promise<void> {
+	await this.client.rest.patch(`/guilds/${this.id}`, {
+		afk_channel_id: changes.afkChannelId,
+		system_channel_id: changes.systemChannelId,
+	});
+}
+```
+
+This replaces an earlier, undocumented convention where snake_case was meant to signal "value straight from the API" versus camelCase for library-specific values. That convention was never written down, drifted as the codebase grew, and is why older files may still have stray snake_case class properties — those are bugs against this rule, not an alternate style, and should be fixed opportunistically when touching that code.
 
 ## 4) Runtime architecture rules
 
@@ -156,7 +193,7 @@ The comments in `src/Types/DiscordGateway.ts` are part of the source of truth. W
 
 ### Use `GlobalCache` for top-level client caches
 
-Top-level collections such as `Client.guilds` and `Client.users` extend `GlobalCache`.
+`GlobalCache` (`src/Contracts/CacheStructure.ts`) is the base class for top-level collections. Concrete caches live in `src/Managers/`; top-level ones such as `Client.guilds` and `Client.users` extend `GlobalCache` (see `src/Managers/Guilds.ts`).
 
 ```ts
 export class GuildCache extends GlobalCache<string, Guild, DiscordGuild> {
@@ -213,9 +250,8 @@ get joinedAt(): Date {
 Use a method when the calculation depends on external state, sibling collections, or mutable cross-entity resolution:
 
 ```ts
-hasPermission(flag: number): boolean {
-	// resolves roles, channel overwrites, and inherited state
-	return this.client.permissions.resolveMemberPermission(this, flag);
+permissionsIn(channel: Channel): BitField<typeof DiscordPermissions> {
+	return ResolvePermissions(this.guild, this, channel);
 }
 ```
 
@@ -243,7 +279,7 @@ Example (acceptable use):
 
 ```ts
 get guild(): Guild | null {
-  const value = this.client.guilds.get(this.guild_id!) ?? null;
+  const value = (this.guildId ? this.client.guilds.get(this.guildId) : undefined) ?? null;
   Object.defineProperty(this, 'guild', {
 	value: value
   });
@@ -253,14 +289,14 @@ get guild(): Guild | null {
 
 ## 7) Builder rules
 
-### Builders implement `ComponentBuilder<T>`
+### Builders implement the raw Discord payload interface they build
 
-Builders are used for validation and conversion of API-ready payloads. `src/Builders/EmbedBuilder.ts` is the current example.
+Builders are used for validation and conversion of API-ready payloads, and each one directly `implements` the Discord payload shape it produces (e.g. `EmbedBuilder implements Embed`, `ActionRowBuilder implements ActionRow`) rather than a shared generic contract. `src/Builders/EmbedBuilder.ts` is the current example.
 
 A builder should provide:
 
-- `from(value)` to hydrate from an existing payload
-- `validate()` to enforce all builder invariants
+- a static `from(value)` to hydrate from an existing payload
+- a static `validate()` to enforce all builder invariants
 
 ### Validate as close to mutation as possible
 
@@ -297,7 +333,7 @@ Timers must not keep the process alive. The repo has a custom lint rule that req
 ```ts
 setInterval(() => {
 	// heartbeat
-}, this.heartbeat_interval * this.jitter).unref();
+}, this.heartbeatInterval * this.jitter).unref();
 ```
 
 ### Never use `process.exit()`
@@ -317,11 +353,8 @@ Good comments explain why a field exists, what Discord requires, or how a payloa
 Example from `src/Structures/Message.ts`:
 
 ```ts
-/**
- * Extra field not in types
- * @see https://docs.discord.com/developers/events/gateway-events#message-create
- */
-guild_id?: string | null
+/** Id of the guild this message was sent in, only present on gateway payloads (`MESSAGE_CREATE` etc.), not in the Discord message object itself */
+guildId?: string | null
 ```
 
 ### Prefer JSDoc for public APIs and non-obvious behavior
@@ -366,7 +399,7 @@ If a constant is added to `src/Types/DiscordGateway.ts`, make sure any matching 
 - `src/Client.ts` — app bootstrap and cache construction
 - `src/WSClient.ts` — gateway handshake, heartbeat, and dispatch
 - `src/EventDispatcher.ts` — event registration and handler overrides
-- `src/Cache/Guilds.ts` — cache upsert and REST-backed fetch
+- `src/Managers/Guilds.ts` — cache upsert and REST-backed fetch
 - `src/Structures/Guild.ts` — partial patching and nested cache ownership
 - `src/Builders/EmbedBuilder.ts` — validation-heavy builder pattern
 - `src/Types/DiscordGateway.ts` — canonical protocol constants and intent commentary
