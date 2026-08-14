@@ -2,7 +2,7 @@ import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { defineEvent, JSONObject } from "../Types/Internal.js";
 import { DiscordUser } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
-import { ClientEvents } from "../Types/SimplicityTypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 const READY_GUILD_FALLBACK_TIMEOUT_MS = 15_000;
 

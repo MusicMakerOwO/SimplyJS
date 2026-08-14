@@ -18,7 +18,7 @@ import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
 import { GuildBanAdd, GuildBanRemove } from "../Events/Bans.js";
 import { AuditLogEntryCreate } from "../Events/AuditLogs.js";
 import { DiscordAuditLogEvent } from "../Types/DiscordAPITypes.js";
-import { ClientEvents } from "../Types/SimplicityTypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
 
@@ -370,7 +370,7 @@ describe("Gateway event handlers mutate caches", () => {
 		const { Client } = await import("../Client.js");
 		const { ReactionAdd, ReactionRemove } = await import("../Events/Reactions.js");
 		const { GuildCreate } = await import("../Events/Guilds.js");
-		const { ClientEvents } = await import("../Types/SimplicityTypes.js");
+		const { ClientEvents } = await import("../Types/SimplyJSTypes.js");
 		const { GatewayIntents } = await import("../Types/DiscordGateway.js");
 		const vi = (await import("vitest")).vi;
 
@@ -462,7 +462,7 @@ describe("Gateway event handlers mutate caches", () => {
 	it("EmojiCreate adds new emoji to cache and emits EmojiCreate event", async () => {
 		const { EmojisUpdate } = await import("../Events/Emojis.js");
 		const { GuildCreate } = await import("../Events/Guilds.js");
-		const { ClientEvents } = await import("../Types/SimplicityTypes.js");
+		const { ClientEvents } = await import("../Types/SimplyJSTypes.js");
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions });
 		const emitSpy = vi.spyOn(client, "emit");
 
@@ -483,7 +483,7 @@ describe("Gateway event handlers mutate caches", () => {
 	it("EmojiUpdate filters cached emojis and only emits changed data", async () => {
 		const { EmojisUpdate } = await import("../Events/Emojis.js");
 		const { GuildCreate } = await import("../Events/Guilds.js");
-		const { ClientEvents } = await import("../Types/SimplicityTypes.js");
+		const { ClientEvents } = await import("../Types/SimplyJSTypes.js");
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions });
 		const emitSpy = vi.spyOn(client, "emit");
 
@@ -509,7 +509,7 @@ describe("Gateway event handlers mutate caches", () => {
 	it("EmojiDelete removes emoji from cache and emits EmojiDelete event", async () => {
 		const { EmojisUpdate } = await import("../Events/Emojis.js");
 		const { GuildCreate } = await import("../Events/Guilds.js");
-		const { ClientEvents } = await import("../Types/SimplicityTypes.js");
+		const { ClientEvents } = await import("../Types/SimplyJSTypes.js");
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions });
 		const emitSpy = vi.spyOn(client, "emit");
 

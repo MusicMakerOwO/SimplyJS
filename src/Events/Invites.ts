@@ -1,6 +1,6 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents, GatewayInvite } from "../Types/DiscordGateway.js";
-import { ClientEvents, InviteDeletePayload } from "../Types/SimplicityTypes.js";
+import { ClientEvents, InviteDeletePayload } from "../Types/SimplyJSTypes.js";
 import { Invite } from "../Structures/Invite.js";
 
 export const InviteCreate = defineEvent({

@@ -7,4 +7,4 @@ export * from "./HelperTypes.js";
 export * from "./Interactions.js";
 export * from "./Internal.js";
 export * from "./MessageComponents.js";
-export * from "./SimplicityTypes.js";
+export * from "./SimplyJSTypes.js";

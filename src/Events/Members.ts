@@ -1,7 +1,7 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordMember, DiscordUser } from "../Types/DiscordAPITypes.js";
-import { ClientEvents } from "../Types/SimplicityTypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 /** Fires when a member joins a guild; ignored if the guild isn't cached */
 export const MemberCreate = defineEvent({

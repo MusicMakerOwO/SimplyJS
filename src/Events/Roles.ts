@@ -1,7 +1,7 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordRole } from "../Types/DiscordAPITypes.js";
-import { ClientEvents } from "../Types/SimplicityTypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 export const RoleCreate = defineEvent({
 	name: GatewayEvents.GuildRoleCreate,

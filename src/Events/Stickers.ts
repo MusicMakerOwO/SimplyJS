@@ -1,7 +1,7 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordSticker } from "../Types/DiscordAPITypes.js";
-import { ClientEvents } from "../Types/SimplicityTypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 /**
  * Fires on a guild sticker sync; diffs the incoming sticker list against the cache to derive and

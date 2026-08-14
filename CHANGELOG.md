@@ -186,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MessageComponents` (`src/Types/MessageComponents.ts`) — message payload subtypes (`Embed`, `Attachment`, `Reaction`, `Poll`, `MessageReference`, etc.)
 - `DiscordGateway` (`src/Types/DiscordGateway.ts`) — `GatewayOpCodes`, `GatewayIntents`, `GatewayEvents`, and `GatewayPayload<T>` envelope type
 - `DiscordOAuth` (`src/Types/DiscordOAuth.ts`) — OAuth2 scope and token type constants
-- `SimplicityTypes` (`src/Types/SimplicityTypes.ts`) — `ClientEventMap` typed event map used by `Client`; `Status`, `ActivityType`, `ClientActivity`
+- `SimplyJSTypes` (`src/Types/SimplyJSTypes.ts`) — `ClientEventMap` typed event map used by `Client`; `Status`, `ActivityType`, `ClientActivity`
 - `Internal` (`src/Types/Internal.ts`) — `EventHandler<N,D>`, `defineEvent(...)` factory for strongly-typed handler declarations; `MessagePayload`; `JSONPrimitive` / `JSONValue` / `JSONObject` utility types
 - `HelperTypes` (`src/Types/HelperTypes.ts`) — `ObjectValues<T>`, `DeepPartial<T>`, `Awaitable<T>` shared utility types
 

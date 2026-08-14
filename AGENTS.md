@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project snapshot
-- `Simplicity` is a TypeScript-first Discord library (`package.json` description: minimal `discord.js` alternative).
+- `SimplyJS` is a TypeScript-first Discord library (`package.json` description: minimal `discord.js` alternative).
 - Current implementation is still type- and protocol-heavy, but runtime layers are no longer fully empty: `src/Client.ts` wires auth/login/destroy with top-level caches (`GuildCache`, `UserCache`), `src/WSClient.ts` has gateway handshake/heartbeat/event dispatch logic, `src/Rest.ts` has authenticated `GET`/`POST`/`PATCH`/`DELETE`/`PUT` helpers, and `src/EventDispatcher.ts` routes gateway events using handlers exported from `src/Events/index.ts`.
 
 ## Architecture and data flow (what exists now)
@@ -12,7 +12,7 @@
 - Event-to-intent resolution lives in `src/Intents.ts` via `EventRequiredIntent`; this is the main cross-file bridge between gateway events and enabled intents.
 - Intent normalization helpers (`ResolveIntents`, `HasIntent`) convert mixed user input (number, key names, numeric array) into a bitfield.
 - Gateway dispatch flows: `WSClient.#handleMessage` → `CreateDispatch()` result from `src/EventDispatcher.ts` → handler module exported from `src/Events/index.ts` (e.g., `GuildCreate`) → updates `Client` cache or structure in `src/Structures/` (channel classes live under `src/Structures/Channels/`) or `src/Managers/`.
-- Gateway handlers then emit the public client event surface from `src/Types/SimplicityTypes.ts` (`ClientEvents` / `ClientEventMap`) via `Client.emit(...)`.
+- Gateway handlers then emit the public client event surface from `src/Types/SimplyJSTypes.ts` (`ClientEvents` / `ClientEventMap`) via `Client.emit(...)`.
 - `Client.guilds` and `Client.users` are top-level caches (`GuildCache`, `UserCache`, both extending `GlobalCache<string, V, API>`); `fetch(id)` uses REST and `upsert()` to patch/create entries, and `Guild` owns nested caches for `channels`, `roles`, `emojis`, `stickers`, and `members`.
 - `src/Rest.ts` keeps route/bucket rate-limit state in `src/DataStructures/TTLCache.ts` (`routeRateLimits`, `routeToBucket`) and exposes `RestOptions` for `retryAfterRateLimit`, `rateLimitDurationMultiplier`, and `perRouteRateLimits`.
 - Abstract base classes in `src/Contracts/` define the structural contracts:

@@ -1,6 +1,6 @@
 # Code Style and Rules
 
-This document is a practical guide for working in `Simplicity2`. It focuses on the style and structure already used in the repository, so new code fits the existing runtime, type system, and event flow.
+This document is a practical guide for working in `SimplyJS`. It focuses on the style and structure already used in the repository, so new code fits the existing runtime, type system, and event flow.
 
 ## 1) Core principles
 
