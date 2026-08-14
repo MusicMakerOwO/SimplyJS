@@ -21,7 +21,7 @@ export default {
 		// Note the casing: it's .setCustomID() when building, but interaction.customId when
 		// reading it back in selects/ticketCategory.ts. Easy one to get caught by.
 		const category = new StringSelectBuilder()
-			.setCustomID('ticket_category')
+			.setCustomId('ticket_category')
 			.setPlaceholder('Select a category')
 			// addOption(label, value): the label is what the user sees, the value is what
 			// comes back on the interaction. Keeping values short and machine-friendly makes
@@ -33,7 +33,7 @@ export default {
 		const cancel = new ButtonBuilder()
 			.setStyle(ButtonStyles.SECONDARY)
 			.setLabel('Cancel')
-			.setCustomID('ticket_cancel');
+			.setCustomId('ticket_cancel');
 
 		await interaction.reply({
 			embeds: [embed],

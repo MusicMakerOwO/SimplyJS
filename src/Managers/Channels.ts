@@ -12,7 +12,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
-import { Channel } from "../Types/index.js";
+import { Channel, JSONObject } from "../Types/index.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
 
 /** Cache of a single guild's {@link Channel}s, including threads. */
@@ -49,35 +49,55 @@ export class ChannelCache extends GuildCache<string, Channel, DiscordChannel> {
 		/** Optional bitrate for voice channels */
 		bitrate?: number
 		/** Optional user limit for voice channels */
-		user_limit?: number
+		userLimit?: number
 		/** Optional slowmode duration in seconds */
-		rate_limit_per_user?: number
+		rateLimitPerUser?: number
 		/** Optional position in the channel list */
 		position?: number
 		/** Optional permission overwrite set */
-		permission_overwrites?: DiscordOverwrite[]
+		permissionOverwrites?: DiscordOverwrite[]
 		/** Optional parent category id */
-		parent_id?: string | null
+		parentId?: string | null
 		/** Whether the channel is marked NSFW */
 		nsfw?: boolean
 		/** Optional RTC region override for voice channels */
-		rtc_region?: string | null
+		rtcRegion?: string | null
 		/** Optional video quality mode for voice channels */
-		video_quality_mode?: ObjectValues<typeof DiscordVideoQualityModes>
+		videoQualityMode?: ObjectValues<typeof DiscordVideoQualityModes>
 		/** Optional default thread archive duration in minutes */
-		default_auto_archive_duration?: number
+		defaultAutoArchiveDuration?: number
 		/** Optional default reaction used in forum channels */
-		default_reaction_emoji?: DiscordDefaultReaction | null
+		defaultReactionEmoji?: DiscordDefaultReaction | null
 		/** Optional available tags for forum channels */
-		available_tags?: DiscordForumTag[]
+		availableTags?: DiscordForumTag[]
 		/** Optional default sort order for forum posts */
-		default_sort_order?: ObjectValues<typeof DiscordSortOrderTypes> | null
+		defaultSortOrder?: ObjectValues<typeof DiscordSortOrderTypes> | null
 		/** Optional default forum layout */
-		default_forum_layout?: ObjectValues<typeof DiscordForumLayoutTypes>
+		defaultForumLayout?: ObjectValues<typeof DiscordForumLayoutTypes>
 		/** Optional default slowmode for created threads */
-		default_thread_rate_limit_per_user?: number
+		defaultThreadRateLimitPerUser?: number
 	}): Promise<Channel> {
-		const created = await this.client.rest.post<DiscordChannel>(`/guilds/${this.guild.id}/channels`, options);
+		const {
+			userLimit, rateLimitPerUser, permissionOverwrites, parentId, rtcRegion, videoQualityMode,
+			defaultAutoArchiveDuration, defaultReactionEmoji, availableTags, defaultSortOrder,
+			defaultForumLayout, defaultThreadRateLimitPerUser, ...rest
+		} = options;
+		const payload = {
+			...rest,
+			user_limit: userLimit,
+			rate_limit_per_user: rateLimitPerUser,
+			permission_overwrites: permissionOverwrites,
+			parent_id: parentId,
+			rtc_region: rtcRegion,
+			video_quality_mode: videoQualityMode,
+			default_auto_archive_duration: defaultAutoArchiveDuration,
+			default_reaction_emoji: defaultReactionEmoji,
+			available_tags: availableTags,
+			default_sort_order: defaultSortOrder,
+			default_forum_layout: defaultForumLayout,
+			default_thread_rate_limit_per_user: defaultThreadRateLimitPerUser,
+		};
+		const created = await this.client.rest.post<DiscordChannel>(`/guilds/${this.guild.id}/channels`, payload as unknown as JSONObject);
 		return this.upsert(created);
 	}
 }

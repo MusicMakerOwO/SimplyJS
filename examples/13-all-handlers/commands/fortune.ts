@@ -10,7 +10,7 @@ export default {
 
 	async execute(client, interaction) {
 		const category = new StringSelectBuilder()
-			.setCustomID('fortune_category')
+			.setCustomId('fortune_category')
 			.setPlaceholder('Pick a category')
 			.addOption('Love', 'love')
 			.addOption('Career', 'career')
@@ -19,7 +19,7 @@ export default {
 		const random = new ButtonBuilder()
 			.setStyle(ButtonStyles.SECONDARY)
 			.setLabel('🎲 Surprise me')
-			.setCustomID('fortune_random');
+			.setCustomId('fortune_random');
 
 		await interaction.reply({
 			content: 'Pick a category for your fortune, or leave it to chance.',

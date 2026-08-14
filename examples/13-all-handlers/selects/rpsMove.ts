@@ -21,7 +21,7 @@ export default {
 		// has to be re-attached on every update. Worth extracting into a shared builder
 		// function once the same menu appears in more than two places.
 		const move = new StringSelectBuilder()
-			.setCustomID('rps_move')
+			.setCustomId('rps_move')
 			.setPlaceholder('Choose your move')
 			.addOption('Rock', 'rock', { emoji: { name: '🪨' } })
 			.addOption('Paper', 'paper', { emoji: { name: '📄' } })

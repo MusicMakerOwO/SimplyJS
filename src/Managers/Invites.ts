@@ -1,6 +1,6 @@
 import { Guild, Invite } from "../Structures/index.js";
 import { Client } from "../Client.js";
-import { DiscordInvite } from "../Types/index.js";
+import { DiscordInvite, JSONObject } from "../Types/index.js";
 
 /**
  * Manages a guild's invites. This manager has no local cache — every method calls the REST API
@@ -18,31 +18,44 @@ export class GuildInviteManager {
 	/**
 	 * Creates an invite for a channel in this guild. Requires the `CREATE_INSTANT_INVITE`
 	 * permission.
-	 * @param channel_id The id of the channel (must belong to this guild) to create the invite for.
+	 * @param channelId The id of the channel (must belong to this guild) to create the invite for.
 	 * @param options Invite creation options.
 	 * @returns The created invite.
-	 * @throws {Error} When `channel_id` does not refer to a channel cached on this guild.
+	 * @throws {Error} When `channelId` does not refer to a channel cached on this guild.
 	 */
-	async create(channel_id: string, options: {
+	async create(channelId: string, options: {
 		/** duration of invite in seconds before expiry, or 0 for never. between 0 and 604800 (7 days) */
-		max_age: number;
+		maxAge: number;
 		/** max number of uses or 0 for unlimited. between 0 and 100 */
-		max_uses?: number;
+		maxUses?: number;
 		/** whether this invite only grants temporary membership */
 		temporary?: boolean;
 		/** if true, don’t try to reuse a similar invite (useful for creating many unique one time use invites) */
 		unique?: boolean;
 		/** the type of target for this voice channel invite */
-		target_type?: number;
-		/** the id of the user whose stream to display for this invite, required if target_type is 1, the user must be streaming in the channel */
-		target_user_id?: string;
-		/** the id of the embedded application to open for this invite, required if target_type is 2, the application must have the EMBEDDED flag */
-		target_application_id?: string;
-		/** the role ID(s) for roles in the guild given to the users that accept this invite (requires MANAGE_SERVER permission) */
-		role_ids?: string[];
+		targetType?: number;
+		/** the id of the user whose stream to display for this invite, required if targetType is 1, the user must be streaming in the channel */
+		targetUserId?: string;
+		/** the id of the embedded application to open for this invite, required if targetType is 2, the application must have the EMBEDDED flag */
+		targetApplicationId?: string;
+		/** the role Id(s) for roles in the guild given to the users that accept this invite (requires MANAGE_SERVER permission) */
+		roleIds?: string[];
 	}): Promise<Invite> {
-		if (!this.guild.channels.has(channel_id)) throw new Error("Unknown channel, does that channel exist in this guild?");
-		const response = await this.client.rest.post<DiscordInvite>(`/channels/${channel_id}/invites`, options);
+		if (!this.guild.channels.has(channelId)) throw new Error("Unknown channel, does that channel exist in this guild?");
+		const payload: Record<string, unknown> = {
+			max_age: options.maxAge,
+			max_uses: options.maxUses,
+			temporary: options.temporary,
+			unique: options.unique,
+			target_type: options.targetType,
+			target_user_id: options.targetUserId,
+			target_application_id: options.targetApplicationId,
+			role_ids: options.roleIds,
+		};
+		for (const key of Object.keys(payload)) {
+			if (payload[key] === undefined) delete payload[key];
+		}
+		const response = await this.client.rest.post<DiscordInvite>(`/channels/${channelId}/invites`, payload as unknown as JSONObject);
 		return new Invite(this.client, response);
 	}
 

@@ -62,7 +62,7 @@ function validateActionRowShape(components: ActionRowChild[]): void {
  *
  * ```ts
  * new ActionRowBuilder().addComponents(
- *     new ButtonBuilder().setStyle(ButtonStyles.DANGER).setLabel("Red").setCustomID("red"),
+ *     new ButtonBuilder().setStyle(ButtonStyles.DANGER).setLabel("Red").setCustomId("red"),
  *     { type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, label: "Blue", custom_id: "blue" }
  * );
  * ```

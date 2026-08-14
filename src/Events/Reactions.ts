@@ -36,11 +36,11 @@ export const ReactionAdd = defineEvent({
 			guild: guild,
 			channel: channel,
 			user: user,
-			message_id: data.message_id,
+			messageId: data.message_id,
 			member: member,
 			emoji: data.emoji,
-			message_user_id: data.message_author_id ?? null,
-			super_reaction: data.burst
+			messageUserId: data.message_author_id ?? null,
+			superReaction: data.burst
 		})
 
 	}
@@ -71,11 +71,11 @@ export const ReactionAdd = defineEvent({
 					guild: guild,
 					channel: channel,
 					user: user,
-					message_id: data.message_id,
+					messageId: data.message_id,
 					member: null,
 					emoji: data.emoji,
-					message_user_id: data.message_author_id ?? null,
-					super_reaction: false
+					messageUserId: data.message_author_id ?? null,
+					superReaction: false
 				})
 			}
 		})

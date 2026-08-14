@@ -105,28 +105,28 @@ describe("Client methods", () => {
         });
 
         it("registerGuildCommands() calls rest.put with correct guild-scoped endpoint", async () => {
-            const guildID = "guild-123";
+            const guildId = "guild-123";
             const mockCommands = [
                 { name: "guild-only", description: "Guild command" }
             ];
             const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue(mockCommands);
 
-            const result = await client.registerGuildCommands(guildID, mockCommands);
+            const result = await client.registerGuildCommands(guildId, mockCommands);
 
             expect(restPutSpy).toHaveBeenCalledWith(
-                `/applications/${client.id}/guilds/${guildID}/commands`,
+                `/applications/${client.id}/guilds/${guildId}/commands`,
                 mockCommands
             );
             expect(result).toEqual(mockCommands);
         });
 
-        it("registerGuildCommands() requires guildID parameter (cannot be accidentally omitted)", async () => {
+        it("registerGuildCommands() requires guildId parameter (cannot be accidentally omitted)", async () => {
             const mockCommands = [
                 { name: "test", description: "Test" }
             ];
             const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue(mockCommands);
 
-            // This should fail at compile time, but verify at runtime that guildID is used
+            // This should fail at compile time, but verify at runtime that guildId is used
             await client.registerGuildCommands("guild-456", mockCommands);
 
             const [endpoint] = restPutSpy.mock.calls[0]! as [string, JSONArray];
@@ -135,13 +135,13 @@ describe("Client methods", () => {
         });
 
         it("registerGuildCommands() allows empty array to clear guild commands", async () => {
-            const guildID = "guild-789";
+            const guildId = "guild-789";
             const restPutSpy = vi.spyOn(client.rest, "put").mockResolvedValue([]);
 
-            await client.registerGuildCommands(guildID, []);
+            await client.registerGuildCommands(guildId, []);
 
             expect(restPutSpy).toHaveBeenCalledWith(
-                `/applications/${client.id}/guilds/${guildID}/commands`,
+                `/applications/${client.id}/guilds/${guildId}/commands`,
                 []
             );
         });

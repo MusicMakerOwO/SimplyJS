@@ -23,7 +23,7 @@ export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 	name?: string | null
 	/** Channel flags bitfield (e.g. `PINNED`, `REQUIRE_TAG`) */
 	flags?: number
-	guild_id?: string
+	guildId?: string
 
 	constructor(client: Client, guild: Guild, data: DiscordChannel) {
 		super(client, guild);
@@ -35,7 +35,7 @@ export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 		this.type = data.type;
 		if (data.name !== undefined) this.name = data.name;
 		if (data.flags !== undefined) this.flags = data.flags;
-		if (data.guild_id !== undefined) this.guild_id = data.guild_id;
+		if (data.guild_id !== undefined) this.guildId = data.guild_id;
 	}
 
 	/**

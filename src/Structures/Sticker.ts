@@ -13,7 +13,7 @@ import { Guild } from "./Guild.js";
 export class Sticker extends APIGuildStructure<DiscordSticker> {
 	id!: string
 	/** Sticker pack id for standard stickers, when present */
-	pack_id?: string
+	packId?: string
 	/** Sticker display name */
 	name!: string
 	/** Sticker description, or `null` when omitted */
@@ -23,15 +23,15 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 	/** Sticker type (standard or guild) */
 	type!: ObjectValues<typeof DiscordStickerTypes>
 	/** Sticker file format type */
-	format_type!: ObjectValues<typeof DiscordStickerFormatTypes>
+	formatType!: ObjectValues<typeof DiscordStickerFormatTypes>
 	/** Whether this sticker is currently available for use */
 	available?: boolean
 	/** Guild id that owns this sticker */
-	guild_id?: string
+	guildId?: string
 	/** User who uploaded the sticker, when included by the API */
 	user?: User
 	/** Sorting hint value used by Discord clients */
-	sort_value?: number
+	sortValue?: number
 
 	constructor(client: Client, guild: Guild, data: DiscordSticker) {
 		super(client, guild);
@@ -43,10 +43,10 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 		this.name = data.name;
 		this.tags = data.tags;
 		this.type = data.type;
-		this.format_type = data.format_type;
+		this.formatType = data.format_type;
 
 		if ('pack_id' in data && data.pack_id !== undefined) {
-			this.pack_id = data.pack_id;
+			this.packId = data.pack_id;
 		}
 
 		if ('description' in data && data.description !== undefined) {
@@ -58,7 +58,7 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 		}
 
 		if ('guild_id' in data && data.guild_id !== undefined) {
-			this.guild_id = data.guild_id;
+			this.guildId = data.guild_id;
 		}
 
 		if ('user' in data && data.user !== undefined) {
@@ -66,7 +66,7 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 		}
 
 		if ('sort_value' in data && data.sort_value !== undefined) {
-			this.sort_value = data.sort_value;
+			this.sortValue = data.sort_value;
 		}
 	}
 

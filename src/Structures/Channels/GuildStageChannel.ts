@@ -18,14 +18,14 @@ export class GuildStageChannel extends GuildVoiceChannel {
 		this.topic = data.topic!;
 	}
 
-	// narrower than GuildVoiceChannel.modify() - no video_quality_mode or user_limit
+	// narrower than GuildVoiceChannel.modify() - no videoQualityMode or userLimit
 	async modify(options: {
 		name?: string
 		position?: number
 		bitrate?: number
-		rtc_region?: string | null
-		permission_overwrites?: DiscordOverwrite[]
-		parent_id?: string | null
+		rtcRegion?: string | null
+		permissionOverwrites?: DiscordOverwrite[]
+		parentId?: string | null
 		topic?: string | null
 	}): Promise<void> {
 		await super.modify(options);

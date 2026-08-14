@@ -16,24 +16,24 @@ export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(
 	// the super() chain than this class's own field declarations).
 	declare topic?: string | null
 	declare nsfw?: boolean
-	declare last_message_id?: string | null
+	declare lastMessageId?: string | null
 	/** Slowmode duration in seconds that members must wait between sending messages, `0` for no slowmode */
-	declare rate_limit_per_user?: number
-	declare parent_id?: string | null
+	declare rateLimitPerUser?: number
+	declare parentId?: string | null
 	/** ISO timestamp of the last pinned message, or `null` if none are pinned; not guaranteed to be accurate */
-	declare last_pin_timestamp?: string | null
+	declare lastPinTimestamp?: string | null
 	/** Default auto-archive duration, in minutes, applied to newly created threads in this channel */
-	declare default_auto_archive_duration?: number
+	declare defaultAutoArchiveDuration?: number
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
 		if (data.topic !== undefined) this.topic = data.topic;
 		if (data.nsfw !== undefined) this.nsfw = data.nsfw;
-		if (data.last_message_id !== undefined) this.last_message_id = data.last_message_id;
-		if (data.rate_limit_per_user !== undefined) this.rate_limit_per_user = data.rate_limit_per_user;
-		if (data.parent_id !== undefined) this.parent_id = data.parent_id;
-		if (data.last_pin_timestamp !== undefined) this.last_pin_timestamp = data.last_pin_timestamp;
-		if (data.default_auto_archive_duration !== undefined) this.default_auto_archive_duration = data.default_auto_archive_duration;
+		if (data.last_message_id !== undefined) this.lastMessageId = data.last_message_id;
+		if (data.rate_limit_per_user !== undefined) this.rateLimitPerUser = data.rate_limit_per_user;
+		if (data.parent_id !== undefined) this.parentId = data.parent_id;
+		if (data.last_pin_timestamp !== undefined) this.lastPinTimestamp = data.last_pin_timestamp;
+		if (data.default_auto_archive_duration !== undefined) this.defaultAutoArchiveDuration = data.default_auto_archive_duration;
 	}
 
 	async modify(options: {
@@ -41,12 +41,18 @@ export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(
 		position?: number
 		topic?: string | null
 		nsfw?: boolean
-		rate_limit_per_user?: number
-		permission_overwrites?: DiscordOverwrite[]
-		parent_id?: string | null
-		default_auto_archive_duration?: number
+		rateLimitPerUser?: number
+		permissionOverwrites?: DiscordOverwrite[]
+		parentId?: string | null
+		defaultAutoArchiveDuration?: number
 		flags?: number
 	}): Promise<void> {
-		await super.modify(options);
+		const { rateLimitPerUser, permissionOverwrites, parentId, defaultAutoArchiveDuration, ...rest } = options;
+		const payload: Partial<DiscordChannel> = { ...rest };
+		if (rateLimitPerUser !== undefined) payload.rate_limit_per_user = rateLimitPerUser;
+		if (permissionOverwrites !== undefined) payload.permission_overwrites = permissionOverwrites;
+		if (parentId !== undefined) payload.parent_id = parentId;
+		if (defaultAutoArchiveDuration !== undefined) payload.default_auto_archive_duration = defaultAutoArchiveDuration;
+		await super.modify(payload);
 	}
 }

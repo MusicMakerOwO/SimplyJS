@@ -40,16 +40,16 @@ function makeRole(id: string, permissions: bigint): DiscordRole {
 }
 
 function makeGuild(client: Client, options: {
-	guildID?: string;
+	guildId?: string;
 	ownerID?: string;
 	roles?: DiscordRole[];
 } = {}): Guild {
-	const guildID = options.guildID ?? "guild-1";
+	const guildId = options.guildId ?? "guild-1";
 	const ownerID = options.ownerID ?? "owner-1";
-	const roles = options.roles ?? [makeRole(guildID, 0n)];
+	const roles = options.roles ?? [makeRole(guildId, 0n)];
 
 	const data: DiscordGuild = {
-		id: guildID,
+		id: guildId,
 		name: "Test Guild",
 		owner_id: ownerID,
 		afk_timeout: 60,
@@ -80,10 +80,10 @@ function makeUser(id: string): DiscordUser {
 	};
 }
 
-function makeMember(client: Client, guild: Guild, userID: string, roleIDs: string[]): Member {
+function makeMember(client: Client, guild: Guild, userId: string, roleIds: string[]): Member {
 	const data: DiscordMember = {
-		user: makeUser(userID),
-		roles: roleIDs,
+		user: makeUser(userId),
+		roles: roleIds,
 		joined_at: "2024-01-01T00:00:00.000Z",
 		deaf: false,
 		mute: false,

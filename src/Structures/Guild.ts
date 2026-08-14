@@ -16,6 +16,7 @@ import {
 	DiscordWelcomeScreen
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
+import { JSONObject } from "../Types/Internal.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { RoleCache } from "../Managers/Roles.js";
 import { StickerCache } from "../Managers/Stickers.js";
@@ -36,68 +37,68 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	/** Icon hash, or `null` when the guild has no icon */
 	icon?: string | null;
 	/** Icon hash as returned from the template object, distinct from `icon` which comes from the live guild */
-	icon_hash?: string | null;
+	iconHash?: string | null;
 	/** Invite splash background hash, or `null` when unset */
 	splash?: string | null;
 	/** Discovery splash background hash, only present for guilds with the `DISCOVERABLE` feature */
-	discovery_splash?: string | null;
+	discoverySplash?: string | null;
 	/** Whether the current bot user owns this guild, only present on guild lists fetched via OAuth2 (`GET /users/@me/guilds`) */
 	owner?: boolean;
-	owner_id!: string;
+	ownerId!: string;
 	/** Total permission bitfield string for the bot user in this guild, excluding channel overwrites and implicit permissions; only present on some endpoints */
 	permissions?: string;
 	/** Legacy voice region id, `@deprecated` by Discord in favor of per-channel `rtc_region` */
 	region?: string | null;
-	afk_channel_id?: string | null;
+	afkChannelId?: string | null;
 	/** How long, in seconds, a voice-inactive member waits before being moved to the AFK channel */
-	afk_timeout!: number;
+	afkTimeout!: number;
 	/** Whether the server widget is enabled */
-	widget_enabled?: boolean;
+	widgetEnabled?: boolean;
 	/** Channel the widget generates an invite to, or `null` when the widget has no invite channel set */
-	widget_channel_id?: string | null;
+	widgetChannelId?: string | null;
 	/** Required verification level for new members to send messages */
-	verification_level!: ObjectValues<typeof DiscordVerificationLevels>;
-	default_message_notifications!: ObjectValues<typeof DiscordDefaultMessageNotificationLevels>;
-	explicit_content_filter!: ObjectValues<typeof DiscordExplicitContentFilterLevels>;
+	verificationLevel!: ObjectValues<typeof DiscordVerificationLevels>;
+	defaultMessageNotifications!: ObjectValues<typeof DiscordDefaultMessageNotificationLevels>;
+	explicitContentFilter!: ObjectValues<typeof DiscordExplicitContentFilterLevels>;
 	/** Enabled guild feature strings (e.g. `"COMMUNITY"`, `"DISCOVERABLE"`) */
 	features!: ObjectValues<typeof DiscordGuildFeatures>[];
 	/** Required multi-factor authentication level for moderation actions */
-	mfa_level!: ObjectValues<typeof DiscordMFALevels>;
+	mfaLevel!: ObjectValues<typeof DiscordMFALevels>;
 	/** Application id of the bot that created this guild, if it was bot-created */
-	application_id?: string;
-	system_channel_id?: string | null;
+	applicationId?: string;
+	systemChannelId?: string | null;
 	/** Bitfield controlling which system messages (join messages, boost messages, etc.) are suppressed in the system channel */
-	system_channel_flags!: number;
-	rules_channel_id?: string | null;
+	systemChannelFlags!: number;
+	rulesChannelId?: string | null;
 	/** Maximum presences allowed in the guild, `null` for all but the largest guilds */
-	max_presences?: number | null;
-	max_members?: number;
+	maxPresences?: number | null;
+	maxMembers?: number;
 	/** The guild's custom invite URL slug (`discord.gg/<code>`), or `null` when none is set */
-	vanity_url_code?: string | null;
+	vanityUrlCode?: string | null;
 	description?: string | null;
 	banner?: string | null;
 	/** Server Boost level, determines perks like boosted upload/bitrate limits */
-	premium_tier!: ObjectValues<typeof DiscordPremiumTiers>;
+	premiumTier!: ObjectValues<typeof DiscordPremiumTiers>;
 	/** Number of Nitro boosts currently applied to the guild */
-	premium_subscription_count?: number;
-	preferred_locale!: ObjectValues<typeof DiscordLocaleByLanguage>;
+	premiumSubscriptionCount?: number;
+	preferredLocale!: ObjectValues<typeof DiscordLocaleByLanguage>;
 	/** Channel where Community guild admins/moderators receive notices from Discord */
-	public_updates_channel_id?: string | null;
-	max_video_channel_users?: number;
-	max_stage_video_channel_users?: number;
+	publicUpdatesChannelId?: string | null;
+	maxVideoChannelUsers?: number;
+	maxStageVideoChannelUsers?: number;
 	/** Approximate member count, only present when fetched with `with_counts` set */
-	approximate_member_count?: number;
+	approximateMemberCount?: number;
 	/** Approximate count of non-offline members, only present when fetched with `with_counts` set */
-	approximate_presence_count?: number;
+	approximatePresenceCount?: number;
 	/** Welcome screen shown to new members of a Community guild */
-	welcome_screen?: DiscordWelcomeScreen;
+	welcomeScreen?: DiscordWelcomeScreen;
 	/** Age-restriction level applied to the guild */
-	nsfw_level!: ObjectValues<typeof DiscordGuildAgeRestrictionLevels>;
-	premium_progress_bar_enabled!: boolean;
+	nsfwLevel!: ObjectValues<typeof DiscordGuildAgeRestrictionLevels>;
+	premiumProgressBarEnabled!: boolean;
 	/** Channel where Community guild admins/moderators receive safety alerts from Discord */
-	safety_alerts_channel_id?: string | null;
+	safetyAlertsChannelId?: string | null;
 	/** Active incident/moderation lockdown state (e.g. invites-disabled/DMs-disabled windows) for this guild */
-	incidents_data?: DiscordIncidentsData;
+	incidentsData?: DiscordIncidentsData;
 
 	channels: ChannelCache;
 	roles: RoleCache;
@@ -125,52 +126,52 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	patch(data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[] }): void {
 		this.id = data.id;
 		this.name = data.name;
-		this.owner_id = data.owner_id;
-		this.afk_timeout = data.afk_timeout;
-		this.verification_level = data.verification_level;
-		this.default_message_notifications = data.default_message_notifications;
-		this.explicit_content_filter = data.explicit_content_filter;
+		this.ownerId = data.owner_id;
+		this.afkTimeout = data.afk_timeout;
+		this.verificationLevel = data.verification_level;
+		this.defaultMessageNotifications = data.default_message_notifications;
+		this.explicitContentFilter = data.explicit_content_filter;
 		this.features = data.features;
-		this.mfa_level = data.mfa_level;
-		this.premium_tier = data.premium_tier;
-		this.preferred_locale = data.preferred_locale;
-		this.nsfw_level = data.nsfw_level;
-		this.premium_progress_bar_enabled = data.premium_progress_bar_enabled;
+		this.mfaLevel = data.mfa_level;
+		this.premiumTier = data.premium_tier;
+		this.preferredLocale = data.preferred_locale;
+		this.nsfwLevel = data.nsfw_level;
+		this.premiumProgressBarEnabled = data.premium_progress_bar_enabled;
 
 		if ("icon" in data && data.icon !== undefined) this.icon = data.icon;
-		if ("icon_hash" in data && data.icon_hash !== undefined) this.icon_hash = data.icon_hash;
+		if ("icon_hash" in data && data.icon_hash !== undefined) this.iconHash = data.icon_hash;
 		if ("splash" in data && data.splash !== undefined) this.splash = data.splash;
-		if ("discovery_splash" in data && data.discovery_splash !== undefined) this.discovery_splash = data.discovery_splash;
+		if ("discovery_splash" in data && data.discovery_splash !== undefined) this.discoverySplash = data.discovery_splash;
 		if ("owner" in data && data.owner !== undefined) this.owner = data.owner;
 
 		if ("permissions" in data && data.permissions !== undefined) this.permissions = data.permissions;
 		if ("region" in data && data.region !== undefined) this.region = data.region;
-		if ("afk_channel_id" in data && data.afk_channel_id !== undefined) this.afk_channel_id = data.afk_channel_id;
+		if ("afk_channel_id" in data && data.afk_channel_id !== undefined) this.afkChannelId = data.afk_channel_id;
 
-		if ("widget_enabled" in data && data.widget_enabled !== undefined) this.widget_enabled = data.widget_enabled;
-		if ("widget_channel_id" in data && data.widget_channel_id !== undefined) this.widget_channel_id = data.widget_channel_id;
+		if ("widget_enabled" in data && data.widget_enabled !== undefined) this.widgetEnabled = data.widget_enabled;
+		if ("widget_channel_id" in data && data.widget_channel_id !== undefined) this.widgetChannelId = data.widget_channel_id;
 
-		if ("application_id" in data && data.application_id !== undefined) this.application_id = data.application_id;
-		if ("system_channel_id" in data && data.system_channel_id !== undefined) this.system_channel_id = data.system_channel_id;
-		if ("system_channel_flags" in data) this.system_channel_flags = data.system_channel_flags;
-		if ("rules_channel_id" in data && data.rules_channel_id !== undefined) this.rules_channel_id = data.rules_channel_id;
-		if ("max_presences" in data && data.max_presences !== undefined) this.max_presences = data.max_presences;
-		if ("max_members" in data && data.max_members !== undefined) this.max_members = data.max_members;
+		if ("application_id" in data && data.application_id !== undefined) this.applicationId = data.application_id;
+		if ("system_channel_id" in data && data.system_channel_id !== undefined) this.systemChannelId = data.system_channel_id;
+		if ("system_channel_flags" in data) this.systemChannelFlags = data.system_channel_flags;
+		if ("rules_channel_id" in data && data.rules_channel_id !== undefined) this.rulesChannelId = data.rules_channel_id;
+		if ("max_presences" in data && data.max_presences !== undefined) this.maxPresences = data.max_presences;
+		if ("max_members" in data && data.max_members !== undefined) this.maxMembers = data.max_members;
 
-		if ("vanity_url_code" in data && data.vanity_url_code !== undefined) this.vanity_url_code = data.vanity_url_code;
+		if ("vanity_url_code" in data && data.vanity_url_code !== undefined) this.vanityUrlCode = data.vanity_url_code;
 		if ("description" in data && data.description !== undefined) this.description = data.description;
 		if ("banner" in data && data.banner !== undefined) this.banner = data.banner;
-		if ("premium_subscription_count" in data && data.premium_subscription_count !== undefined) this.premium_subscription_count = data.premium_subscription_count;
+		if ("premium_subscription_count" in data && data.premium_subscription_count !== undefined) this.premiumSubscriptionCount = data.premium_subscription_count;
 
-		if ("public_updates_channel_id" in data && data.public_updates_channel_id !== undefined) this.public_updates_channel_id = data.public_updates_channel_id;
-		if ("max_video_channel_users" in data && data.max_video_channel_users !== undefined) this.max_video_channel_users = data.max_video_channel_users;
-		if ("max_stage_video_channel_users" in data && data.max_stage_video_channel_users !== undefined) this.max_stage_video_channel_users = data.max_stage_video_channel_users;
-		if ("approximate_member_count" in data && data.approximate_member_count !== undefined) this.approximate_member_count = data.approximate_member_count;
-		if ("approximate_presence_count" in data && data.approximate_presence_count !== undefined) this.approximate_presence_count = data.approximate_presence_count;
+		if ("public_updates_channel_id" in data && data.public_updates_channel_id !== undefined) this.publicUpdatesChannelId = data.public_updates_channel_id;
+		if ("max_video_channel_users" in data && data.max_video_channel_users !== undefined) this.maxVideoChannelUsers = data.max_video_channel_users;
+		if ("max_stage_video_channel_users" in data && data.max_stage_video_channel_users !== undefined) this.maxStageVideoChannelUsers = data.max_stage_video_channel_users;
+		if ("approximate_member_count" in data && data.approximate_member_count !== undefined) this.approximateMemberCount = data.approximate_member_count;
+		if ("approximate_presence_count" in data && data.approximate_presence_count !== undefined) this.approximatePresenceCount = data.approximate_presence_count;
 
-		if ("welcome_screen" in data && data.welcome_screen !== undefined) this.welcome_screen = data.welcome_screen;
-		if ("safety_alerts_channel_id" in data && data.safety_alerts_channel_id !== undefined) this.safety_alerts_channel_id = data.safety_alerts_channel_id;
-		if ("incidents_data" in data && data.incidents_data !== undefined) this.incidents_data = data.incidents_data;
+		if ("welcome_screen" in data && data.welcome_screen !== undefined) this.welcomeScreen = data.welcome_screen;
+		if ("safety_alerts_channel_id" in data && data.safety_alerts_channel_id !== undefined) this.safetyAlertsChannelId = data.safety_alerts_channel_id;
+		if ("incidents_data" in data && data.incidents_data !== undefined) this.incidentsData = data.incidents_data;
 
 		if ("channels" in data && data.channels !== undefined) {
 			for (const apiChannel of data.channels) {
@@ -220,9 +221,9 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 */
 	async fetchAuditLogs(options: {
 		/** Entries from a specific user ID */
-		user_id?: string;
+		userId?: string;
 		/** Entries for a specific audit log event */
-		action_type?: ObjectValues<typeof DiscordAuditLogEvent>;
+		actionType?: ObjectValues<typeof DiscordAuditLogEvent>;
 		/** Entries with ID less than a specific audit log entry ID */
 		before?: string;
 		/** Entries with ID greater than a specific audit log entry ID */
@@ -231,8 +232,8 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		limit?: number;
 	} = {}): Promise<DiscordAuditLog> {
 		const params = new URLSearchParams();
-		if (options.user_id) params.append('user_id', options.user_id);
-		if (options.action_type !== undefined) params.append('action_type', options.action_type.toString());
+		if (options.userId) params.append('user_id', options.userId);
+		if (options.actionType !== undefined) params.append('action_type', options.actionType.toString());
 		if (options.before) params.append('before', options.before);
 		if (options.after) params.append('after', options.after);
 		if (options.limit) params.append('limit', options.limit.toString());
@@ -262,36 +263,56 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		name?: string;
 		/** Legacy voice region id, `@deprecated` by Discord */
 		region?: string;
-		verification_level?: ObjectValues<typeof DiscordVerificationLevels>;
-		default_message_notifications?: ObjectValues<typeof DiscordDefaultMessageNotificationLevels>;
-		explicit_content_filter?: ObjectValues<typeof DiscordExplicitContentFilterLevels>;
+		verificationLevel?: ObjectValues<typeof DiscordVerificationLevels>;
+		defaultMessageNotifications?: ObjectValues<typeof DiscordDefaultMessageNotificationLevels>;
+		explicitContentFilter?: ObjectValues<typeof DiscordExplicitContentFilterLevels>;
 		/** Channel to move inactive voice members to, or `null` to disable the AFK channel */
-		afk_channel_id?: string | null;
+		afkChannelId?: string | null;
 		/** How long, in seconds, a voice-inactive member waits before being moved to the AFK channel */
-		afk_timeout?: number;
+		afkTimeout?: number;
 		/** New icon image data, or `null` to remove the icon */
 		icon?: string | null;
 		/** New invite splash image data, or `null` to remove it */
 		splash?: string | null;
 		/** New discovery splash image data, or `null` to remove it */
-		discovery_splash?: string | null;
+		discoverySplash?: string | null;
 		/** New banner image data, or `null` to remove it */
 		banner?: string | null;
 		/** Channel for system messages (joins, boosts, etc.), or `null` to disable them */
-		system_channel_id?: string | null;
+		systemChannelId?: string | null;
 		/** Bitfield controlling which system messages are suppressed in the system channel */
-		system_channel_flags?: number;
+		systemChannelFlags?: number;
 		/** Channel for Community guild rules/guidelines, or `null` to unset */
-		rules_channel_id?: string | null;
+		rulesChannelId?: string | null;
 		/** Channel for Community guild admin/moderator notices, or `null` to unset */
-		public_updates_channel_id?: string | null;
-		preferred_locale?: ObjectValues<typeof DiscordLocaleByLanguage>;
+		publicUpdatesChannelId?: string | null;
+		preferredLocale?: ObjectValues<typeof DiscordLocaleByLanguage>;
 		/** New guild description, or `null` to clear it */
 		description?: string | null;
-		premium_progress_bar_enabled?: boolean;
+		premiumProgressBarEnabled?: boolean;
 		/** Channel for Community guild safety alerts from Discord, or `null` to unset */
-		safety_alerts_channel_id?: string | null;
+		safetyAlertsChannelId?: string | null;
 	}): Promise<void> {
-		await this.client.rest.patch(`/guilds/${this.id}`, changes);
+		await this.client.rest.patch(`/guilds/${this.id}`, {
+			name: changes.name,
+			region: changes.region,
+			verification_level: changes.verificationLevel,
+			default_message_notifications: changes.defaultMessageNotifications,
+			explicit_content_filter: changes.explicitContentFilter,
+			afk_channel_id: changes.afkChannelId,
+			afk_timeout: changes.afkTimeout,
+			icon: changes.icon,
+			splash: changes.splash,
+			discovery_splash: changes.discoverySplash,
+			banner: changes.banner,
+			system_channel_id: changes.systemChannelId,
+			system_channel_flags: changes.systemChannelFlags,
+			rules_channel_id: changes.rulesChannelId,
+			public_updates_channel_id: changes.publicUpdatesChannelId,
+			preferred_locale: changes.preferredLocale,
+			description: changes.description,
+			premium_progress_bar_enabled: changes.premiumProgressBarEnabled,
+			safety_alerts_channel_id: changes.safetyAlertsChannelId,
+		} as unknown as JSONObject);
 	}
 }

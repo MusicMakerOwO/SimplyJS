@@ -31,7 +31,7 @@ client.on(ClientEvents.Ready, (user) => {
 const PREFIX = '!';
 client.on(ClientEvents.MessageCreate, async (message) => {
 	if (!message.content.startsWith(PREFIX)) return;
-	if (!message.guild_id) return; // these commands only make sense from a guild
+	if (!message.guildId) return; // these commands only make sense from a guild
 
 	const args = message.content.slice(PREFIX.length).split(/ +/);
 	const command = args.shift();

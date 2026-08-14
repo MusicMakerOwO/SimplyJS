@@ -314,7 +314,11 @@ describe("Gateway event handlers mutate caches", () => {
 		const deletePayload = { id: payload.id, channel_id: payload.channel_id, guild_id: payload.guild_id };
 		await MessageDelete.handler(client, deletePayload);
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessageDelete, deletePayload);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessageDelete, {
+			id: deletePayload.id,
+			channelId: deletePayload.channel_id,
+			guildId: deletePayload.guild_id
+		});
 	});
 
 	it("Ready stores client.user and emits READY", async () => {
@@ -415,7 +419,7 @@ describe("Gateway event handlers mutate caches", () => {
 				guild: expect.objectContaining({ id: "guild-1" }),
 				channel: expect.objectContaining({ id: "channel-1" }),
 				user: expect.objectContaining({ id: "user-1" }),
-				message_id: "message-1",
+				messageId: "message-1",
 				emoji: expect.objectContaining({ id: "emoji-1" })
 			})
 		);
@@ -435,7 +439,7 @@ describe("Gateway event handlers mutate caches", () => {
 				guild: expect.objectContaining({ id: "guild-1" }),
 				channel: expect.objectContaining({ id: "channel-1" }),
 				user: expect.objectContaining({ id: "user-1" }),
-				message_id: "message-1",
+				messageId: "message-1",
 				emoji: expect.objectContaining({ id: "emoji-1" })
 			})
 		);

@@ -12,12 +12,12 @@ export default {
 		const confirm = new ButtonBuilder()
 			.setStyle(ButtonStyles.DANGER)
 			.setLabel('Confirm')
-			.setCustomID('close_confirm');
+			.setCustomId('close_confirm');
 
 		const cancel = new ButtonBuilder()
 			.setStyle(ButtonStyles.SECONDARY)
 			.setLabel('Cancel')
-			.setCustomID('close_cancel');
+			.setCustomId('close_cancel');
 
 		// Both buttons fit in one row, unlike commands/ticket.ts where a select forced a
 		// second row. DANGER colours the confirm button red, which is the only signal a user

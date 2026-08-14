@@ -20,6 +20,7 @@ import {
 	ComponentTypes,
 	InteractiveButton,
 	Label,
+	LabelChild,
 	LinkButton,
 	MentionableSelect,
 	PremiumButton,
@@ -54,7 +55,7 @@ describe("ButtonBuilder", () => {
 
 		expect(builder.style).toBe(ButtonStyles.DANGER);
 		expect(builder.label).toBe("Delete");
-		expect(builder.custom_id).toBe("delete");
+		expect(builder.customId).toBe("delete");
 	});
 
 	it("carries emoji and disabled through static from", () => {
@@ -85,14 +86,14 @@ describe("ButtonBuilder", () => {
 	});
 
 	it("sets custom_id within the allowed length", () => {
-		const builder = new ButtonBuilder().setCustomID("a".repeat(100));
+		const builder = new ButtonBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.custom_id).toBe("a".repeat(100));
+		expect(builder.customId).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new ButtonBuilder().setCustomID("")).toThrow(/Button custom_id must be between 1 and 100 characters long/);
-		expect(() => new ButtonBuilder().setCustomID("a".repeat(101))).toThrow(/Button custom_id must be between 1 and 100 characters long/);
+		expect(() => new ButtonBuilder().setCustomId("")).toThrow(/Button customId must be between 1 and 100 characters long/);
+		expect(() => new ButtonBuilder().setCustomId("a".repeat(101))).toThrow(/Button customId must be between 1 and 100 characters long/);
 	});
 
 	it("rejects the link and premium styles at the type level", () => {
@@ -124,13 +125,13 @@ describe("ButtonBuilder", () => {
 
 	describe("validate", () => {
 		it("passes for a fully-populated button", () => {
-			const builder = new ButtonBuilder().setStyle(ButtonStyles.PRIMARY).setLabel("Click me").setCustomID("click");
+			const builder = new ButtonBuilder().setStyle(ButtonStyles.PRIMARY).setLabel("Click me").setCustomId("click");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
 
 		it("throws when label is missing", () => {
-			const builder = new ButtonBuilder().setCustomID("click");
+			const builder = new ButtonBuilder().setCustomId("click");
 
 			expect(() => builder.validate()).toThrow(/Button must have a label/);
 		});
@@ -138,11 +139,11 @@ describe("ButtonBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new ButtonBuilder().setLabel("Click me");
 
-			expect(() => builder.validate()).toThrow(/Non-link buttons must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Non-link buttons must have a customId/);
 		});
 
 		it("throws when a url is set", () => {
-			const builder = new ButtonBuilder().setLabel("Click me").setCustomID("click");
+			const builder = new ButtonBuilder().setLabel("Click me").setCustomId("click");
 			// only reachable from a hand-written payload - the builder has no setURL
 			Object.assign(builder, { url: "https://example.com" });
 
@@ -150,12 +151,12 @@ describe("ButtonBuilder", () => {
 		});
 
 		it("is assignable to the payload type it mirrors", () => {
-			const button: InteractiveButton = new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomID("delete");
+			const button: InteractiveButton = new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete").toJSON();
 
 			expectTypeOf(button).toExtend<Button>();
 			// a builder stands in for a payload, and a payload can be read back into a builder
 			expect(() => ButtonBuilder.validate(button)).not.toThrow();
-			expect(ButtonBuilder.from(button).custom_id).toBe("delete");
+			expect(ButtonBuilder.from(button).customId).toBe("delete");
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -230,7 +231,7 @@ describe("LinkButtonBuilder", () => {
 
 		it("throws when a custom_id is set", () => {
 			const builder = new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com");
-			// only reachable from a hand-written payload - the builder has no setCustomID
+			// only reachable from a hand-written payload - the builder has no setCustomId
 			Object.assign(builder, { custom_id: "click" });
 
 			expect(() => builder.validate()).toThrow(/Link buttons cannot have a custom_id/);
@@ -264,7 +265,7 @@ describe("ResolveButton", () => {
 	});
 
 	it("validates any button style, builder or payload alike", () => {
-		expect(() => ValidateButton(new ButtonBuilder().setLabel("Click me").setCustomID("click"))).not.toThrow();
+		expect(() => ValidateButton(new ButtonBuilder().setLabel("Click me").setCustomId("click").toJSON())).not.toThrow();
 		expect(() => ValidateButton(new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com"))).not.toThrow();
 		expect(() => ValidateButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.PREMIUM, sku_id: "1234567890" })).not.toThrow();
 
@@ -287,7 +288,7 @@ describe("SKUButtonBuilder", () => {
 
 		const builder = SKUButtonBuilder.from(payload);
 
-		expect(builder.sku_id).toBe("1234567890");
+		expect(builder.skuId).toBe("1234567890");
 		expect(builder.disabled).toBeUndefined();
 	});
 
@@ -300,13 +301,13 @@ describe("SKUButtonBuilder", () => {
 	});
 
 	it("sets sku_id via setSkuId", () => {
-		const builder = new SKUButtonBuilder().setSkuID("1234567890");
+		const builder = new SKUButtonBuilder().setSkuId("1234567890");
 
-		expect(builder.sku_id).toBe("1234567890");
+		expect(builder.skuId).toBe("1234567890");
 	});
 
 	it("throws when sku_id is empty", () => {
-		expect(() => new SKUButtonBuilder().setSkuID("")).toThrow(/SKU button's sku_id cannot be empty/);
+		expect(() => new SKUButtonBuilder().setSkuId("")).toThrow(/SKU button's skuId cannot be empty/);
 	});
 
 	it("defaults setDisabled to true when called without an argument", () => {
@@ -323,7 +324,7 @@ describe("SKUButtonBuilder", () => {
 
 	describe("validate", () => {
 		it("passes for a fully-populated SKU button", () => {
-			const builder = new SKUButtonBuilder().setSkuID("1234567890");
+			const builder = new SKUButtonBuilder().setSkuId("1234567890");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -331,15 +332,15 @@ describe("SKUButtonBuilder", () => {
 		it("throws when sku_id is missing", () => {
 			const builder = new SKUButtonBuilder();
 
-			expect(() => builder.validate()).toThrow(/SKU button must have a sku_id/);
+			expect(() => builder.validate()).toThrow(/SKU button must have a skuId/);
 		});
 
 		it("is assignable to the payload type it mirrors", () => {
-			const button: PremiumButton = new SKUButtonBuilder().setSkuID("1234567890");
+			const button: PremiumButton = new SKUButtonBuilder().setSkuId("1234567890").toJSON();
 
 			expectTypeOf(button).toExtend<Button>();
 			expect(() => SKUButtonBuilder.validate(button)).not.toThrow();
-			expect(SKUButtonBuilder.from(button).sku_id).toBe("1234567890");
+			expect(SKUButtonBuilder.from(button).skuId).toBe("1234567890");
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -371,10 +372,10 @@ describe("StringSelectBuilder", () => {
 
 		const builder = StringSelectBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("pick");
+		expect(builder.customId).toBe("pick");
 		expect(builder.placeholder).toBe("Pick one");
-		expect(builder.min_values).toBe(1);
-		expect(builder.max_values).toBe(3);
+		expect(builder.minValues).toBe(1);
+		expect(builder.maxValues).toBe(3);
 		expect(builder.required).toBe(true);
 		expect(builder.disabled).toBe(false);
 		expect(builder.options).toEqual([{ label: "One", value: "one" }, { label: "Two", value: "two" }]);
@@ -383,19 +384,19 @@ describe("StringSelectBuilder", () => {
 	it("throws from static from when provided invalid values", () => {
 		const payload: StringSelect = { type: ComponentTypes.STRING_SELECT, custom_id: "a".repeat(101), options: [{ label: "One", value: "one" }] };
 
-		expect(() => StringSelectBuilder.from(payload)).toThrow(/String select custom_id must be between 1 and 100 characters long/);
+		expect(() => StringSelectBuilder.from(payload)).toThrow(/String select customId must be between 1 and 100 characters long/);
 	});
 
 	it("sets custom_id within the allowed length", () => {
-		const builder = new StringSelectBuilder().setCustomID("a".repeat(100));
+		const builder = new StringSelectBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.custom_id).toBe("a".repeat(100));
+		expect(builder.customId).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new StringSelectBuilder().setCustomID("")).toThrow(/String select custom_id must be between 1 and 100 characters long/);
-		expect(() => new StringSelectBuilder().setCustomID("a".repeat(101))).toThrow(
-			/String select custom_id must be between 1 and 100 characters long/
+		expect(() => new StringSelectBuilder().setCustomId("")).toThrow(/String select customId must be between 1 and 100 characters long/);
+		expect(() => new StringSelectBuilder().setCustomId("a".repeat(101))).toThrow(
+			/String select customId must be between 1 and 100 characters long/
 		);
 	});
 
@@ -414,18 +415,18 @@ describe("StringSelectBuilder", () => {
 	it("sets min_values and max_values within their allowed ranges", () => {
 		const builder = new StringSelectBuilder().setMinValues(0).setMaxValues(25);
 
-		expect(builder.min_values).toBe(0);
-		expect(builder.max_values).toBe(25);
+		expect(builder.minValues).toBe(0);
+		expect(builder.maxValues).toBe(25);
 	});
 
 	it("throws when min_values is out of range", () => {
-		expect(() => new StringSelectBuilder().setMinValues(-1)).toThrow(/String select min_values must be between 0 and 25/);
-		expect(() => new StringSelectBuilder().setMinValues(26)).toThrow(/String select min_values must be between 0 and 25/);
+		expect(() => new StringSelectBuilder().setMinValues(-1)).toThrow(/String select minValues must be between 0 and 25/);
+		expect(() => new StringSelectBuilder().setMinValues(26)).toThrow(/String select minValues must be between 0 and 25/);
 	});
 
 	it("throws when max_values is out of range", () => {
-		expect(() => new StringSelectBuilder().setMaxValues(0)).toThrow(/String select max_values must be between 1 and 25/);
-		expect(() => new StringSelectBuilder().setMaxValues(26)).toThrow(/String select max_values must be between 1 and 25/);
+		expect(() => new StringSelectBuilder().setMaxValues(0)).toThrow(/String select maxValues must be between 1 and 25/);
+		expect(() => new StringSelectBuilder().setMaxValues(26)).toThrow(/String select maxValues must be between 1 and 25/);
 	});
 
 	it("sets required and disabled via their setters", () => {
@@ -492,7 +493,7 @@ describe("StringSelectBuilder", () => {
 
 	describe("validate", () => {
 		it("passes for a fully-populated string select", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("One", "one");
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("One", "one");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -500,49 +501,49 @@ describe("StringSelectBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new StringSelectBuilder().addOption("One", "one");
 
-			expect(() => builder.validate()).toThrow(/String select must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/String select must have a customId/);
 		});
 
 		it("throws when there are no options", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick");
+			const builder = new StringSelectBuilder().setCustomId("pick");
 
 			expect(() => builder.validate()).toThrow(/String select must have at least 1 option/);
 		});
 
 		it("throws when an option is missing a label", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("", "one");
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("", "one");
 
 			expect(() => builder.validate()).toThrow(/String select option must have a label/);
 		});
 
 		it("throws when an option is missing a value", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("One", "");
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("One", "");
 
 			expect(() => builder.validate()).toThrow(/String select option must have a value/);
 		});
 
 		it("throws when an option label exceeds 100 characters", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("a".repeat(101), "one");
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("a".repeat(101), "one");
 
 			expect(() => builder.validate()).toThrow(/String select option label must be 100 characters or fewer/);
 		});
 
 		it("throws when an option value exceeds 100 characters", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("One", "a".repeat(101));
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("One", "a".repeat(101));
 
 			expect(() => builder.validate()).toThrow(/String select option value must be 100 characters or fewer/);
 		});
 
 		it("throws when an option description exceeds 100 characters", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("One", "one", { description: "a".repeat(101) });
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("One", "one", { description: "a".repeat(101) });
 
 			expect(() => builder.validate()).toThrow(/String select option description must be 100 characters or fewer/);
 		});
 
 		it("throws when min_values exceeds max_values", () => {
-			const builder = new StringSelectBuilder().setCustomID("pick").addOption("One", "one").setMinValues(5).setMaxValues(2);
+			const builder = new StringSelectBuilder().setCustomId("pick").addOption("One", "one").setMinValues(5).setMaxValues(2);
 
-			expect(() => builder.validate()).toThrow(/String select min_values cannot exceed max_values/);
+			expect(() => builder.validate()).toThrow(/String select minValues cannot exceed maxValues/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -578,31 +579,31 @@ describe("UserSelectBuilder", () => {
 
 		const builder = UserSelectBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("pick");
+		expect(builder.customId).toBe("pick");
 		expect(builder.placeholder).toBe("Pick a user");
-		expect(builder.min_values).toBe(1);
-		expect(builder.max_values).toBe(3);
+		expect(builder.minValues).toBe(1);
+		expect(builder.maxValues).toBe(3);
 		expect(builder.required).toBe(true);
 		expect(builder.disabled).toBe(false);
-		expect(builder.default_values).toEqual([{ id: "1", type: "user" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
 		const payload: UserSelect = { type: ComponentTypes.USER_SELECT, custom_id: "a".repeat(101) };
 
-		expect(() => UserSelectBuilder.from(payload)).toThrow(/User select custom_id must be between 1 and 100 characters long/);
+		expect(() => UserSelectBuilder.from(payload)).toThrow(/User select customId must be between 1 and 100 characters long/);
 	});
 
 	it("sets custom_id within the allowed length", () => {
-		const builder = new UserSelectBuilder().setCustomID("a".repeat(100));
+		const builder = new UserSelectBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.custom_id).toBe("a".repeat(100));
+		expect(builder.customId).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new UserSelectBuilder().setCustomID("")).toThrow(/User select custom_id must be between 1 and 100 characters long/);
-		expect(() => new UserSelectBuilder().setCustomID("a".repeat(101))).toThrow(
-			/User select custom_id must be between 1 and 100 characters long/
+		expect(() => new UserSelectBuilder().setCustomId("")).toThrow(/User select customId must be between 1 and 100 characters long/);
+		expect(() => new UserSelectBuilder().setCustomId("a".repeat(101))).toThrow(
+			/User select customId must be between 1 and 100 characters long/
 		);
 	});
 
@@ -619,13 +620,13 @@ describe("UserSelectBuilder", () => {
 	it("sets min_values and max_values within their allowed ranges", () => {
 		const builder = new UserSelectBuilder().setMinValues(0).setMaxValues(25);
 
-		expect(builder.min_values).toBe(0);
-		expect(builder.max_values).toBe(25);
+		expect(builder.minValues).toBe(0);
+		expect(builder.maxValues).toBe(25);
 	});
 
 	it("throws when min_values or max_values are out of range", () => {
-		expect(() => new UserSelectBuilder().setMinValues(-1)).toThrow(/User select min_values must be between 0 and 25/);
-		expect(() => new UserSelectBuilder().setMaxValues(0)).toThrow(/User select max_values must be between 1 and 25/);
+		expect(() => new UserSelectBuilder().setMinValues(-1)).toThrow(/User select minValues must be between 0 and 25/);
+		expect(() => new UserSelectBuilder().setMaxValues(0)).toThrow(/User select maxValues must be between 1 and 25/);
 	});
 
 	it("defaults setRequired and setDisabled to true when called without an argument", () => {
@@ -639,7 +640,7 @@ describe("UserSelectBuilder", () => {
 		const values = [{ id: "1", type: "user" as const }];
 		const builder = new UserSelectBuilder().setDefaultValues(values);
 
-		expect(builder.default_values).toEqual(values);
+		expect(builder.defaultValues).toEqual(values);
 	});
 
 	it("appends default_values via addDefaultValues", () => {
@@ -647,18 +648,18 @@ describe("UserSelectBuilder", () => {
 			.addDefaultValues({ id: "1", type: "user" })
 			.addDefaultValues({ id: "2", type: "user" });
 
-		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
 	});
 
 	it("appends default users by id via addDefaultUsers", () => {
 		const builder = new UserSelectBuilder().addDefaultUsers("1", "2");
 
-		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
 	});
 
 	describe("validate", () => {
 		it("passes for a fully-populated user select", () => {
-			const builder = new UserSelectBuilder().setCustomID("pick");
+			const builder = new UserSelectBuilder().setCustomId("pick");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -666,19 +667,19 @@ describe("UserSelectBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new UserSelectBuilder();
 
-			expect(() => builder.validate()).toThrow(/User select must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/User select must have a customId/);
 		});
 
 		it("throws when default_values has more entries than max_values", () => {
-			const builder = new UserSelectBuilder().setCustomID("pick").setMaxValues(1).addDefaultUsers("1", "2");
+			const builder = new UserSelectBuilder().setCustomId("pick").setMaxValues(1).addDefaultUsers("1", "2");
 
-			expect(() => builder.validate()).toThrow(/User select cannot have more default_values than max_values/);
+			expect(() => builder.validate()).toThrow(/User select cannot have more defaultValues than maxValues/);
 		});
 
 		it("throws when min_values exceeds max_values", () => {
-			const builder = new UserSelectBuilder().setCustomID("pick").setMinValues(5).setMaxValues(2);
+			const builder = new UserSelectBuilder().setCustomId("pick").setMinValues(5).setMaxValues(2);
 
-			expect(() => builder.validate()).toThrow(/User select min_values cannot exceed max_values/);
+			expect(() => builder.validate()).toThrow(/User select minValues cannot exceed maxValues/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -705,20 +706,20 @@ describe("RoleSelectBuilder", () => {
 
 		const builder = RoleSelectBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("pick");
-		expect(builder.default_values).toEqual([{ id: "1", type: "role" }]);
+		expect(builder.customId).toBe("pick");
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "role" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
 		const payload: RoleSelect = { type: ComponentTypes.ROLE_SELECT, custom_id: "a".repeat(101) };
 
-		expect(() => RoleSelectBuilder.from(payload)).toThrow(/Role select custom_id must be between 1 and 100 characters long/);
+		expect(() => RoleSelectBuilder.from(payload)).toThrow(/Role select customId must be between 1 and 100 characters long/);
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new RoleSelectBuilder().setCustomID("")).toThrow(/Role select custom_id must be between 1 and 100 characters long/);
-		expect(() => new RoleSelectBuilder().setCustomID("a".repeat(101))).toThrow(
-			/Role select custom_id must be between 1 and 100 characters long/
+		expect(() => new RoleSelectBuilder().setCustomId("")).toThrow(/Role select customId must be between 1 and 100 characters long/);
+		expect(() => new RoleSelectBuilder().setCustomId("a".repeat(101))).toThrow(
+			/Role select customId must be between 1 and 100 characters long/
 		);
 	});
 
@@ -729,12 +730,12 @@ describe("RoleSelectBuilder", () => {
 	it("appends default roles by id via addDefaultRoles", () => {
 		const builder = new RoleSelectBuilder().addDefaultRoles("1", "2");
 
-		expect(builder.default_values).toEqual([{ id: "1", type: "role" }, { id: "2", type: "role" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "role" }, { id: "2", type: "role" }]);
 	});
 
 	describe("validate", () => {
 		it("passes for a fully-populated role select", () => {
-			const builder = new RoleSelectBuilder().setCustomID("pick");
+			const builder = new RoleSelectBuilder().setCustomId("pick");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -742,7 +743,7 @@ describe("RoleSelectBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new RoleSelectBuilder();
 
-			expect(() => builder.validate()).toThrow(/Role select must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Role select must have a customId/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -769,31 +770,31 @@ describe("MentionableSelectBuilder", () => {
 
 		const builder = MentionableSelectBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("pick");
-		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
+		expect(builder.customId).toBe("pick");
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
 		const payload: MentionableSelect = { type: ComponentTypes.MENTIONABLE_SELECT, custom_id: "a".repeat(101) };
 
-		expect(() => MentionableSelectBuilder.from(payload)).toThrow(/Mentionable select custom_id must be between 1 and 100 characters long/);
+		expect(() => MentionableSelectBuilder.from(payload)).toThrow(/Mentionable select customId must be between 1 and 100 characters long/);
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new MentionableSelectBuilder().setCustomID("")).toThrow(
-			/Mentionable select custom_id must be between 1 and 100 characters long/
+		expect(() => new MentionableSelectBuilder().setCustomId("")).toThrow(
+			/Mentionable select customId must be between 1 and 100 characters long/
 		);
 	});
 
 	it("appends default users and roles via their respective setters", () => {
 		const builder = new MentionableSelectBuilder().addDefaultUsers("1").addDefaultRoles("2");
 
-		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
 	});
 
 	describe("validate", () => {
 		it("passes for a fully-populated mentionable select", () => {
-			const builder = new MentionableSelectBuilder().setCustomID("pick");
+			const builder = new MentionableSelectBuilder().setCustomId("pick");
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -801,7 +802,7 @@ describe("MentionableSelectBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new MentionableSelectBuilder();
 
-			expect(() => builder.validate()).toThrow(/Mentionable select must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Mentionable select must have a customId/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -829,36 +830,36 @@ describe("ChannelSelectBuilder", () => {
 
 		const builder = ChannelSelectBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("pick");
-		expect(builder.channel_types).toEqual([DiscordChannelTypes.GUILD_TEXT, DiscordChannelTypes.GUILD_VOICE]);
-		expect(builder.default_values).toEqual([{ id: "1", type: "channel" }]);
+		expect(builder.customId).toBe("pick");
+		expect(builder.channelTypes).toEqual([DiscordChannelTypes.GUILD_TEXT, DiscordChannelTypes.GUILD_VOICE]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "channel" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
 		const payload: ChannelSelect = { type: ComponentTypes.CHANNEL_SELECT, custom_id: "a".repeat(101) };
 
-		expect(() => ChannelSelectBuilder.from(payload)).toThrow(/Channel select custom_id must be between 1 and 100 characters long/);
+		expect(() => ChannelSelectBuilder.from(payload)).toThrow(/Channel select customId must be between 1 and 100 characters long/);
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new ChannelSelectBuilder().setCustomID("")).toThrow(/Channel select custom_id must be between 1 and 100 characters long/);
+		expect(() => new ChannelSelectBuilder().setCustomId("")).toThrow(/Channel select customId must be between 1 and 100 characters long/);
 	});
 
 	it("sets channel_types via setChannelTypes", () => {
 		const builder = new ChannelSelectBuilder().setChannelTypes(DiscordChannelTypes.GUILD_TEXT);
 
-		expect(builder.channel_types).toEqual([DiscordChannelTypes.GUILD_TEXT]);
+		expect(builder.channelTypes).toEqual([DiscordChannelTypes.GUILD_TEXT]);
 	});
 
 	it("appends default channels by id via addDefaultChannels", () => {
 		const builder = new ChannelSelectBuilder().addDefaultChannels("1", "2");
 
-		expect(builder.default_values).toEqual([{ id: "1", type: "channel" }, { id: "2", type: "channel" }]);
+		expect(builder.defaultValues).toEqual([{ id: "1", type: "channel" }, { id: "2", type: "channel" }]);
 	});
 
 	describe("validate", () => {
 		it("passes for a fully-populated channel select", () => {
-			const builder = new ChannelSelectBuilder().setCustomID("pick").setChannelTypes(DiscordChannelTypes.GUILD_TEXT);
+			const builder = new ChannelSelectBuilder().setCustomId("pick").setChannelTypes(DiscordChannelTypes.GUILD_TEXT);
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -866,13 +867,13 @@ describe("ChannelSelectBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new ChannelSelectBuilder();
 
-			expect(() => builder.validate()).toThrow(/Channel select must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Channel select must have a customId/);
 		});
 
 		it("throws when default_values has more entries than max_values", () => {
-			const builder = new ChannelSelectBuilder().setCustomID("pick").setMaxValues(1).addDefaultChannels("1", "2");
+			const builder = new ChannelSelectBuilder().setCustomId("pick").setMaxValues(1).addDefaultChannels("1", "2");
 
-			expect(() => builder.validate()).toThrow(/Channel select cannot have more default_values than max_values/);
+			expect(() => builder.validate()).toThrow(/Channel select cannot have more defaultValues than maxValues/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -884,11 +885,11 @@ describe("ChannelSelectBuilder", () => {
 });
 
 function makeButton(customId = "click"): ButtonBuilder {
-	return new ButtonBuilder().setLabel("Click me").setCustomID(customId);
+	return new ButtonBuilder().setLabel("Click me").setCustomId(customId);
 }
 
 function makeSelect(customId = "pick"): StringSelectBuilder {
-	return new StringSelectBuilder().setCustomID(customId).addOption("One", "one");
+	return new StringSelectBuilder().setCustomId(customId).addOption("One", "one");
 }
 
 describe("ActionRowBuilder", () => {
@@ -901,36 +902,36 @@ describe("ActionRowBuilder", () => {
 
 	it("hydrates a builder from a component list using static from", () => {
 		const button = makeButton();
-		const builder = ActionRowBuilder.from([button]);
+		const builder = ActionRowBuilder.from([button.toJSON()]);
 
-		expect(builder.components).toEqual([button]);
+		expect(builder.components).toEqual([button.toJSON()]);
 	});
 
 	it("appends components via addComponents", () => {
 		const first = makeButton("first");
 		const second = makeButton("second");
-		const builder = new ActionRowBuilder<ButtonBuilder>().addComponents(first).addComponents(second);
+		const builder = new ActionRowBuilder<Button>().addComponents(first.toJSON()).addComponents(second.toJSON());
 
-		expect(builder.components).toEqual([first, second]);
+		expect(builder.components).toEqual([first.toJSON(), second.toJSON()]);
 	});
 
 	it("replaces the component list via setComponents", () => {
 		const button = makeButton();
-		const builder = new ActionRowBuilder<ButtonBuilder>().addComponents(makeButton("stale")).setComponents([button]);
+		const builder = new ActionRowBuilder<Button>().addComponents(makeButton("stale").toJSON()).setComponents([button.toJSON()]);
 
-		expect(builder.components).toEqual([button]);
+		expect(builder.components).toEqual([button.toJSON()]);
 	});
 
 	describe("validate", () => {
 		it("passes for a row of up to 5 buttons", () => {
-			const buttons = Array.from({ length: 5 }, (_, index) => makeButton(`button-${index}`));
-			const builder = new ActionRowBuilder<ButtonBuilder>().setComponents(buttons);
+			const buttons = Array.from({ length: 5 }, (_, index) => makeButton(`button-${index}`).toJSON());
+			const builder = new ActionRowBuilder<Button>().setComponents(buttons);
 
 			expect(() => builder.validate()).not.toThrow();
 		});
 
 		it("passes for a row with a single select menu", () => {
-			const builder = new ActionRowBuilder<StringSelectBuilder>().addComponents(makeSelect());
+			const builder = new ActionRowBuilder<StringSelect>().addComponents(makeSelect().toJSON());
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -942,27 +943,27 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("throws when the row has more than 5 buttons", () => {
-			const buttons = Array.from({ length: 6 }, (_, index) => makeButton(`button-${index}`));
-			const builder = new ActionRowBuilder<ButtonBuilder>().setComponents(buttons);
+			const buttons = Array.from({ length: 6 }, (_, index) => makeButton(`button-${index}`).toJSON());
+			const builder = new ActionRowBuilder<Button>().setComponents(buttons);
 
 			expect(() => builder.validate()).toThrow(/Action row cannot have more than 5 buttons/);
 		});
 
 		it("throws when the row has more than 1 select menu", () => {
-			const builder = new ActionRowBuilder().setComponents([makeSelect("first"), makeSelect("second")]);
+			const builder = new ActionRowBuilder().setComponents([makeSelect("first").toJSON(), makeSelect("second").toJSON()]);
 
 			expect(() => builder.validate()).toThrow(/Action row can only contain 1 select menu/);
 		});
 
 		it("throws when the row mixes a select menu with buttons", () => {
-			const builder = new ActionRowBuilder().setComponents([makeButton(), makeSelect()]);
+			const builder = new ActionRowBuilder().setComponents([makeButton().toJSON(), makeSelect().toJSON()]);
 
 			expect(() => builder.validate()).toThrow(/Action row cannot mix a select menu with buttons/);
 		});
 
 		it("cascades validation into each child component", () => {
-			const invalidButton = new ButtonBuilder().setCustomID("click");
-			const builder = new ActionRowBuilder<ButtonBuilder>().addComponents(invalidButton);
+			const invalidButton = new ButtonBuilder().setCustomId("click");
+			const builder = new ActionRowBuilder<Button>().addComponents(invalidButton.toJSON());
 
 			expect(() => builder.validate()).toThrow(/Button must have a label/);
 		});
@@ -975,7 +976,7 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("accepts builders and raw payloads in the same row", () => {
-			const builder = new ActionRowBuilder().addComponents(makeButton("from-builder"), {
+			const builder = new ActionRowBuilder().addComponents(makeButton("from-builder").toJSON(), {
 				type: ComponentTypes.BUTTON,
 				style: ButtonStyles.LINK,
 				label: "Docs",
@@ -987,16 +988,16 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("is assignable to the ActionRow payload type", () => {
-			const row: ActionRow = new ActionRowBuilder().addComponents(makeButton());
+			const row: ActionRow = new ActionRowBuilder().addComponents(makeButton().toJSON());
 
 			expectTypeOf(row).toExtend<ActionRow>();
 			expect(row.type).toBe(ComponentTypes.ACTION_ROW);
 		});
 
 		it("static validate accepts a bare component list or a whole row", () => {
-			expect(() => ActionRowBuilder.validate([makeButton()])).not.toThrow();
+			expect(() => ActionRowBuilder.validate([makeButton().toJSON()])).not.toThrow();
 			expect(() => ActionRowBuilder.validate([])).toThrow(/Action row must have at least 1 component/);
-			expect(() => ActionRowBuilder.validate({ type: ComponentTypes.ACTION_ROW, components: [makeButton()] })).not.toThrow();
+			expect(() => ActionRowBuilder.validate({ type: ComponentTypes.ACTION_ROW, components: [makeButton().toJSON()] })).not.toThrow();
 		});
 	});
 });
@@ -1022,10 +1023,10 @@ describe("TextInputBuilder", () => {
 
 		const builder = TextInputBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("feedback");
+		expect(builder.customId).toBe("feedback");
 		expect(builder.style).toBe(TextInputStyles.PARAGRAPH);
-		expect(builder.min_length).toBe(1);
-		expect(builder.max_length).toBe(100);
+		expect(builder.minLength).toBe(1);
+		expect(builder.maxLength).toBe(100);
 		expect(builder.required).toBe(true);
 		expect(builder.value).toBe("hello");
 		expect(builder.placeholder).toBe("Type here");
@@ -1034,19 +1035,19 @@ describe("TextInputBuilder", () => {
 	it("throws from static from when provided invalid values", () => {
 		const payload: TextInput = { type: ComponentTypes.TEXT_INPUT, custom_id: "a".repeat(101), style: TextInputStyles.SHORT };
 
-		expect(() => TextInputBuilder.from(payload)).toThrow(/Text input custom_id must be between 1 and 100 characters long/);
+		expect(() => TextInputBuilder.from(payload)).toThrow(/Text input customId must be between 1 and 100 characters long/);
 	});
 
 	it("sets custom_id within the allowed length", () => {
-		const builder = new TextInputBuilder().setCustomID("a".repeat(100));
+		const builder = new TextInputBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.custom_id).toBe("a".repeat(100));
+		expect(builder.customId).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new TextInputBuilder().setCustomID("")).toThrow(/Text input custom_id must be between 1 and 100 characters long/);
-		expect(() => new TextInputBuilder().setCustomID("a".repeat(101))).toThrow(
-			/Text input custom_id must be between 1 and 100 characters long/
+		expect(() => new TextInputBuilder().setCustomId("")).toThrow(/Text input customId must be between 1 and 100 characters long/);
+		expect(() => new TextInputBuilder().setCustomId("a".repeat(101))).toThrow(
+			/Text input customId must be between 1 and 100 characters long/
 		);
 	});
 
@@ -1059,15 +1060,15 @@ describe("TextInputBuilder", () => {
 	it("sets min_length and max_length within their allowed ranges", () => {
 		const builder = new TextInputBuilder().setMinLength(0).setMaxLength(4000);
 
-		expect(builder.min_length).toBe(0);
-		expect(builder.max_length).toBe(4000);
+		expect(builder.minLength).toBe(0);
+		expect(builder.maxLength).toBe(4000);
 	});
 
 	it("throws when min_length or max_length are out of range", () => {
-		expect(() => new TextInputBuilder().setMinLength(-1)).toThrow(/Text input min_length must be between 0 and 4000/);
-		expect(() => new TextInputBuilder().setMinLength(4001)).toThrow(/Text input min_length must be between 0 and 4000/);
-		expect(() => new TextInputBuilder().setMaxLength(0)).toThrow(/Text input max_length must be between 1 and 4000/);
-		expect(() => new TextInputBuilder().setMaxLength(4001)).toThrow(/Text input max_length must be between 1 and 4000/);
+		expect(() => new TextInputBuilder().setMinLength(-1)).toThrow(/Text input minLength must be between 0 and 4000/);
+		expect(() => new TextInputBuilder().setMinLength(4001)).toThrow(/Text input minLength must be between 0 and 4000/);
+		expect(() => new TextInputBuilder().setMaxLength(0)).toThrow(/Text input maxLength must be between 1 and 4000/);
+		expect(() => new TextInputBuilder().setMaxLength(4001)).toThrow(/Text input maxLength must be between 1 and 4000/);
 	});
 
 	it("defaults setRequired to true when called without an argument", () => {
@@ -1100,7 +1101,7 @@ describe("TextInputBuilder", () => {
 
 	describe("validate", () => {
 		it("passes for a fully-populated text input", () => {
-			const builder = new TextInputBuilder().setCustomID("feedback").setStyle(TextInputStyles.SHORT);
+			const builder = new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT);
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -1108,19 +1109,19 @@ describe("TextInputBuilder", () => {
 		it("throws when custom_id is missing", () => {
 			const builder = new TextInputBuilder().setStyle(TextInputStyles.SHORT);
 
-			expect(() => builder.validate()).toThrow(/Text input must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Text input must have a customId/);
 		});
 
 		it("throws when style is missing", () => {
-			const builder = new TextInputBuilder().setCustomID("feedback");
+			const builder = new TextInputBuilder().setCustomId("feedback");
 
 			expect(() => builder.validate()).toThrow(/Text input must have a style/);
 		});
 
 		it("throws when min_length exceeds max_length", () => {
-			const builder = new TextInputBuilder().setCustomID("feedback").setStyle(TextInputStyles.SHORT).setMinLength(10).setMaxLength(5);
+			const builder = new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT).setMinLength(10).setMaxLength(5);
 
-			expect(() => builder.validate()).toThrow(/Text input min_length cannot exceed max_length/);
+			expect(() => builder.validate()).toThrow(/Text input minLength cannot exceed maxLength/);
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -1132,7 +1133,7 @@ describe("TextInputBuilder", () => {
 });
 
 function makeTextInput(customId = "feedback"): TextInputBuilder {
-	return new TextInputBuilder().setCustomID(customId).setStyle(TextInputStyles.SHORT);
+	return new TextInputBuilder().setCustomId(customId).setStyle(TextInputStyles.SHORT);
 }
 
 describe("LabelBuilder", () => {
@@ -1155,7 +1156,7 @@ describe("LabelBuilder", () => {
 		expect(builder.label).toBe("Feedback");
 		expect(builder.description).toBe("Tell us what you think");
 		expect(builder.component).toBeInstanceOf(TextInputBuilder);
-		expect((builder.component as TextInputBuilder).custom_id).toBe("feedback");
+		expect((builder.component as TextInputBuilder).customId).toBe("feedback");
 	});
 
 	it("hydrates a builder from a raw payload, inferring a select builder", () => {
@@ -1218,7 +1219,7 @@ describe("LabelBuilder", () => {
 		});
 
 		it("cascades validation into the wrapped component", () => {
-			const builder = new LabelBuilder().setLabel("Feedback").setComponent(new TextInputBuilder().setCustomID("feedback"));
+			const builder = new LabelBuilder().setLabel("Feedback").setComponent(new TextInputBuilder().setCustomId("feedback"));
 
 			expect(() => builder.validate()).toThrow(/Text input must have a style/);
 		});
@@ -1257,7 +1258,7 @@ describe("ModalBuilder", () => {
 
 		const builder = ModalBuilder.from(payload);
 
-		expect(builder.custom_id).toBe("feedback-modal");
+		expect(builder.customId).toBe("feedback-modal");
 		expect(builder.title).toBe("Feedback");
 		expect(builder.components).toHaveLength(1);
 		expect(builder.components[0]).toBeInstanceOf(LabelBuilder);
@@ -1276,12 +1277,12 @@ describe("ModalBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new ModalBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.custom_id).toBe("a".repeat(100));
+		expect(builder.customId).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
-		expect(() => new ModalBuilder().setCustomId("")).toThrow(/Modal custom_id must be between 1 and 100 characters long/);
-		expect(() => new ModalBuilder().setCustomId("a".repeat(101))).toThrow(/Modal custom_id must be between 1 and 100 characters long/);
+		expect(() => new ModalBuilder().setCustomId("")).toThrow(/Modal customId must be between 1 and 100 characters long/);
+		expect(() => new ModalBuilder().setCustomId("a".repeat(101))).toThrow(/Modal customId must be between 1 and 100 characters long/);
 	});
 
 	it("sets title within the allowed length", () => {
@@ -1297,7 +1298,7 @@ describe("ModalBuilder", () => {
 
 	it("appends a field via addField, wrapping it in a LabelBuilder automatically", () => {
 		const textInput = makeTextInput();
-		const builder = new ModalBuilder().addField("Feedback", textInput, { description: "Tell us what you think" });
+		const builder = new ModalBuilder().addField("Feedback", textInput as unknown as LabelChild, { description: "Tell us what you think" });
 
 		expect(builder.components).toHaveLength(1);
 		expect(builder.components[0]).toBeInstanceOf(LabelBuilder);
@@ -1308,26 +1309,26 @@ describe("ModalBuilder", () => {
 
 	it("replaces the component list via setComponents", () => {
 		const label = new LabelBuilder().setLabel("Feedback").setComponent(makeTextInput());
-		const builder = new ModalBuilder().addField("Stale", makeTextInput("stale")).setComponents([label]);
+		const builder = new ModalBuilder().addField("Stale", makeTextInput("stale") as unknown as LabelChild).setComponents([label]);
 
 		expect(builder.components).toEqual([label]);
 	});
 
 	describe("validate", () => {
 		it("passes for a fully-populated modal", () => {
-			const builder = new ModalBuilder().setCustomId("feedback-modal").setTitle("Feedback").addField("Feedback", makeTextInput());
+			const builder = new ModalBuilder().setCustomId("feedback-modal").setTitle("Feedback").addField("Feedback", makeTextInput() as unknown as LabelChild);
 
 			expect(() => builder.validate()).not.toThrow();
 		});
 
 		it("throws when custom_id is missing", () => {
-			const builder = new ModalBuilder().setTitle("Feedback").addField("Feedback", makeTextInput());
+			const builder = new ModalBuilder().setTitle("Feedback").addField("Feedback", makeTextInput() as unknown as LabelChild);
 
-			expect(() => builder.validate()).toThrow(/Modal must have a custom_id/);
+			expect(() => builder.validate()).toThrow(/Modal must have a customId/);
 		});
 
 		it("throws when title is missing", () => {
-			const builder = new ModalBuilder().setCustomId("feedback-modal").addField("Feedback", makeTextInput());
+			const builder = new ModalBuilder().setCustomId("feedback-modal").addField("Feedback", makeTextInput() as unknown as LabelChild);
 
 			expect(() => builder.validate()).toThrow(/Modal must have a title/);
 		});
@@ -1340,7 +1341,7 @@ describe("ModalBuilder", () => {
 
 		it("throws when there are more than 5 components", () => {
 			const builder = new ModalBuilder().setCustomId("feedback-modal").setTitle("Feedback");
-			for (let index = 0; index < 6; index++) builder.addField(`Field ${index}`, makeTextInput(`field-${index}`));
+			for (let index = 0; index < 6; index++) builder.addField(`Field ${index}`, makeTextInput(`field-${index}`) as unknown as LabelChild);
 
 			expect(() => builder.validate()).toThrow(/Modal cannot have more than 5 components/);
 		});
@@ -1349,7 +1350,7 @@ describe("ModalBuilder", () => {
 			const builder = new ModalBuilder()
 				.setCustomId("feedback-modal")
 				.setTitle("Feedback")
-				.addField("Feedback", new TextInputBuilder().setCustomID("feedback"));
+				.addField("Feedback", new TextInputBuilder().setCustomId("feedback") as unknown as LabelChild);
 
 			expect(() => builder.validate()).toThrow(/Text input must have a style/);
 		});

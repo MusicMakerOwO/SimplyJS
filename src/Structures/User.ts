@@ -25,7 +25,7 @@ export class User extends APIClientStructure<DiscordUser> {
 	/** Legacy discriminator string (for migrated users this may be `"0"`) */
 	discriminator!: string
 	/** Display name chosen by the user, or `null` when unset */
-	global_name!: string | null
+	globalName!: string | null
 	/** User avatar hash, or `null` when no custom avatar is set */
 	avatar!: string | null
 	/** Whether this user account is a bot */
@@ -33,11 +33,11 @@ export class User extends APIClientStructure<DiscordUser> {
 	/** Whether this account is a Discord system user */
 	system?: boolean
 	/** Whether multifactor authentication is enabled */
-	mfa_enabled?: boolean
+	mfaEnabled?: boolean
 	/** User banner hash, or `null` when no banner is set */
 	banner?: string | null
 	/** Accent color integer for profile styling, or `null` when unset */
-	accent_color?: number | null
+	accentColor?: number | null
 	/** User locale, typically present on OAuth/current-user responses */
 	locale?: string
 	/** Email verification status, when provided by the API */
@@ -47,15 +47,15 @@ export class User extends APIClientStructure<DiscordUser> {
 	/** User account flags bitfield */
 	flags?: number
 	/** Nitro/premium subscription tier */
-	premium_type?: number
+	premiumType?: number
 	/** Public user flags bitfield */
-	public_flags?: number
+	publicFlags?: number
 	/** Avatar decoration metadata keyed by decoration id */
-	avatar_decoration_data?: Record<string, DiscordAvatarDecoration> | null
+	avatarDecorationData?: Record<string, DiscordAvatarDecoration> | null
 	/** Collectible profile metadata such as nameplates */
 	collectibles?: Record<string, DiscordNameplate> | null
 	/** Primary guild metadata for the user profile */
-	primary_guild?: Record<string, DiscordUserPrimaryGuild> | null
+	primaryGuild?: Record<string, DiscordUserPrimaryGuild> | null
 
 	constructor(client: Client, data: DiscordUser) {
 		super(client);
@@ -66,7 +66,7 @@ export class User extends APIClientStructure<DiscordUser> {
 		this.id = data.id;
 		this.username = data.username;
 		this.discriminator = data.discriminator;
-		this.global_name = data.global_name;
+		this.globalName = data.global_name;
 		this.avatar = data.avatar;
 
 		if ('bot' in data && data.bot !== undefined) {
@@ -78,7 +78,7 @@ export class User extends APIClientStructure<DiscordUser> {
 		}
 
 		if ('mfa_enabled' in data && data.mfa_enabled !== undefined) {
-			this.mfa_enabled = data.mfa_enabled;
+			this.mfaEnabled = data.mfa_enabled;
 		}
 
 		if ('banner' in data && data.banner !== undefined) {
@@ -86,7 +86,7 @@ export class User extends APIClientStructure<DiscordUser> {
 		}
 
 		if ('accent_color' in data && data.accent_color !== undefined) {
-			this.accent_color = data.accent_color;
+			this.accentColor = data.accent_color;
 		}
 
 		if ('locale' in data && data.locale !== undefined) {
@@ -106,15 +106,15 @@ export class User extends APIClientStructure<DiscordUser> {
 		}
 
 		if ('premium_type' in data && data.premium_type !== undefined) {
-			this.premium_type = data.premium_type;
+			this.premiumType = data.premium_type;
 		}
 
 		if ('public_flags' in data && data.public_flags !== undefined) {
-			this.public_flags = data.public_flags;
+			this.publicFlags = data.public_flags;
 		}
 
 		if ('avatar_decoration_data' in data && data.avatar_decoration_data !== undefined) {
-			this.avatar_decoration_data = data.avatar_decoration_data;
+			this.avatarDecorationData = data.avatar_decoration_data;
 		}
 
 		if ('collectibles' in data && data.collectibles !== undefined) {
@@ -122,7 +122,7 @@ export class User extends APIClientStructure<DiscordUser> {
 		}
 
 		if ('primary_guild' in data && data.primary_guild !== undefined) {
-			this.primary_guild = data.primary_guild;
+			this.primaryGuild = data.primary_guild;
 		}
 	}
 

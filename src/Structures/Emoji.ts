@@ -17,7 +17,7 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 	/** User who created the emoji, when included in payloads */
 	user?: User
 	/** Whether Discord requires surrounding colons for this emoji */
-	require_colons?: boolean
+	requireColons?: boolean
 	/** Whether this emoji is managed by an integration */
 	managed?: boolean
 
@@ -41,7 +41,7 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 		}
 
 		if ('require_colons' in data && data.require_colons !== undefined) {
-			this.require_colons = data.require_colons;
+			this.requireColons = data.require_colons;
 		}
 
 		if ('managed' in data && data.managed !== undefined) {
@@ -67,8 +67,8 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 		/** Role ids (or role objects) allowed to use this emoji; pass an empty array to lift the restriction */
 		roles: string[] | {id: string}[]
 	}): Promise<void> {
-		const roleIDs = changes.roles.map(r => typeof r === 'string' ? r : r.id);
-		await this.client.rest.patch(`/guilds/${this.guild.id}/emojis/${this.id}`, { name: changes.name, roles: roleIDs });
+		const roleIds = changes.roles.map(r => typeof r === 'string' ? r : r.id);
+		await this.client.rest.patch(`/guilds/${this.guild.id}/emojis/${this.id}`, { name: changes.name, roles: roleIds });
 	}
 
 	/** Generate the emoji markup usable in message content: `Hello ${emoji.toString()}` -> `Hello <:frog:1234567890>` */

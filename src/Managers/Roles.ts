@@ -79,11 +79,12 @@ export class RoleCache extends GuildCache<string, Role, DiscordRole> {
 		/** Optional role icon data */
 		icon?: string | null
 		/** Optional Unicode emoji shown as the role icon */
-		unicode_emoji?: string | null
+		unicodeEmoji?: string | null
 		/** Whether this role can be mentioned by anyone */
 		mentionable?: boolean
 	}): Promise<Role> {
-		const payload = { ...data };
+		const { unicodeEmoji, ...rest } = data;
+		const payload = { ...rest, unicode_emoji: unicodeEmoji };
 		payload.permissions = SerializeBitFieldValue(DiscordPermissions, payload.permissions);
 
 		const roleData = await this.client.rest.post<DiscordRole>(`/guilds/${this.guild.id}/roles`, payload as unknown as JSONObject);

@@ -18,16 +18,16 @@ export class GuildBanManager {
 	/**
 	 * Bans a user from the guild. Requires the `BAN_MEMBERS` permission.
 	 *
-	 * `delete_message_seconds` defaults to `0`, which keeps existing message history.
+	 * `deleteMessageSeconds` defaults to `0`, which keeps existing message history.
 	 * @param user The user to ban, or their id.
 	 * @param options Ban options including delete window and optional audit log reason.
 	 */
-	async create(user: User | DiscordUser | string, options: { delete_message_seconds?: number, reason?: string } = {}): Promise<void> {
-		const userID = typeof user === 'object' ? user.id : user;
+	async create(user: User | DiscordUser | string, options: { deleteMessageSeconds?: number, reason?: string } = {}): Promise<void> {
+		const userId = typeof user === 'object' ? user.id : user;
 		await this.client.rest.put(
-			`/guilds/${this.guild.id}/bans/${userID}`,
+			`/guilds/${this.guild.id}/bans/${userId}`,
 			{
-				delete_message_seconds: options.delete_message_seconds ?? 0
+				delete_message_seconds: options.deleteMessageSeconds ?? 0
 			},
 			options.reason ? { 'X-Audit-Log-Reason': options.reason } : {}
 		);

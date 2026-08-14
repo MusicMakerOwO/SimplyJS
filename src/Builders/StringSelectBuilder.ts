@@ -1,5 +1,5 @@
 import { ComponentTypes, SelectOption, StringSelect } from "../Types/Components.js";
-import { BaseSelectBuilder, validateBaseSelectShape } from "./BaseSelectBuilder.js";
+import { BaseSelectBuilder, omitUndefined, validateBaseSelectShape } from "./BaseSelectBuilder.js";
 
 const MAX_OPTIONS = 25;
 
@@ -20,14 +20,14 @@ function validateStringSelectOptions(options: SelectOption[] | undefined, label:
 }
 
 /** Fluent builder for a string select menu, validating limits as they're set. */
-export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes.STRING_SELECT> implements StringSelect {
+export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes.STRING_SELECT> {
 	/**
 	 * Creates a builder from an existing string select payload
 	 */
 	static from(value: StringSelect): StringSelectBuilder {
 		const select = new StringSelectBuilder();
 
-		select.setCustomID(value.custom_id);
+		select.setCustomId(value.custom_id);
 		if (value.placeholder !== undefined) select.setPlaceholder(value.placeholder);
 		if (value.min_values !== undefined) select.setMinValues(value.min_values);
 		if (value.max_values !== undefined) select.setMaxValues(value.max_values);
@@ -42,7 +42,15 @@ export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes
 	 * Validates a string select payload against Discord's constraints
 	 */
 	static validate(select: StringSelect): void {
-		validateBaseSelectShape(select, "String select");
+		validateBaseSelectShape(
+			{
+				customId: select.custom_id,
+				placeholder: select.placeholder,
+				minValues: select.min_values,
+				maxValues: select.max_values
+			},
+			"String select"
+		);
 		validateStringSelectOptions(select.options, "String select");
 	}
 
@@ -85,5 +93,21 @@ export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes
 	validate(): void {
 		validateBaseSelectShape(this, this.selectLabel);
 		validateStringSelectOptions(this.options, this.selectLabel);
+	}
+
+	/**
+	 * Serializes this builder into the raw {@link StringSelect} payload Discord expects
+	 */
+	toJSON(): StringSelect {
+		return omitUndefined<StringSelect>({
+			type: this.type,
+			custom_id: this.customId,
+			placeholder: this.placeholder,
+			min_values: this.minValues,
+			max_values: this.maxValues,
+			required: this.required,
+			disabled: this.disabled,
+			options: this.options
+		});
 	}
 }

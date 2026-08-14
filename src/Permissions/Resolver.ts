@@ -50,8 +50,8 @@ const ALL_PERMISSIONS: bigint = Object.values(DiscordPermissions).reduce( (x, a)
  *
  * @see https://docs.discord.com/developers/topics/permissions#permission-overwrites
  */
-export function ResolvePermissions(guild: Guild, member: Member, channel?: Channel & { permission_overwrites?: ChannelPermissionManager }): BitField<typeof DiscordPermissions> {
-	if (member.user.id === guild.owner_id) {
+export function ResolvePermissions(guild: Guild, member: Member, channel?: Channel & { permissionOverwrites?: ChannelPermissionManager }): BitField<typeof DiscordPermissions> {
+	if (member.user.id === guild.ownerId) {
 		return new BitField(DiscordPermissions, ALL_PERMISSIONS);
 	}
 
@@ -60,8 +60,8 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 	const everyoneRole = guild.roles.get(guild.id)!;
 	permissions |= everyoneRole.permissions.value;
 
-	for (const roleID of member.roles) {
-		const role = guild.roles.get(roleID);
+	for (const roleId of member.roles) {
+		const role = guild.roles.get(roleId);
 		if (!role) throw new Error("Role does not exist in cache");
 
 		permissions |= role.permissions.value;
@@ -72,7 +72,7 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 	}
 
 	// Channels without a permission overwrite manager (categories aside, e.g. DMs) have nothing to apply
-	const overwrites = channel?.permission_overwrites;
+	const overwrites = channel?.permissionOverwrites;
 	if (!overwrites || permissions === ALL_PERMISSIONS) return new BitField(DiscordPermissions, permissions);
 
 	// Apply @everyone role overwrite
@@ -85,8 +85,8 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 	// Aggregate all role-specific overwrites for roles the member has
 	let roleAllow = 0n;
 	let roleDeny = 0n;
-	for (const roleID of member.roles) {
-		const roleOverwrite = overwrites.get(roleID);
+	for (const roleId of member.roles) {
+		const roleOverwrite = overwrites.get(roleId);
 		if (roleOverwrite) {
 			roleAllow |= BigInt(roleOverwrite.allow);
 			roleDeny |= BigInt(roleOverwrite.deny);

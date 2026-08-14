@@ -13,7 +13,7 @@ type MessageableClass<T> = {
 } & T;
 
 /** Extracts an ID from a {@link MessageResolvable}, passing plain string IDs through unchanged */
-function resolveMessageID(message: MessageResolvable): string {
+function resolveMessageId(message: MessageResolvable): string {
 	return typeof message === "string"
 		? message
 		: message.id;
@@ -46,7 +46,7 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 		 * @param reason Reason to attach to the audit log entry.
 		 */
 		async deleteMessage(message: MessageResolvable, reason?: string): Promise<void> {
-			const id = resolveMessageID(message);
+			const id = resolveMessageId(message);
 			await this.client.rest.delete(
 				`/channels/${this.id}/messages/${id}`,
 				reason ? { "X-Audit-Log-Reason": reason } : undefined
@@ -65,7 +65,7 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 		 * @throws {Error} When no messages are provided, or more than 100 unique messages are provided.
 		 */
 		async bulkDeleteMessages(messages: MessageResolvable[], reason?: string): Promise<string[]> {
-			const ids = [...new Set(messages.map(resolveMessageID))];
+			const ids = [...new Set(messages.map(resolveMessageId))];
 
 			if (ids.length === 0) throw new Error("Cannot bulk delete without any messages");
 			if (ids.length > 100) throw new Error(`Cannot bulk delete more than 100 messages at once, received ${ids.length}`);

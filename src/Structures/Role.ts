@@ -20,18 +20,18 @@ export class Role extends APIGuildStructure<DiscordRole> {
 	 * sync by Discord but not itself deprecated on this field
 	 */
 	color!: number
-	/** Gradient role color, with `secondary_color`/`tertiary_color` `null` when the role uses fewer than 3 colors */
+	/** Gradient role color, with `secondaryColor`/`tertiaryColor` `null` when the role uses fewer than 3 colors */
 	colors!: {
-		primary_color: number
-		secondary_color: number | null
-		tertiary_color: number | null
+		primaryColor: number
+		secondaryColor: number | null
+		tertiaryColor: number | null
 	}
 	/** Whether the role is displayed separately from online members in the member list */
 	hoist!: boolean
-	/** Role icon hash, mutually exclusive with `unicode_emoji` */
+	/** Role icon hash, mutually exclusive with `unicodeEmoji` */
 	icon?: string | null
 	/** Standard Unicode emoji shown as the role icon, mutually exclusive with `icon` */
-	unicode_emoji?: string | null
+	unicodeEmoji?: string | null
 	position!: number
 	permissions!: BitField<typeof DiscordPermissions>
 	/** Whether this role is managed by an integration (bot role, boost role, linked role, etc.) and cannot be manually assigned or deleted */
@@ -45,16 +45,16 @@ export class Role extends APIGuildStructure<DiscordRole> {
 	 */
 	tags!: {
 		/** Id of the bot this role belongs to, if it's a bot integration role */
-		bot_id?: string
-		integration_id?: string
+		botId?: string
+		integrationId?: string
 		/** Present (and `null`) when this is the guild's Nitro Booster role */
-		premium_subscriber?: null
+		premiumSubscriber?: null
 		/** Id of this role's subscription SKU and listing, if it's a subscriber-only role */
-		subscription_listing_id?: string
+		subscriptionListingId?: string
 		/** Present (and `null`) when this role is available for purchase */
-		available_for_purchase?: null
+		availableForPurchase?: null
 		/** Present (and `null`) when this is the guild's linked role (granted via a connected external account) */
-		guild_connections?: null
+		guildConnections?: null
 	}
 	flags!: number
 
@@ -68,7 +68,11 @@ export class Role extends APIGuildStructure<DiscordRole> {
 		this.id = data.id;
 		this.name = data.name;
 		this.color = data.color;
-		this.colors = data.colors;
+		this.colors = {
+			primaryColor: data.colors.primary_color,
+			secondaryColor: data.colors.secondary_color,
+			tertiaryColor: data.colors.tertiary_color,
+		};
 		this.hoist = data.hoist;
 		this.position = data.position;
 		this.permissions.override(data.permissions);
@@ -81,10 +85,17 @@ export class Role extends APIGuildStructure<DiscordRole> {
 		}
 
 		if ('unicode_emoji' in data && data.unicode_emoji !== undefined) {
-			this.unicode_emoji = data.unicode_emoji;
+			this.unicodeEmoji = data.unicode_emoji;
 		}
 
-		this.tags = data.tags ?? {};
+		const tags = data.tags ?? {};
+		this.tags = {};
+		if (tags.bot_id !== undefined) this.tags.botId = tags.bot_id;
+		if (tags.integration_id !== undefined) this.tags.integrationId = tags.integration_id;
+		if (tags.premium_subscriber !== undefined) this.tags.premiumSubscriber = tags.premium_subscriber;
+		if (tags.subscription_listing_id !== undefined) this.tags.subscriptionListingId = tags.subscription_listing_id;
+		if (tags.available_for_purchase !== undefined) this.tags.availableForPurchase = tags.available_for_purchase;
+		if (tags.guild_connections !== undefined) this.tags.guildConnections = tags.guild_connections;
 	}
 
 	/** Asks the API to delete the current role, might fail due to permissions or role order (can't delete roles above your own) */
@@ -98,22 +109,31 @@ export class Role extends APIGuildStructure<DiscordRole> {
 		permissions?: BitFieldValue<typeof DiscordPermissions>
 		/** @deprecated Use `colors` instead */
 		color?: number
-		/** Gradient role color, with `secondary_color`/`tertiary_color` left `null` for a solid color */
+		/** Gradient role color, with `secondaryColor`/`tertiaryColor` left `null` for a solid color */
 		colors?: {
-			primary_color?: number
-			secondary_color?: number | null
-			tertiary_color?: number | null
+			primaryColor?: number
+			secondaryColor?: number | null
+			tertiaryColor?: number | null
 		}
 		/** Whether to display the role separately from online members in the member list */
 		hoist?: boolean
-		/** New role icon, or `null` to remove it; mutually exclusive with `unicode_emoji` */
+		/** New role icon, or `null` to remove it; mutually exclusive with `unicodeEmoji` */
 		icon?: string | null
 		/** New Unicode emoji for the role icon, or `null` to remove it; mutually exclusive with `icon` */
-		unicode_emoji?: string | null
+		unicodeEmoji?: string | null
 		/** Whether members may `@mention` this role */
 		mentionable?: boolean
 	}): Promise<void> {
-		const payload = { ...options };
+		const { colors, unicodeEmoji, ...rest } = options;
+		const payload = {
+			...rest,
+			colors: colors ? {
+				primary_color: colors.primaryColor,
+				secondary_color: colors.secondaryColor,
+				tertiary_color: colors.tertiaryColor,
+			} : undefined,
+			unicode_emoji: unicodeEmoji,
+		};
 
 		if (payload.permissions !== undefined) {
 			payload.permissions = SerializeBitFieldValue(DiscordPermissions, payload.permissions);

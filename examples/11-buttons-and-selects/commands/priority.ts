@@ -9,7 +9,7 @@ export default {
 
 	async execute(client, interaction) {
 		const priority = new StringSelectBuilder()
-			.setCustomID('priority_select')
+			.setCustomId('priority_select')
 			.setPlaceholder('Select a priority')
 			.addOption('Low', 'low')
 			.addOption('Medium', 'medium')

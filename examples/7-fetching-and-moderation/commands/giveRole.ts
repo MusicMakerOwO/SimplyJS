@@ -7,7 +7,7 @@ export default {
 	// filename or the export alias in commands/index.ts.
 	name: 'give-role',
 	async execute(client, message, args) {
-		const member = await resolveMember(client, message.guild_id!, args.shift());
+		const member = await resolveMember(client, message.guildId!, args.shift());
 		if (!member) return message.reply("Couldn't find that member");
 
 		const guild = message.guild!;

@@ -26,7 +26,7 @@ export default {
 				// customId format: `color:<the color, lowercased>` - the `color` base id is what
 				// routes this click to buttons/color.ts, and everything after the `:` is read
 				// there as the arg, eg. `color:red` -> colorArg === "red".
-				.setCustomID(`color:${label.toLowerCase()}`)
+				.setCustomId(`color:${label.toLowerCase()}`)
 		);
 
 		await interaction.reply({

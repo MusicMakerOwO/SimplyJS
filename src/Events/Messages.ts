@@ -2,7 +2,7 @@ import { defineEvent, JSONObject } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
-import { ClientEvents } from "../Types/SimplyJSTypes.js";
+import { ClientEvents, MessageDeleteBulkPayload, MessageDeletePayload } from "../Types/SimplyJSTypes.js";
 
 export const MessageCreate = defineEvent({
 	name: GatewayEvents.MessageCreate,
@@ -19,7 +19,12 @@ export const MessageDelete = defineEvent({
 		channel_id: string,
 		guild_id: string | null
 	}) => {
-		client.emit(ClientEvents.MessageDelete, data);
+		const payload: MessageDeletePayload = {
+			id: data.id,
+			channelId: data.channel_id,
+			guildId: data.guild_id
+		};
+		client.emit(ClientEvents.MessageDelete, payload);
 	}
 });
 
@@ -31,7 +36,12 @@ export const MessageDeleteBulk = defineEvent({
 		channel_id: string,
 		guild_id: string | null
 	}) => {
-		client.emit(ClientEvents.MessageDeleteBulk, data);
+		const payload: MessageDeleteBulkPayload = {
+			ids: data.ids,
+			channelId: data.channel_id,
+			guildId: data.guild_id
+		};
+		client.emit(ClientEvents.MessageDeleteBulk, payload);
 	}
 });
 

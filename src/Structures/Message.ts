@@ -43,9 +43,9 @@ export function CreateMessagePayload(input: string | MessagePayload): MessagePay
  */
 export class Message extends APIClientStructure<DiscordMessage> {
 	id!: string
-	channel_id!: string
+	channelId!: string
 	/** Id of the guild this message was sent in, only present on gateway payloads (`MESSAGE_CREATE` etc.), not in the Discord message object itself */
-	guild_id?: string | null
+	guildId?: string | null
 	/**
 	 * Raw partial guild member object for the message author, only present on gateway payloads
 	 * and not otherwise parsed into a {@link Member}. Typed `unknown` because no consumer in
@@ -58,13 +58,13 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	content!: string
 	timestamp!: string
 	/** ISO timestamp of the last edit, or `null` if the message was never edited */
-	edited_timestamp!: string | null
+	editedTimestamp!: string | null
 	tts!: boolean
-	mention_everyone!: boolean
+	mentionEveryone!: boolean
 	mentions!: User[]
-	mention_roles!: string[]
+	mentionRoles!: string[]
 	/** Partial channel objects for channels specifically mentioned in this message */
-	mention_channels?: unknown[]
+	mentionChannels?: unknown[]
 	attachments!: Attachment[]
 	embeds!: Embed[]
 	reactions?: Reaction[]
@@ -72,45 +72,45 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	nonce?: number | string
 	pinned!: boolean
 	/** Id of the webhook that generated this message, only present for webhook messages */
-	webhook_id?: string
+	webhookId?: string
 	type!: ObjectValues<typeof MessageTypes>
 	/** Rich Presence activity data, sent with invite-to-game/spectate chat embeds */
 	activity?: MessageActivity
 	/** Rich Presence application data, sent alongside `activity` */
 	application?: Partial<DiscordApplication>
 	/** Id of the application that sent this message, present when the message is an interaction response or an application-owned webhook message */
-	application_id?: string
+	applicationId?: string
 	/** Message flags bitfield (e.g. `CROSSPOSTED`, `EPHEMERAL`, `SUPPRESS_NOTIFICATIONS`) */
 	flags?: number
 	/** Reference data identifying the source message for a reply, crosspost, forward, or channel-follow-add */
-	message_reference?: MessageReference
+	messageReference?: MessageReference
 	/** For forwarded messages, a minimal snapshot of the forwarded message (author is excluded) */
-	message_snapshots?: { message: Partial<DiscordMessage> }[]
-	/** The message pointed to by `message_reference`, or `null` if it has since been deleted */
-	referenced_message?: DiscordMessage | null
+	messageSnapshots?: { message: Partial<DiscordMessage> }[]
+	/** The message pointed to by `messageReference`, or `null` if it has since been deleted */
+	referencedMessage?: DiscordMessage | null
 	/** Metadata about the interaction that produced this message, if any */
-	interaction_metadata?: unknown
-	/** @deprecated Superseded by `interaction_metadata`; the interaction this message was a response to */
+	interactionMetadata?: unknown
+	/** @deprecated Superseded by `interactionMetadata`; the interaction this message was a response to */
 	interaction?: unknown
 	/** The thread that was started from this message, if any */
 	thread?: DiscordChannel
 	/** Message components (buttons, action rows, etc.) attached to this message */
 	components?: unknown[]
 	/** Lightweight sticker references (id, name, format) sent with the message */
-	sticker_items?: StickerItem[]
-	/** @deprecated Full sticker objects sent with the message; superseded by `sticker_items` */
+	stickerItems?: StickerItem[]
+	/** @deprecated Full sticker objects sent with the message; superseded by `stickerItems` */
 	stickers?: DiscordSticker[]
 	/** Generally-increasing (may contain gaps or duplicates) approximate position of this message within its thread, usable alongside the parent thread's `total_message_sent` */
 	position?: number
 	/** Data about the role subscription purchase/renewal that triggered a `ROLE_SUBSCRIPTION_PURCHASE` message */
-	role_subscription_data?: RoleSubscriptionData
+	roleSubscriptionData?: RoleSubscriptionData
 	/** Users, members, channels, and roles referenced by this message, resolved for interaction responses */
 	resolved?: ResolvedData
 	poll?: Poll
 	/** Data for the voice/video call this message represents (`type` `CALL`) */
 	call?: MessageCall
 	/** Custom client-side theme shared via this message */
-	shared_client_theme?: SharedClientTheme
+	sharedClientTheme?: SharedClientTheme
 
 	constructor(client: Client, data: DiscordMessage & { guild_id?: string | null; member?: unknown | null }) {
 		super(client);
@@ -119,14 +119,14 @@ export class Message extends APIClientStructure<DiscordMessage> {
 
 	patch(data: DiscordMessage & { guild_id?: string | null; member?: unknown | null }): void {
 		this.id = data.id;
-		this.channel_id = data.channel_id;
+		this.channelId = data.channel_id;
 		this.user = this.client.users.upsert(data.author);
 		this.content = data.content;
 		this.timestamp = data.timestamp;
-		this.edited_timestamp = data.edited_timestamp;
+		this.editedTimestamp = data.edited_timestamp;
 		this.tts = data.tts;
-		this.mention_everyone = data.mention_everyone;
-		this.mention_roles = data.mention_roles;
+		this.mentionEveryone = data.mention_everyone;
+		this.mentionRoles = data.mention_roles;
 		this.attachments = data.attachments;
 		this.embeds = data.embeds;
 		this.pinned = data.pinned;
@@ -138,31 +138,31 @@ export class Message extends APIClientStructure<DiscordMessage> {
 		}
 		this.mentions = mentionUsers;
 
-		if ("mention_channels" in data && data.mention_channels !== undefined) this.mention_channels = data.mention_channels;
+		if ("mention_channels" in data && data.mention_channels !== undefined) this.mentionChannels = data.mention_channels;
 		if ("reactions" in data && data.reactions !== undefined) this.reactions = data.reactions;
 		if ("nonce" in data && data.nonce !== undefined) this.nonce = data.nonce;
-		if ("webhook_id" in data && data.webhook_id !== undefined) this.webhook_id = data.webhook_id;
+		if ("webhook_id" in data && data.webhook_id !== undefined) this.webhookId = data.webhook_id;
 		if ("activity" in data && data.activity !== undefined) this.activity = data.activity;
 		if ("application" in data && data.application !== undefined) this.application = data.application;
-		if ("application_id" in data && data.application_id !== undefined) this.application_id = data.application_id;
+		if ("application_id" in data && data.application_id !== undefined) this.applicationId = data.application_id;
 		if ("flags" in data && data.flags !== undefined) this.flags = data.flags;
-		if ("message_reference" in data && data.message_reference !== undefined) this.message_reference = data.message_reference;
-		if ("message_snapshots" in data && data.message_snapshots !== undefined) this.message_snapshots = data.message_snapshots;
-		if ("referenced_message" in data && data.referenced_message !== undefined) this.referenced_message = data.referenced_message;
-		if ("interaction_metadata" in data && data.interaction_metadata !== undefined) this.interaction_metadata = data.interaction_metadata;
+		if ("message_reference" in data && data.message_reference !== undefined) this.messageReference = data.message_reference;
+		if ("message_snapshots" in data && data.message_snapshots !== undefined) this.messageSnapshots = data.message_snapshots;
+		if ("referenced_message" in data && data.referenced_message !== undefined) this.referencedMessage = data.referenced_message;
+		if ("interaction_metadata" in data && data.interaction_metadata !== undefined) this.interactionMetadata = data.interaction_metadata;
 		if ("interaction" in data && data.interaction !== undefined) this.interaction = data.interaction;
 		if ("thread" in data && data.thread !== undefined) this.thread = data.thread;
 		if ("components" in data && data.components !== undefined) this.components = data.components;
-		if ("sticker_items" in data && data.sticker_items !== undefined) this.sticker_items = data.sticker_items;
+		if ("sticker_items" in data && data.sticker_items !== undefined) this.stickerItems = data.sticker_items;
 		if ("stickers" in data && data.stickers !== undefined) this.stickers = data.stickers;
 		if ("position" in data && data.position !== undefined) this.position = data.position;
-		if ("role_subscription_data" in data && data.role_subscription_data !== undefined) this.role_subscription_data = data.role_subscription_data;
+		if ("role_subscription_data" in data && data.role_subscription_data !== undefined) this.roleSubscriptionData = data.role_subscription_data;
 		if ("resolved" in data && data.resolved !== undefined) this.resolved = data.resolved;
 		if ("poll" in data && data.poll !== undefined) this.poll = data.poll;
 		if ("call" in data && data.call !== undefined) this.call = data.call;
-		if ("shared_client_theme" in data && data.shared_client_theme !== undefined) this.shared_client_theme = data.shared_client_theme;
+		if ("shared_client_theme" in data && data.shared_client_theme !== undefined) this.sharedClientTheme = data.shared_client_theme;
 
-		if ("guild_id" in data) this.guild_id ??= data.guild_id;
+		if ("guild_id" in data) this.guildId ??= data.guild_id;
 		if ("member" in data) this.member ??= data.member;
 	}
 
@@ -170,7 +170,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * A smart getter that reads the guild from cache on first read and overwrites itself on consecutive reads
 	 */
 	get guild(): Guild | null {
-		const value = this.client.guilds.get(this.guild_id!) ?? null;
+		const value = this.client.guilds.get(this.guildId!) ?? null;
 		Object.defineProperty(this, 'guild', {
 			value: value
 		});
@@ -182,7 +182,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 */
 	// physically impossible for a message to be sent in a category lmao
 	get channel(): MessageableChannel | null {
-		const value = (this.guild?.channels.get(this.channel_id) ?? null) as MessageableChannel | null;
+		const value = (this.guild?.channels.get(this.channelId) ?? null) as MessageableChannel | null;
 		Object.defineProperty(this, 'channel', {
 			value: value
 		});
@@ -204,7 +204,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 			payload.allowed_mentions ??= {};
 			payload.allowed_mentions.replied_user ??= false
 		}
-		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.channel_id}/messages`, payload);
+		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.channelId}/messages`, payload);
 		return new Message(this.client, response);
 	}
 
@@ -212,7 +212,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * Deletes a message. Requires the `MANAGE_MESSAGES` permission and will error otherwise.
 	 */
 	async delete(): Promise<void> {
-		return await this.client.rest.delete(`/channels/${this.channel_id}/messages/${this.id}`);
+		return await this.client.rest.delete(`/channels/${this.channelId}/messages/${this.id}`);
 	}
 
 	/**
@@ -226,7 +226,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	async update(content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>): Promise<Message> {
 		if (this.user.id !== this.client.user!.id) throw new Error("Can only edit messages sent by the bot");
 		const payload = CreateMessagePayload(content);
-		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channel_id}/messages/${this.id}`, payload);
+		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channelId}/messages/${this.id}`, payload);
 		return new Message(this.client, response);
 	}
 
@@ -234,14 +234,14 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * Pins this message in its channel.
 	 */
 	async pin(): Promise<void> {
-		await this.client.rest.put(`/channels/${this.channel_id}/messages/pins/${this.id}`, null);
+		await this.client.rest.put(`/channels/${this.channelId}/messages/pins/${this.id}`, null);
 	}
 
 	/**
 	 * Removes this message from channel pins.
 	 */
 	async unpin(): Promise<void> {
-		await this.client.rest.delete(`/channels/${this.channel_id}/messages/pins/${this.id}`);
+		await this.client.rest.delete(`/channels/${this.channelId}/messages/pins/${this.id}`);
 	}
 
 	/**
@@ -260,6 +260,6 @@ export class Message extends APIClientStructure<DiscordMessage> {
 		} else {
 			encodedEmoji = encodeURI(input.name + ':' + input.id);
 		}
-		await this.client.rest.put(`/channels/${this.channel_id}/messages/${this.id}/reactions/${encodedEmoji}/@me`, null)
+		await this.client.rest.put(`/channels/${this.channelId}/messages/${this.id}/reactions/${encodedEmoji}/@me`, null)
 	}
 }

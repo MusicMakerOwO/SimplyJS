@@ -154,7 +154,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	 * The bot must be in the server to manage commands.
 	 * @note If you want to delete all commands pass an empty array `[]`
 	 */
-	async registerGuildCommands(guildID: string, commands: ApplicationCommand[]): Promise<ApplicationCommand[]> {
-		return await this.rest.put<ApplicationCommand[]>(`/applications/${this.id}/guilds/${guildID}/commands`, commands as unknown as JSONArray);
+	async registerGuildCommands(guildId: string, commands: ApplicationCommand[]): Promise<ApplicationCommand[]> {
+		return await this.rest.put<ApplicationCommand[]>(`/applications/${this.id}/guilds/${guildId}/commands`, commands as unknown as JSONArray);
 	}
 }

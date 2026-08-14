@@ -18,32 +18,39 @@ export class GuildVoiceChannel extends PermissionOverwrites(Moveable(Messageable
 	/** Bitrate (in bits) for the voice channel */
 	declare bitrate?: number
 	/** Maximum number of users allowed in the voice channel at once, `0` for unlimited */
-	declare user_limit?: number
+	declare userLimit?: number
 	/** Voice region id for the channel, or `null` to have Discord auto-select the region */
-	declare rtc_region?: string | null
+	declare rtcRegion?: string | null
 	/** Camera video quality, see {@link DiscordVideoQualityModes} */
-	declare video_quality_mode?: ObjectValues<typeof DiscordVideoQualityModes>
-	declare parent_id?: string | null
+	declare videoQualityMode?: ObjectValues<typeof DiscordVideoQualityModes>
+	declare parentId?: string | null
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
 		if (data.bitrate !== undefined) this.bitrate = data.bitrate;
-		if (data.user_limit !== undefined) this.user_limit = data.user_limit;
-		if (data.rtc_region !== undefined) this.rtc_region = data.rtc_region;
-		if (data.video_quality_mode !== undefined) this.video_quality_mode = data.video_quality_mode;
-		if (data.parent_id !== undefined) this.parent_id = data.parent_id;
+		if (data.user_limit !== undefined) this.userLimit = data.user_limit;
+		if (data.rtc_region !== undefined) this.rtcRegion = data.rtc_region;
+		if (data.video_quality_mode !== undefined) this.videoQualityMode = data.video_quality_mode;
+		if (data.parent_id !== undefined) this.parentId = data.parent_id;
 	}
 
 	async modify(options: {
 		name?: string
 		position?: number
 		bitrate?: number
-		user_limit?: number
-		rtc_region?: string | null
-		video_quality_mode?: ObjectValues<typeof DiscordVideoQualityModes>
-		permission_overwrites?: DiscordOverwrite[]
-		parent_id?: string | null
+		userLimit?: number
+		rtcRegion?: string | null
+		videoQualityMode?: ObjectValues<typeof DiscordVideoQualityModes>
+		permissionOverwrites?: DiscordOverwrite[]
+		parentId?: string | null
 	}): Promise<void> {
-		await super.modify(options);
+		const { userLimit, rtcRegion, videoQualityMode, permissionOverwrites, parentId, ...rest } = options;
+		const payload: Partial<DiscordChannel> = { ...rest };
+		if (userLimit !== undefined) payload.user_limit = userLimit;
+		if (rtcRegion !== undefined) payload.rtc_region = rtcRegion;
+		if (videoQualityMode !== undefined) payload.video_quality_mode = videoQualityMode;
+		if (permissionOverwrites !== undefined) payload.permission_overwrites = permissionOverwrites;
+		if (parentId !== undefined) payload.parent_id = parentId;
+		await super.modify(payload);
 	}
 }

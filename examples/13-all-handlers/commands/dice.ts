@@ -11,7 +11,7 @@ export default {
 		const roll = new ButtonBuilder()
 			.setStyle(ButtonStyles.PRIMARY)
 			.setLabel('🎲 Roll')
-			.setCustomID('dice_roll');
+			.setCustomId('dice_roll');
 
 		await interaction.reply({
 			content: 'Click to roll!',

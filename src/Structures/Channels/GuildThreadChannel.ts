@@ -14,50 +14,55 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 	// set during construction (patch() is invoked from BaseChannel's constructor, further up
 	// the super() chain than this class's own field declarations).
 	/** Id of the user who created the thread */
-	declare owner_id?: string
+	declare ownerId?: string
 	/** Id of the channel the thread was created in */
-	declare parent_id?: string | null
-	declare last_message_id?: string | null
+	declare parentId?: string | null
+	declare lastMessageId?: string | null
 	/** Number of messages in the thread, not counting the initial message or deleted messages */
-	declare message_count?: number
+	declare messageCount?: number
 	/** Approximate number of members in the thread; Discord stops counting past `50`, so this is not exact for larger threads */
-	declare member_count?: number
+	declare memberCount?: number
 	/** Thread-specific state: archive status, auto-archive duration, lock status, and timestamps */
-	declare thread_metadata?: DiscordThreadMetadata
+	declare threadMetadata?: DiscordThreadMetadata
 	/** Thread membership data for the current user, only present when the current user has joined the thread */
 	declare member?: DiscordThreadMember
-	/** Total number of messages ever sent in the thread, including deleted ones; unlike `message_count` this never decreases */
-	declare total_message_sent?: number
+	/** Total number of messages ever sent in the thread, including deleted ones; unlike `messageCount` this never decreases */
+	declare totalMessageSent?: number
 	/** Ids of the forum/media tags applied to this thread */
-	declare applied_tags?: string[]
-	declare rate_limit_per_user?: number
-	// no permission_overwrites - threads inherit from parent
+	declare appliedTags?: string[]
+	declare rateLimitPerUser?: number
+	// no permissionOverwrites - threads inherit from parent
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
-		if (data.owner_id !== undefined) this.owner_id = data.owner_id;
-		if (data.parent_id !== undefined) this.parent_id = data.parent_id;
-		if (data.last_message_id !== undefined) this.last_message_id = data.last_message_id;
-		if (data.message_count !== undefined) this.message_count = data.message_count;
-		if (data.member_count !== undefined) this.member_count = data.member_count;
-		if (data.thread_metadata !== undefined) this.thread_metadata = data.thread_metadata;
+		if (data.owner_id !== undefined) this.ownerId = data.owner_id;
+		if (data.parent_id !== undefined) this.parentId = data.parent_id;
+		if (data.last_message_id !== undefined) this.lastMessageId = data.last_message_id;
+		if (data.message_count !== undefined) this.messageCount = data.message_count;
+		if (data.member_count !== undefined) this.memberCount = data.member_count;
+		if (data.thread_metadata !== undefined) this.threadMetadata = data.thread_metadata;
 		if (data.member !== undefined) this.member = data.member;
-		if (data.total_message_sent !== undefined) this.total_message_sent = data.total_message_sent;
-		if (data.applied_tags !== undefined) this.applied_tags = data.applied_tags;
-		if (data.rate_limit_per_user !== undefined) this.rate_limit_per_user = data.rate_limit_per_user;
+		if (data.total_message_sent !== undefined) this.totalMessageSent = data.total_message_sent;
+		if (data.applied_tags !== undefined) this.appliedTags = data.applied_tags;
+		if (data.rate_limit_per_user !== undefined) this.rateLimitPerUser = data.rate_limit_per_user;
 	}
 
 	// threads have their own modify semantics - no position, no parent, no overwrites
 	async modify(options: {
 		name?: string
 		archived?: boolean
-		auto_archive_duration?: number
+		autoArchiveDuration?: number
 		locked?: boolean
 		invitable?: boolean
-		rate_limit_per_user?: number
+		rateLimitPerUser?: number
 		flags?: number
-		applied_tags?: string[]
+		appliedTags?: string[]
 	}): Promise<void> {
-		await super.modify(options);
+		const { autoArchiveDuration, rateLimitPerUser, appliedTags, ...rest } = options;
+		const payload: Record<string, unknown> = { ...rest };
+		if (autoArchiveDuration !== undefined) payload.auto_archive_duration = autoArchiveDuration;
+		if (rateLimitPerUser !== undefined) payload.rate_limit_per_user = rateLimitPerUser;
+		if (appliedTags !== undefined) payload.applied_tags = appliedTags;
+		await super.modify(payload as Partial<DiscordChannel>);
 	}
 }

@@ -111,7 +111,7 @@ describe("WSClient lifecycle", () => {
 
 	it("handles HELLO by sending identify and scheduling heartbeats", async () => {
 		vi.useFakeTimers();
-		const socket = new WSClient({} as Client, { jitter_override: 1 });
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
 		socket.setToken("token");
 		const heartbeatSpy = vi.fn();
 		socket.on("HEARTBEAT", heartbeatSpy);
@@ -125,7 +125,7 @@ describe("WSClient lifecycle", () => {
 			t: null
 		});
 
-		expect(socket.heartbeat_interval).toBe(100);
+		expect(socket.heartbeatInterval).toBe(100);
 		expect(mockSocket.sent).toHaveLength(1);
 		expect(JSON.parse(mockSocket.sent[0]!) as GatewayPayload).toMatchObject({ op: GatewayOpCodes.Identify });
 
@@ -167,6 +167,6 @@ describe("WSClient lifecycle", () => {
 		mockSocket.close();
 
 		expect(client.socket.ready).toBe(false);
-		expect(client.socket.heartbeat_interval).toBe(-1);
+		expect(client.socket.heartbeatInterval).toBe(-1);
 	});
 });

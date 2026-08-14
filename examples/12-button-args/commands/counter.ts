@@ -14,9 +14,9 @@ export default {
 			// is "0" here.
 			components: [
 				new ActionRowBuilder().addComponents(
-					new ButtonBuilder().setStyle(ButtonStyles.DANGER   ).setLabel('-1'   ).setCustomID('counter:sub:0'  ),
-					new ButtonBuilder().setStyle(ButtonStyles.SECONDARY).setLabel('Reset').setCustomID('counter:reset:0'),
-					new ButtonBuilder().setStyle(ButtonStyles.SUCCESS  ).setLabel('+1'   ).setCustomID('counter:add:0'  )
+					new ButtonBuilder().setStyle(ButtonStyles.DANGER   ).setLabel('-1'   ).setCustomId('counter:sub:0'  ),
+					new ButtonBuilder().setStyle(ButtonStyles.SECONDARY).setLabel('Reset').setCustomId('counter:reset:0'),
+					new ButtonBuilder().setStyle(ButtonStyles.SUCCESS  ).setLabel('+1'   ).setCustomId('counter:add:0'  )
 				)
 			]
 		});

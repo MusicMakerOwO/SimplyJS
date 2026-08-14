@@ -95,21 +95,21 @@ describe("Invite normalization", () => {
 		const invite = new Invite(makeClient(), apiInvite());
 
 		expect(invite.code).toBe("abc123");
-		expect(invite.guild_id).toBe("guild-1");
-		expect(invite.channel_id).toBe("channel-1");
-		expect(invite.role_ids).toEqual([ "role-1" ]);
+		expect(invite.guildId).toBe("guild-1");
+		expect(invite.channelId).toBe("channel-1");
+		expect(invite.roleIds).toEqual([ "role-1" ]);
 		expect(invite.type).toBe(DiscordInviteTypes.GUILD);
-		expect(invite.expires_at).toBe("2024-06-01T00:00:00.000Z");
-		expect(invite.approximate_member_count).toBe(42);
+		expect(invite.expiresAt).toBe("2024-06-01T00:00:00.000Z");
+		expect(invite.approximateMemberCount).toBe(42);
 	});
 
 	it("reads the gateway shape's ids straight through", () => {
 		const invite = new Invite(makeClient(), gatewayInvite());
 
 		expect(invite.code).toBe("abc123");
-		expect(invite.guild_id).toBe("guild-1");
-		expect(invite.channel_id).toBe("channel-1");
-		expect(invite.role_ids).toEqual([ "role-1" ]);
+		expect(invite.guildId).toBe("guild-1");
+		expect(invite.channelId).toBe("channel-1");
+		expect(invite.roleIds).toEqual([ "role-1" ]);
 	});
 
 	it("produces the same identifying fields from both shapes", () => {
@@ -118,9 +118,9 @@ describe("Invite normalization", () => {
 		const fromGateway = new Invite(client, gatewayInvite());
 
 		expect(fromGateway.code).toBe(fromApi.code);
-		expect(fromGateway.guild_id).toBe(fromApi.guild_id);
-		expect(fromGateway.channel_id).toBe(fromApi.channel_id);
-		expect(fromGateway.role_ids).toEqual(fromApi.role_ids);
+		expect(fromGateway.guildId).toBe(fromApi.guildId);
+		expect(fromGateway.channelId).toBe(fromApi.channelId);
+		expect(fromGateway.roleIds).toEqual(fromApi.roleIds);
 		expect(fromGateway.type).toBe(fromApi.type);
 	});
 
@@ -134,30 +134,30 @@ describe("Invite normalization", () => {
 		const withMetadata = new Invite(client, gatewayInvite());
 		const withoutMetadata = new Invite(client, apiInvite());
 
-		expect(withMetadata.has_metadata).toBe(true);
+		expect(withMetadata.hasMetadata).toBe(true);
 		expect(withMetadata.uses).toBe(0);
-		expect(withMetadata.max_uses).toBe(5);
-		expect(withMetadata.max_age).toBe(3600);
+		expect(withMetadata.maxUses).toBe(5);
+		expect(withMetadata.maxAge).toBe(3600);
 		expect(withMetadata.temporary).toBe(false);
-		expect(withMetadata.created_at).toBe("2024-01-01T00:00:00.000Z");
+		expect(withMetadata.createdAt).toBe("2024-01-01T00:00:00.000Z");
 
-		expect(withoutMetadata.has_metadata).toBe(false);
+		expect(withoutMetadata.hasMetadata).toBe(false);
 		expect(withoutMetadata.uses).toBeUndefined();
 	});
 
 	it("normalizes a missing gateway expires_at to null", () => {
 		const data = gatewayInvite();
 		delete data.expires_at;
-		expect(new Invite(makeClient(), data).expires_at).toBeNull();
+		expect(new Invite(makeClient(), data).expiresAt).toBeNull();
 	});
 
 	it("retains the API's partial objects for uncached guilds", () => {
 		const invite = new Invite(makeClient(), apiInvite());
 
 		expect(invite.guild).toBeNull();
-		expect(invite.partial_guild?.name).toBe("Test Guild");
-		expect(invite.partial_channel?.name).toBe("general");
-		expect(invite.partial_roles?.[0].name).toBe("Test Role");
+		expect(invite.partialGuild?.name).toBe("Test Guild");
+		expect(invite.partialChannel?.name).toBe("general");
+		expect(invite.partialRoles?.[0].name).toBe("Test Role");
 	});
 
 	it("upserts the inviter into the user cache", () => {

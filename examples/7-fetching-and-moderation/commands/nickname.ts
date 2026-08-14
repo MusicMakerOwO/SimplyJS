@@ -5,7 +5,7 @@ export default {
 	// "!nickname @user New Name" -> "!nickname @user" clears it
 	name: 'nickname',
 	async execute(client, message, args) {
-		const member = await resolveMember(client, message.guild_id!, args.shift());
+		const member = await resolveMember(client, message.guildId!, args.shift());
 		if (!member) return message.reply("Couldn't find that member");
 
 		try {

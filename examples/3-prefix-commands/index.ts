@@ -22,7 +22,7 @@ client.on(ClientEvents.MessageCreate, async (message) => {
 	if (!message.content.startsWith(PREFIX)) return;
 
 	// ignore messages not sent in a guild
-	if (!message.guild_id) return;
+	if (!message.guildId) return;
 
 	// "!say hello world" -> ["say", "hello", "world"]
 	const args = message.content.slice(PREFIX.length).split(/ +/);

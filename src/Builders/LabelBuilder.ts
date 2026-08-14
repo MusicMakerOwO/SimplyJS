@@ -8,12 +8,23 @@ import { UserSelectBuilder } from "./UserSelectBuilder.js";
 
 /**
  * Anything that can be wrapped by a {@link LabelBuilder}, modal-only - a raw {@link LabelChild}
- * payload or any of the matching builders, which are assignable to it.
- *
- * @deprecated Prefer {@link LabelChild} directly - this alias only exists for the previous
- * builder-only spelling and resolves to the same type.
+ * payload, or any of the matching component builders (which serialize to one via `toJSON()`).
  */
-export type LabelChildBuilder = LabelChild;
+export type LabelChildBuilder =
+	| LabelChild
+	| TextInputBuilder
+	| StringSelectBuilder
+	| UserSelectBuilder
+	| RoleSelectBuilder
+	| MentionableSelectBuilder
+	| ChannelSelectBuilder;
+
+/** Resolves a {@link LabelChildBuilder} (raw payload or builder) down to its raw wire payload */
+function resolveLabelChild(component: LabelChildBuilder): LabelChild {
+	return "toJSON" in component && typeof component.toJSON === "function"
+		? component.toJSON() as LabelChild
+		: component as LabelChild;
+}
 
 /** Runtime checks of the label/description text, shared by both the raw-payload and builder validation paths */
 function validateLabelText(label: { label?: string; description?: string }): void {
@@ -23,13 +34,6 @@ function validateLabelText(label: { label?: string; description?: string }): voi
 	if (label.description && label.description.length > 100) {
 		throw new Error(`Label description must be 100 characters or fewer - Received ${label.description.length} characters`);
 	}
-}
-
-/** Runtime checks for a label - shape plus cascading into the wrapped component's own checks */
-function validateLabelShape(label: { label?: string; description?: string; component?: LabelChild }): void {
-	validateLabelText(label);
-	if (!label.component) throw new Error("Label must have a component");
-	validateLabelChild(label.component);
 }
 
 /** Builds the appropriate builder for a raw {@link Label}'s `component`, based on its type */
@@ -61,7 +65,7 @@ function validateLabelChild(component: LabelChild): void {
  * single interactive component (text input or select menu). The builder *is* a {@link Label}
  * payload, and `component` is typed as a payload too, so a builder or a plain object both work.
  */
-export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
+export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
 	/**
 	 * Creates a builder from an existing label payload, inferring the right builder for `component`
 	 */
@@ -125,6 +129,21 @@ export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
 	 * Validates this builder's current state against Discord's constraints
 	 */
 	validate(): void {
-		validateLabelShape(this);
+		validateLabelText(this);
+		if (!this.component) throw new Error("Label must have a component");
+		validateLabelChild(resolveLabelChild(this.component));
+	}
+
+	/**
+	 * Serializes this builder to the raw {@link Label} payload sent to Discord
+	 */
+	toJSON(): Label {
+		const payload: Label = {
+			type: this.type,
+			label: this.label,
+			component: resolveLabelChild(this.component),
+		};
+		if (this.description !== undefined) payload.description = this.description;
+		return payload;
 	}
 }

@@ -22,9 +22,9 @@ export default {
 			content: `Count: **${next}**`,
 			components: [
 				new ActionRowBuilder().addComponents(
-					new ButtonBuilder().setStyle(ButtonStyles.DANGER).setLabel('-1').setCustomID(`counter:sub:${next}`),
-					new ButtonBuilder().setStyle(ButtonStyles.SECONDARY).setLabel('Reset').setCustomID(`counter:reset:${next}`),
-					new ButtonBuilder().setStyle(ButtonStyles.SUCCESS).setLabel('+1').setCustomID(`counter:add:${next}`)
+					new ButtonBuilder().setStyle(ButtonStyles.DANGER).setLabel('-1').setCustomId(`counter:sub:${next}`),
+					new ButtonBuilder().setStyle(ButtonStyles.SECONDARY).setLabel('Reset').setCustomId(`counter:reset:${next}`),
+					new ButtonBuilder().setStyle(ButtonStyles.SUCCESS).setLabel('+1').setCustomId(`counter:add:${next}`)
 				)
 			]
 		});

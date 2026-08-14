@@ -18,12 +18,12 @@ export type WSEvents = {
 export type WSOptions = {
 	/**
 	 * Manual override for `jitter`, a value between 0 and 1.
-	 * This is used in conjunction with `heartbeat_interval`.
+	 * This is used in conjunction with `heartbeatInterval`.
 	 * A small value will send heartbeats faster but too low may result in rate limits.
 	 *
 	 * @default Math.random()
 	 */
-	jitter_override?: number;
+	jitterOverride?: number;
 	/**
 	 * A bitfield of desiree gateway intents.
 	 * Some may require special access from Discord.
@@ -51,8 +51,8 @@ export class WSClient extends EventEmitter<WSEvents> {
 	#sequence: number | null;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
-	heartbeat_interval: number;
-	/** Randomization factor (0–1) applied to `heartbeat_interval` for the first heartbeat delay */
+	heartbeatInterval: number;
+	/** Randomization factor (0–1) applied to `heartbeatInterval` for the first heartbeat delay */
 	jitter: number;
 	/** Gateway intents bitfield sent on `IDENTIFY`, controlling which events Discord sends */
 	intents: number;
@@ -72,8 +72,8 @@ export class WSClient extends EventEmitter<WSEvents> {
 		this.#socket = null;
 		this.#sequence = null;
 
-		this.heartbeat_interval = -1;
-		this.jitter = options.jitter_override ?? Math.random();
+		this.heartbeatInterval = -1;
+		this.jitter = options.jitterOverride ?? Math.random();
 		this.intents = options.intents ?? 0;
 
 		this.ready = false;
@@ -101,7 +101,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
 		socket.on("close", () => {
 			this.ready = false;
-			this.heartbeat_interval = -1;
+			this.heartbeatInterval = -1;
 		});
 	}
 
@@ -145,7 +145,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 	#handleHello(data: unknown): void {
 		if (!this.#isHelloPayload(data)) return;
 
-		this.heartbeat_interval = data.heartbeat_interval;
+		this.heartbeatInterval = data.heartbeat_interval;
 
 		setInterval(() => {
 			this.send({
@@ -155,7 +155,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 				s: null
 			});
 			this.emit("HEARTBEAT");
-		}, this.heartbeat_interval * this.jitter).unref();
+		}, this.heartbeatInterval * this.jitter).unref();
 
 		this.send({
 			op: GatewayOpCodes.Identify,

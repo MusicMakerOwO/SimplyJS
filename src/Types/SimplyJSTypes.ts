@@ -70,9 +70,9 @@ export type MessageDeletePayload = {
 	/** ID of the deleted message */
 	id: string;
 	/** Channel the message was deleted from */
-	channel_id: string;
+	channelId: string;
 	/** Guild the channel belongs to, or `null` for DM channels */
-	guild_id: string | null;
+	guildId: string | null;
 };
 
 /** Payload for `MessageDeleteBulk`; Discord only sends identifiers, never the deleted messages themselves */
@@ -80,17 +80,17 @@ export type MessageDeleteBulkPayload = {
 	/** IDs of the deleted messages */
 	ids: string[];
 	/** Channel the messages were deleted from */
-	channel_id: string;
+	channelId: string;
 	/** Guild the channel belongs to, or `null` for DM channels */
-	guild_id: string | null;
+	guildId: string | null;
 };
 
 /** Payload for `InviteDelete`; Discord only sends the invite's location and code, never the invite itself */
 export type InviteDeletePayload = {
 	/** Channel the invite pointed to */
-	channel_id: string;
+	channelId: string;
 	/** Guild the invite belonged to, omitted for group DM invites */
-	guild_id?: string;
+	guildId?: string;
 	/** The invite code that was deleted */
 	code: string;
 };
@@ -339,22 +339,22 @@ export type ClientEventMap = {
 		guild: Guild | { id: string } | null,
 		channel: Channel | { id: string },
 		user: User | { id: string },
-		message_id: string,
+		messageId: string,
 		member: Member | null,
 		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>,
-		message_user_id?: string | null
-		super_reaction: boolean
+		messageUserId?: string | null
+		superReaction: boolean
 	}];
 
 	[ClientEvents.ReactionRemove]: [payload: {
 		guild: Guild | { id: string } | null,
 		channel: Channel | { id: string },
 		user: User | { id: string },
-		message_id: string,
+		messageId: string,
 		member: Member | null,
 		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>,
-		message_user_id?: string | null
-		super_reaction: boolean
+		messageUserId?: string | null
+		superReaction: boolean
 	}];
 
 	[ClientEvents.InviteCreate]: [invite: Invite];

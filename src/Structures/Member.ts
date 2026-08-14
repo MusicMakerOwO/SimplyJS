@@ -20,9 +20,9 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	/** Role ids assigned to this member in the guild */
 	roles!: string[]
 	/** ISO timestamp when the member joined the guild */
-	joined_at!: string
+	joinedAt!: string
 	/** ISO timestamp for Nitro boost start, or `null` when not boosting */
-	premium_since?: string | null
+	premiumSince?: string | null
 	/** Voice state server deaf flag */
 	deaf!: boolean
 	/** Voice state server mute flag */
@@ -32,9 +32,9 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	/** Whether the member still has membership screening pending */
 	pending?: boolean
 	/** ISO timestamp when timeout expires, or `null` when not timed out */
-	communication_disabled_until?: string | null
+	communicationDisabledUntil?: string | null
 	/** Avatar decoration metadata for this member profile */
-	avatar_decoration_data?: DiscordAvatarDecoration | null
+	avatarDecorationData?: DiscordAvatarDecoration | null
 	/** Collectible profile metadata such as active nameplate */
 	collectibles?: Record<string, DiscordNameplate> | null
 
@@ -48,7 +48,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		this.mute = data.mute;
 		this.flags = data.flags;
 		this.roles = data.roles;
-		this.joined_at = data.joined_at;
+		this.joinedAt = data.joined_at;
 		this.user = this.client.users.upsert(data.user);
 
 		if ('nick' in data) {
@@ -64,7 +64,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		}
 
 		if ('premium_since' in data) {
-			this.premium_since = data.premium_since;
+			this.premiumSince = data.premium_since;
 		}
 
 		if ('pending' in data) {
@@ -72,11 +72,11 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		}
 
 		if ('communication_disabled_until' in data) {
-			this.communication_disabled_until = data.communication_disabled_until;
+			this.communicationDisabledUntil = data.communication_disabled_until;
 		}
 
 		if ('avatar_decoration_data' in data) {
-			this.avatar_decoration_data = data.avatar_decoration_data;
+			this.avatarDecorationData = data.avatar_decoration_data;
 		}
 
 		if ('collectibles' in data) {
@@ -192,7 +192,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		}
 
 		await this.client.rest.patch(`/guilds/${this.guild.id}/members/${this.user.id}`, {
-			communications_disabled_until: expires
+			communication_disabled_until: expires
 				? expires.toISOString()
 				: new Date().toISOString(),
 		}, reason
@@ -219,7 +219,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	 * `deleteMessageSeconds` defaults to `0`, which keeps existing message history.
 	 * @param options Ban options including delete window and optional audit log reason.
 	 */
-	async ban(options: { delete_message_seconds?: number, reason?: string } = {}): Promise<void> {
+	async ban(options: { deleteMessageSeconds?: number, reason?: string } = {}): Promise<void> {
 		await this.guild.bans.create(this.user.id, options);
 	}
 

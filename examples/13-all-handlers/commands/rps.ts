@@ -9,7 +9,7 @@ export default {
 
 	async execute(client, interaction) {
 		const move = new StringSelectBuilder()
-			.setCustomID('rps_move')
+			.setCustomId('rps_move')
 			.setPlaceholder('Choose your move')
 			.addOption('Rock', 'rock', { emoji: { name: '🪨' } })
 			.addOption('Paper', 'paper', { emoji: { name: '📄' } })

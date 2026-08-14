@@ -1,26 +1,27 @@
 import { ComponentTypes, TextInput, TextInputStyles } from "../Types/Components.js";
+import { omitUndefined } from "./BaseSelectBuilder.js";
 
 /** Runtime checks shared by `TextInputBuilder#validate` and the static `TextInputBuilder.validate` */
 function validateTextInputShape(input: {
-	custom_id?: string;
-	style?: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH;
-	min_length?: number;
-	max_length?: number;
-	value?: string;
+	customId?: string | undefined;
+	style?: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH | undefined;
+	minLength?: number | undefined;
+	maxLength?: number | undefined;
+	value?: string | undefined;
 }): void {
-	if (!input.custom_id || input.custom_id.length === 0) throw new Error("Text input must have a custom_id");
-	if (input.custom_id.length > 100) throw new Error(`Text input custom_id must be 100 characters or fewer - Received ${input.custom_id.length} characters`);
+	if (!input.customId || input.customId.length === 0) throw new Error("Text input must have a customId");
+	if (input.customId.length > 100) throw new Error(`Text input customId must be 100 characters or fewer - Received ${input.customId.length} characters`);
 
 	if (!input.style) throw new Error("Text input must have a style");
 
-	if (input.min_length !== undefined && (input.min_length < 0 || input.min_length > 4000)) {
-		throw new Error("Text input min_length must be between 0 and 4000");
+	if (input.minLength !== undefined && (input.minLength < 0 || input.minLength > 4000)) {
+		throw new Error("Text input minLength must be between 0 and 4000");
 	}
-	if (input.max_length !== undefined && (input.max_length < 1 || input.max_length > 4000)) {
-		throw new Error("Text input max_length must be between 1 and 4000");
+	if (input.maxLength !== undefined && (input.maxLength < 1 || input.maxLength > 4000)) {
+		throw new Error("Text input maxLength must be between 1 and 4000");
 	}
-	if (input.min_length !== undefined && input.max_length !== undefined && input.min_length > input.max_length) {
-		throw new Error("Text input min_length cannot exceed max_length");
+	if (input.minLength !== undefined && input.maxLength !== undefined && input.minLength > input.maxLength) {
+		throw new Error("Text input minLength cannot exceed maxLength");
 	}
 
 	if (input.value && input.value.length > 4000) {
@@ -29,14 +30,14 @@ function validateTextInputShape(input: {
 }
 
 /** Fluent builder for a modal text input, validating limits as they're set. */
-export class TextInputBuilder implements TextInput {
+export class TextInputBuilder {
 	/**
 	 * Creates a builder from an existing text input payload
 	 */
 	static from(value: TextInput): TextInputBuilder {
 		const input = new TextInputBuilder();
 
-		input.setCustomID(value.custom_id);
+		input.setCustomId(value.custom_id);
 		input.setStyle(value.style);
 		if (value.min_length !== undefined) input.setMinLength(value.min_length);
 		if (value.max_length !== undefined) input.setMaxLength(value.max_length);
@@ -51,18 +52,24 @@ export class TextInputBuilder implements TextInput {
 	 * Validates a text input payload against Discord's constraints
 	 */
 	static validate(input: TextInput): void {
-		validateTextInputShape(input);
+		validateTextInputShape({
+			customId: input.custom_id,
+			style: input.style,
+			minLength: input.min_length,
+			maxLength: input.max_length,
+			value: input.value
+		});
 	}
 
 	readonly type = ComponentTypes.TEXT_INPUT;
 	/** Developer-defined identifier, max 100 characters, must be unique per modal - only populated once set, see {@link TextInputBuilder#validate} */
-	custom_id!: string;
+	customId!: string;
 	/** Whether the input is single-line or multi-line - only populated once set, see {@link TextInputBuilder#validate} */
 	style!: typeof TextInputStyles.SHORT | typeof TextInputStyles.PARAGRAPH;
 	/** Minimum input length, 0-4000 */
-	min_length?: number;
+	minLength?: number;
 	/** Maximum input length, 1-4000 */
-	max_length?: number;
+	maxLength?: number;
 	/** Whether the input is required to be filled, defaults to true */
 	required?: boolean;
 	/** Pre-filled value, max 4000 characters */
@@ -71,13 +78,13 @@ export class TextInputBuilder implements TextInput {
 	placeholder?: string;
 
 	/**
-	 * Sets the text input's custom_id
+	 * Sets the text input's customId
 	 */
-	setCustomID(customId: string): this {
+	setCustomId(customId: string): this {
 		if (customId.length === 0 || customId.length > 100) {
-			throw new Error(`Text input custom_id must be between 1 and 100 characters long - Received ${customId.length} characters`);
+			throw new Error(`Text input customId must be between 1 and 100 characters long - Received ${customId.length} characters`);
 		}
-		this.custom_id = customId;
+		this.customId = customId;
 		return this;
 	}
 
@@ -93,8 +100,8 @@ export class TextInputBuilder implements TextInput {
 	 * Sets the minimum input length
 	 */
 	setMinLength(minLength: number): this {
-		if (minLength < 0 || minLength > 4000) throw new Error("Text input min_length must be between 0 and 4000");
-		this.min_length = minLength;
+		if (minLength < 0 || minLength > 4000) throw new Error("Text input minLength must be between 0 and 4000");
+		this.minLength = minLength;
 		return this;
 	}
 
@@ -102,8 +109,8 @@ export class TextInputBuilder implements TextInput {
 	 * Sets the maximum input length
 	 */
 	setMaxLength(maxLength: number): this {
-		if (maxLength < 1 || maxLength > 4000) throw new Error("Text input max_length must be between 1 and 4000");
-		this.max_length = maxLength;
+		if (maxLength < 1 || maxLength > 4000) throw new Error("Text input maxLength must be between 1 and 4000");
+		this.maxLength = maxLength;
 		return this;
 	}
 
@@ -140,5 +147,21 @@ export class TextInputBuilder implements TextInput {
 	 */
 	validate(): void {
 		validateTextInputShape(this);
+	}
+
+	/**
+	 * Serializes this builder into the raw {@link TextInput} payload Discord expects
+	 */
+	toJSON(): TextInput {
+		return omitUndefined<TextInput>({
+			type: this.type,
+			custom_id: this.customId,
+			style: this.style,
+			min_length: this.minLength,
+			max_length: this.maxLength,
+			required: this.required,
+			value: this.value,
+			placeholder: this.placeholder
+		});
 	}
 }

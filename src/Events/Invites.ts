@@ -14,7 +14,12 @@ export const InviteDelete = defineEvent({
 	name: GatewayEvents.InviteDelete,
 	// Discord only sends the code and its location here, never an invite object,
 	// so there is nothing to build an Invite from.
-	handler: (client, data: InviteDeletePayload) => {
-		client.emit(ClientEvents.InviteDelete, data);
+	handler: (client, data: { channel_id: string; guild_id?: string; code: string }) => {
+		const payload: InviteDeletePayload = {
+			channelId: data.channel_id,
+			code: data.code,
+			...(data.guild_id !== undefined ? { guildId: data.guild_id } : {})
+		};
+		client.emit(ClientEvents.InviteDelete, payload);
 	}
 });

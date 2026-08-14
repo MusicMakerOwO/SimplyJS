@@ -275,8 +275,8 @@ describe("Guild action methods", () => {
 		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
 
 		await guild.fetchAuditLogs({
-			user_id: "user-1",
-			action_type: DiscordAuditLogEvent.MEMBER_KICK,
+			userId: "user-1",
+			actionType: DiscordAuditLogEvent.MEMBER_KICK,
 			before: "before-id",
 			after: "after-id",
 			limit: 25,
@@ -300,7 +300,7 @@ describe("Guild action methods", () => {
 	it("fetchAuditLogs() with action_type: 0 still includes it in the query string (falsy-but-valid value)", async () => {
 		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(auditLogData());
 
-		await guild.fetchAuditLogs({ action_type: 0 as ObjectValues<typeof DiscordAuditLogEvent> });
+		await guild.fetchAuditLogs({ actionType: 0 as ObjectValues<typeof DiscordAuditLogEvent> });
 
 		const [route] = spy.mock.calls[0]!;
 		expect(route).toBe(`/guilds/${guild.id}/audit-logs?action_type=0`);
@@ -378,23 +378,23 @@ describe("GuildTextChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
 		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
-		const originalManager = channel.permission_overwrites;
+		const originalManager = channel.permissionOverwrites;
 
 		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
 
-		expect(channel.permission_overwrites).toBe(originalManager);
-		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+		expect(channel.permissionOverwrites).toBe(originalManager);
+		expect(channel.permissionOverwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact API field names in body", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
-		await channel.modify({ name: "new-name", topic: "great topic", nsfw: true, rate_limit_per_user: 5 });
+		await channel.modify({ name: "new-name", topic: "great topic", nsfw: true, rateLimitPerUser: 5 });
 
 		const [route, body] = spy.mock.calls[0]!;
 		expect(route).toContain(`/channels/${channel.id}`);
@@ -503,13 +503,13 @@ describe("GuildAnnouncementChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites, inherited from GuildTextChannel) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("modify() sends PATCH with exact API field names in body (same shape as text channel)", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
-		await channel.modify({ name: "renamed", topic: "news", nsfw: false, rate_limit_per_user: 0 });
+		await channel.modify({ name: "renamed", topic: "news", nsfw: false, rateLimitPerUser: 0 });
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
 			name: "renamed",
@@ -560,17 +560,17 @@ describe("GuildCategoryChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
 		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
-		const originalManager = channel.permission_overwrites;
+		const originalManager = channel.permissionOverwrites;
 
 		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
 
-		expect(channel.permission_overwrites).toBe(originalManager);
-		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+		expect(channel.permissionOverwrites).toBe(originalManager);
+		expect(channel.permissionOverwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with only name/position/permission_overwrites — no parent_id", async () => {
@@ -615,17 +615,17 @@ describe("GuildForumChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
 		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
-		const originalManager = channel.permission_overwrites;
+		const originalManager = channel.permissionOverwrites;
 
 		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
 
-		expect(channel.permission_overwrites).toBe(originalManager);
-		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+		expect(channel.permissionOverwrites).toBe(originalManager);
+		expect(channel.permissionOverwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact forum-specific API field names", async () => {
@@ -633,8 +633,8 @@ describe("GuildForumChannel action methods", () => {
 
 		await channel.modify({
 			name: "renamed-forum",
-			default_reaction_emoji: { emoji_id: null, emoji_name: "🔥" },
-			available_tags: [{ name: "bug" }],
+			defaultReactionEmoji: { emoji_id: null, emoji_name: "🔥" },
+			availableTags: [{ name: "bug" }],
 		});
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
@@ -671,7 +671,7 @@ describe("GuildStageChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites, inherited from GuildVoiceChannel) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("patch() sets topic from the payload (non-null assertion — always present for stage channels)", () => {
@@ -686,14 +686,14 @@ describe("GuildStageChannel action methods", () => {
 
 	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
 		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
-		const originalManager = channel.permission_overwrites;
+		const originalManager = channel.permissionOverwrites;
 
 		channel.patch({
 			id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite], topic: channel.topic,
 		});
 
-		expect(channel.permission_overwrites).toBe(originalManager);
-		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+		expect(channel.permissionOverwrites).toBe(originalManager);
+		expect(channel.permissionOverwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with topic but no video_quality_mode/user_limit", async () => {
@@ -731,23 +731,23 @@ describe("GuildVoiceChannel action methods", () => {
 
 	it("patch() (via Moveable/PermissionOverwrites) sets position and builds a ChannelPermissionManager", () => {
 		expect(channel.position).toBe(0);
-		expect(channel.permission_overwrites).toBeInstanceOf(ChannelPermissionManager);
+		expect(channel.permissionOverwrites).toBeInstanceOf(ChannelPermissionManager);
 	});
 
 	it("re-patching updates the same ChannelPermissionManager instance in place rather than replacing it", () => {
 		const overwrite: DiscordOverwrite = { id: "role-1", type: 0, allow: "0", deny: "0" };
-		const originalManager = channel.permission_overwrites;
+		const originalManager = channel.permissionOverwrites;
 
 		channel.patch({ id: channel.id, type: channel.type, position: 5, permission_overwrites: [overwrite] });
 
-		expect(channel.permission_overwrites).toBe(originalManager);
-		expect(channel.permission_overwrites?.get("role-1")).toEqual(overwrite);
+		expect(channel.permissionOverwrites).toBe(originalManager);
+		expect(channel.permissionOverwrites?.get("role-1")).toEqual(overwrite);
 	});
 
 	it("modify() sends PATCH with exact voice-specific API field names", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
-		await channel.modify({ name: "renamed-voice", bitrate: 96_000, user_limit: 10, rtc_region: "us-west" });
+		await channel.modify({ name: "renamed-voice", bitrate: 96_000, userLimit: 10, rtcRegion: "us-west" });
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
 			name: "renamed-voice",
@@ -781,7 +781,7 @@ describe("GuildThreadChannel action methods", () => {
 	it("modify() sends PATCH with thread-specific API field names — no position/parent_id/permission_overwrites", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
-		await channel.modify({ name: "renamed-thread", archived: true, locked: true, auto_archive_duration: 1440 });
+		await channel.modify({ name: "renamed-thread", archived: true, locked: true, autoArchiveDuration: 1440 });
 
 		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}`, {
 			name: "renamed-thread",
@@ -859,7 +859,7 @@ describe("Role action methods", () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
 		await role.modify({
-			colors: { primary_color: 0x1234ab, secondary_color: null, tertiary_color: null },
+			colors: { primaryColor: 0x1234ab, secondaryColor: null, tertiaryColor: null },
 		});
 
 		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/roles/${role.id}`, {
@@ -943,7 +943,7 @@ describe("Role action methods", () => {
 	it("modify() sends unicode_emoji field when provided", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
-		await role.modify({ unicode_emoji: "🎉" });
+		await role.modify({ unicodeEmoji: "🎉" });
 
 		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/roles/${role.id}`, {
 			unicode_emoji: "🎉",
@@ -1365,7 +1365,7 @@ describe("Member action methods", () => {
 	it("ban() sends exact API body: delete_message_seconds (snake_case)", async () => {
 		const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
-		await member.ban({ delete_message_seconds: 86400, reason: "spam" });
+		await member.ban({ deleteMessageSeconds: 86400, reason: "spam" });
 
 		const [route, body, headers] = spy.mock.calls[0]! as [string, Record<string, unknown>, Record<string, string>];
 		expect(route).toBe(`/guilds/${guild.id}/bans/${member.user.id}`);
@@ -1385,7 +1385,7 @@ describe("Member action methods", () => {
 	it("ban() sends empty headers object when no reason provided", async () => {
 		const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
 
-		await member.ban({ delete_message_seconds: 0 });
+		await member.ban({ deleteMessageSeconds: 0 });
 
 		const [,, headers] = spy.mock.calls[0]!;
 		expect(headers).toEqual({});
@@ -1411,16 +1411,16 @@ describe("Member action methods", () => {
 		expect("nickname" in body).toBe(true);           // field present, value null
 	});
 
-	it("timeoutUntil() sends communications_disabled_until as ISO 8601 string in PATCH body", async () => {
+	it("timeoutUntil() sends communication_disabled_until as ISO 8601 string in PATCH body", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 		const expires = new Date("2026-06-01T12:00:00.000Z");
 
 		await member.timeoutUntil(expires);
 
-		const [, body] = spy.mock.calls[0]! as [string, { communications_disabled_until: string }];
+		const [, body] = spy.mock.calls[0]! as [string, { communication_disabled_until: string }];
 		// Must be ISO string — not a Date object, timestamp number, or other format
-		expect(body.communications_disabled_until).toBe("2026-06-01T12:00:00.000Z");
-		expect(typeof body.communications_disabled_until).toBe("string");
+		expect(body.communication_disabled_until).toBe("2026-06-01T12:00:00.000Z");
+		expect(typeof body.communication_disabled_until).toBe("string");
 	});
 
 	it("timeoutUntil() throws if duration exceeds 28 days", async () => {
@@ -1436,9 +1436,9 @@ describe("Member action methods", () => {
 
 		await member.timeoutUntil(null);
 
-		const [, body] = spy.mock.calls[0]! as [string, { communications_disabled_until: string }];
-		expect(typeof body.communications_disabled_until).toBe("string");
-		expect(() => new Date(body.communications_disabled_until)).not.toThrow();
+		const [, body] = spy.mock.calls[0]! as [string, { communication_disabled_until: string }];
+		expect(typeof body.communication_disabled_until).toBe("string");
+		expect(() => new Date(body.communication_disabled_until)).not.toThrow();
 	});
 
 	it("timeoutUntil() sends X-Audit-Log-Reason in headers — not in body", async () => {
@@ -1907,7 +1907,7 @@ describe("User.send() DM flow", () => {
 		it("create() calls POST /channels/:channelId/invites with exact options", async () => {
 			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData("new-code"));
 
-			await guild.invites.create(channel.id, { max_age: 3600, max_uses: 5 });
+			await guild.invites.create(channel.id, { maxAge: 3600, maxUses: 5 });
 
 			expect(spy).toHaveBeenCalledOnce();
 			expect(spy).toHaveBeenCalledWith(
@@ -1919,14 +1919,14 @@ describe("User.send() DM flow", () => {
 		it("create() returns an Invite instance", async () => {
 			vi.spyOn(client.rest, "post").mockResolvedValue(inviteData("code-1"));
 
-			const result = await guild.invites.create(channel.id, { max_age: 86400 });
+			const result = await guild.invites.create(channel.id, { maxAge: 86400 });
 
 			expect(result).toBeInstanceOf(Invite);
 		});
 
 		it("create() throws when channel does not exist in guild", async () => {
 			await expect(
-				guild.invites.create("unknown-channel", { max_age: 3600 })
+				guild.invites.create("unknown-channel", { maxAge: 3600 })
 			).rejects.toThrow("Unknown channel, does that channel exist in this guild?");
 		});
 
@@ -1934,12 +1934,12 @@ describe("User.send() DM flow", () => {
 			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData());
 
 			await guild.invites.create(channel.id, {
-				max_age: 7200,
-				max_uses: 10,
+				maxAge: 7200,
+				maxUses: 10,
 				temporary: true,
 				unique: true,
-				target_type: 1,
-				target_user_id: "user-123",
+				targetType: 1,
+				targetUserId: "user-123",
 			});
 
 			const [, body] = spy.mock.calls[0]!;
@@ -1956,7 +1956,7 @@ describe("User.send() DM flow", () => {
 		it("create() with only max_age option sends just that field", async () => {
 			const spy = vi.spyOn(client.rest, "post").mockResolvedValue(inviteData());
 
-			await guild.invites.create(channel.id, { max_age: 3600 });
+			await guild.invites.create(channel.id, { maxAge: 3600 });
 
 			const [, body] = spy.mock.calls[0]!;
 			expect(body).toEqual({ max_age: 3600 });
