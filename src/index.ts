@@ -13,6 +13,7 @@ export * from "./Permissions/Resolver.js";
 export * from "./DataStructures/BitField.js";
 
 export * from "./Client.js";
+export * from "./Collector.js";
 export * from "./Constants.js";
 export * from "./EventDispatcher.js";
 export * from "./Intents.js";
