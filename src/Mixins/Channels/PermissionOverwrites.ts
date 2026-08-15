@@ -26,9 +26,9 @@ export function PermissionOverwrites<TBase extends Constructor<BaseChannel>>(
 		patch(data: DiscordChannel): void {
 			super.patch(data);
 			if (!this.permissionOverwrites) {
-				this.permissionOverwrites = new ChannelPermissionManager(this.client, this, data.permission_overwrites!);
-			} else {
-				this.permissionOverwrites.patch(data.permission_overwrites!);
+				this.permissionOverwrites = new ChannelPermissionManager(this.client, this, data.permission_overwrites ?? []);
+			} else if (data.permission_overwrites) {
+				this.permissionOverwrites.patch(data.permission_overwrites);
 			}
 		}
 	} as unknown as Constructor<PermissionOverwritesClass<InstanceType<TBase>>>;

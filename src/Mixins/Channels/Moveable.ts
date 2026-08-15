@@ -24,7 +24,7 @@ export function Moveable<TBase extends Constructor<BaseChannel>>(
 
 		patch(data: DiscordChannel): void {
 			super.patch(data);
-			this.position = data.position!;
+			if (data.position !== undefined) this.position = data.position;
 		}
 	} as unknown as Constructor<PositionClass<InstanceType<TBase>>>;
 }

@@ -15,7 +15,7 @@ export class GuildStageChannel extends GuildVoiceChannel {
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
-		this.topic = data.topic!;
+		if ('topic' in data) this.topic = data.topic ?? null;
 	}
 
 	// narrower than GuildVoiceChannel.modify() - no videoQualityMode or userLimit
