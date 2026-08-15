@@ -36,8 +36,24 @@ export function CreateDispatch(
 		events.set(eventName, eventOverride);
 	}
 
+	const warnedUnhandledEvents = new Set<string>();
+
 	return (client, event, data): void => {
-		if (!events.has(event)) return console.warn(`Unhandled event: "${event}" - No internal handler defined`);
-		void events.get(event)!(client, data);
+		if (!events.has(event)) {
+			if (!warnedUnhandledEvents.has(event)) {
+				warnedUnhandledEvents.add(event);
+				console.warn(`Unhandled event: "${event}" - No internal handler defined`);
+			}
+			return;
+		}
+
+		try {
+			const result = events.get(event)!(client, data);
+			if (result instanceof Promise) {
+				result.catch(error => console.error(`Error in handler for event "${event}":`, error));
+			}
+		} catch (error) {
+			console.error(`Error in handler for event "${event}":`, error);
+		}
 	};
 }
