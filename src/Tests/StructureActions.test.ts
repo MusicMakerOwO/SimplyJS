@@ -1075,7 +1075,7 @@ describe("Role action methods", () => {
 		).rejects.toThrow("API Error");
 	});
 
-	it("highest() returns the role with the lowest position (highest priority)", () => {
+	it("highest() returns the role with the highest position (highest priority)", () => {
 		// Add multiple roles to the cache with different positions
 		const role1 = makeRole(client, guild, "role-1");
 		role1.position = 3;
@@ -1091,12 +1091,12 @@ describe("Role action methods", () => {
 
 		const highest = guild.roles.highest();
 
-		// The role with position 1 should be highest (Discord's role sort rules: lower position = higher priority)
-		expect(highest).toBe(role2);
-		expect(highest.position).toBe(0); // toSorted() normalizes positions to their index
+		// The role with position 3 should be highest (Discord's role sort rules: higher position = higher priority)
+		expect(highest).toBe(role1);
+		expect(highest?.position).toBe(3); // toSorted() no longer mutates cached positions
 	});
 
-	it("lowest() returns the role with the highest position (lowest priority)", () => {
+	it("lowest() returns the role with the lowest position (lowest priority)", () => {
 		// Add multiple roles to the cache with different positions
 		const role1 = makeRole(client, guild, "role-1");
 		role1.position = 3;
@@ -1112,9 +1112,9 @@ describe("Role action methods", () => {
 
 		const lowest = guild.roles.lowest();
 
-		// The role with highest position should be lowest (Discord's role sort rules)
-		expect(lowest).toBe(role1);
-		expect(lowest.position).toBe(2); // toSorted() normalizes positions, so this is index 2
+		// The role with lowest position should be lowest (Discord's role sort rules)
+		expect(lowest).toBe(role2);
+		expect(lowest?.position).toBe(1); // toSorted() no longer mutates cached positions
 	});
 
 	it("highest() handles single role in cache", () => {
@@ -1160,9 +1160,24 @@ describe("Role action methods", () => {
 		const highest = guild.roles.highest();
 		const lowest = guild.roles.lowest();
 
-		// When positions are equal, BigInt ID comparison sorts them (smaller ID first)
-		expect(highest).toBe(role1); // 100n < 999n as BigInt
-		expect(lowest).toBe(role2);
+		// When positions are equal, BigInt ID comparison sorts them (smaller ID first is "lowest")
+		expect(lowest).toBe(role1); // 100n < 999n as BigInt
+		expect(highest).toBe(role2);
+	});
+
+	it("toSorted() does not mutate cached role positions", () => {
+		const role1 = makeRole(client, guild, "role-1");
+		role1.position = 5;
+		guild.roles.set("role-1", role1);
+
+		const role2 = makeRole(client, guild, "role-2");
+		role2.position = 2;
+		guild.roles.set("role-2", role2);
+
+		guild.roles.toSorted();
+
+		expect(role1.position).toBe(5);
+		expect(role2.position).toBe(2);
 	});
 });
 

@@ -22,17 +22,17 @@ export class RoleCache extends GuildCache<string, Role, DiscordRole> {
 	}
 
 	/**
-	 * Gets the highest role based on Discord's role sort rules
+	 * Gets the highest role based on Discord's role sort rules, or `undefined` if the cache is empty
 	 */
-	highest(): Role {
-		return this.toSorted()[0];
+	highest(): Role | undefined {
+		return this.toSorted()[this.size - 1];
 	}
 
 	/**
-	 * Gets the lowest role based on Discord's role sort rules
+	 * Gets the lowest role based on Discord's role sort rules, or `undefined` if the cache is empty
 	 */
-	lowest(): Role {
-		return this.toSorted()[this.size - 1];
+	lowest(): Role | undefined {
+		return this.toSorted()[0];
 	}
 
 	upsert(data: DiscordRole): Role {
@@ -50,16 +50,11 @@ export class RoleCache extends GuildCache<string, Role, DiscordRole> {
 	}
 
 	/**
-	 * Returns roles sorted by position, then id, and normalizes each role position to its sorted index
+	 * Returns roles sorted by position, then id. Does not mutate the cached roles' `position`.
 	 */
 	toSorted(): Role[] {
-		const sorted = Array.from(this.values())
+		return Array.from(this.values())
 		.sort((a, b) => a.position - b.position || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
-		// set each `position` equal to the role's index
-		for (let i = 0; i < sorted.length; i++) {
-			sorted[i].position = i;
-		}
-		return sorted;
 	}
 
 	/**
