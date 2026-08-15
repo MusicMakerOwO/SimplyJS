@@ -6,6 +6,11 @@ import { ClientEvents } from "../Types/SimplyJSTypes.js";
 /**
  * Fires on a guild sticker sync; diffs the incoming sticker list against the cache to derive and
  * emit individual `StickerCreate`/`StickerUpdate`/`StickerDelete` events.
+ *
+ * `GUILD_STICKERS_UPDATE` always carries the guild's *full* sticker list, not a delta. If the
+ * guild's sticker cache was never populated (e.g. a fresh connect where `GUILD_CREATE` carried no
+ * stickers), the first sync will emit `StickerCreate` for every existing sticker rather than
+ * nothing - this is intentional, not a bug.
  */
 export const StickersUpdate = defineEvent({
 	name: GatewayEvents.GuildStickersUpdate,

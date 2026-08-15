@@ -6,6 +6,11 @@ import { ClientEvents } from "../Types/SimplyJSTypes.js";
 /**
  * Fires on a guild emoji sync; diffs the incoming emoji list against the cache to derive and
  * emit individual `EmojiCreate`/`EmojiUpdate`/`EmojiDelete` events.
+ *
+ * `GUILD_EMOJIS_UPDATE` always carries the guild's *full* emoji list, not a delta. If the guild's
+ * emoji cache was never populated (e.g. a fresh connect where `GUILD_CREATE` carried no emojis),
+ * the first sync will emit `EmojiCreate` for every existing emoji rather than nothing - this is
+ * intentional, not a bug.
  */
 export const EmojisUpdate = defineEvent({
 	name: GatewayEvents.GuildEmojisUpdate,
