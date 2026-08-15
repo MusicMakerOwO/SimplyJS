@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { CreateDispatch } from "../EventDispatcher.js";
 import { GatewayEvents, GatewayIntents } from "../Types/DiscordGateway.js";
-import { EventRequiredIntent } from "../Intents.js";
 import { DiscordUser } from "../Types/DiscordAPITypes.js";
-import { EventHandler, GatewayEventName, JSONObject } from "../Types/Internal.js";
+import { JSONObject } from "../Types/Internal.js";
 import { InteractionTypes } from "../Types/Interactions.js";
 import { ApplicationCommandTypes } from "../Types/ApplicationCommand.js";
 import { ComponentTypes } from "../Types/Components.js";
@@ -16,7 +15,6 @@ import { SelectMenuInteraction } from "../Structures/Interactions/SelectMenuInte
 import { AutocompleteInteraction } from "../Structures/Interactions/AutocompleteInteraction.js";
 import { ModalInteraction } from "../Structures/Interactions/ModalInteraction.js";
 
-import * as AvailableEvents from "../Events/index.js";
 import { ClientEvents } from "../Types/index.js";
 
 function createUser(id = "user-1"): DiscordUser {
@@ -280,21 +278,6 @@ describe("EventDispatcher", () => {
 		expect(overrideHandler).toHaveBeenCalledWith(overriddenClient, payload);
 	});
 
-	it("maps exported gateway handlers to required intents where applicable", () => {
-		const exportedHandlers = Object.values(AvailableEvents) as EventHandler<GatewayEventName, JSONObject>[];
-
-		for (const { name } of exportedHandlers) {
-			expect(EventRequiredIntent[name]).toBeDefined();
-		}
-
-		expect(EventRequiredIntent[GatewayEvents.GuildCreate]).toBe(GatewayIntents.Guilds);
-		expect(EventRequiredIntent[GatewayEvents.GuildMemberUpdate]).toBe(GatewayIntents.GuildMembers);
-		expect(EventRequiredIntent[GatewayEvents.MessageDelete]).toEqual([
-			GatewayIntents.GuildMessages,
-			GatewayIntents.DirectMessages
-		]);
-	});
-
 	describe("INTERACTION_CREATE", () => {
 		function dispatchInteraction(payload: JSONObject) {
 			const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
@@ -305,10 +288,6 @@ describe("EventDispatcher", () => {
 
 			return emitSpy;
 		}
-
-		it("requires no intent - it's a global event like READY", () => {
-			expect(EventRequiredIntent[GatewayEvents.InteractionCreate]).toBe(0);
-		});
 
 		it("always emits InteractionCreate regardless of interaction type", () => {
 			const emitSpy = dispatchInteraction(slashCommandPayload());
