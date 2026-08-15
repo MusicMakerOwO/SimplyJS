@@ -8,8 +8,8 @@ export const RoleCreate = defineEvent({
 	handler: (client, data: { guild_id: string, role: DiscordRole }): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const channel = guild.roles.upsert(data.role);
-		client.emit(ClientEvents.RoleCreate, channel);
+		const role = guild.roles.upsert(data.role);
+		client.emit(ClientEvents.RoleCreate, role);
 	}
 });
 
