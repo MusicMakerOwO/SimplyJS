@@ -26,7 +26,7 @@ export const ReactionAdd = defineEvent({
 			? client.guilds.get(data.guild_id) ?? { id: data.guild_id }
 			: null;
 		const user = client.users.get(data.user_id) ?? { id: data.user_id };
-		const channel = guild instanceof Guild ? guild.channels.get(data.guild_id!) ?? { id: data.channel_id } : { id: data.channel_id }
+		const channel = guild instanceof Guild ? guild.channels.get(data.channel_id) ?? { id: data.channel_id } : { id: data.channel_id }
 
 		const member = 'member' in data && guild instanceof Guild
 			? guild.members.upsert(data.member)
