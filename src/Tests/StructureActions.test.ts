@@ -1564,8 +1564,17 @@ describe("Message action methods", () => {
 		await message.react("👍");
 
 		const [route, body] = spy.mock.calls[0]!;
-		expect(route).toBe(`/channels/channel-1/messages/msg-1/reactions/${encodeURI("👍")}/@me`);
+		expect(route).toBe(`/channels/channel-1/messages/msg-1/reactions/${encodeURIComponent("👍")}/@me`);
 		expect(body).toBeNull();
+	});
+
+	it("react() URL-encodes reserved characters like keycap emoji", async () => {
+		const spy = vi.spyOn(client.rest, "put").mockResolvedValue(undefined);
+
+		await message.react("#️⃣");
+
+		const [route] = spy.mock.calls[0]!;
+		expect(route).toBe(`/channels/channel-1/messages/msg-1/reactions/${encodeURIComponent("#️⃣")}/@me`);
 	});
 
 	it("react() with Emoji object encodes as name:id and hits reactions endpoint", async () => {
@@ -1578,7 +1587,7 @@ describe("Message action methods", () => {
 
 		const [route] = spy.mock.calls[0]!;
 		expect(route).toBe(
-			`/channels/channel-1/messages/msg-1/reactions/${encodeURI("test_emoji:emoji-1")}/@me`
+			`/channels/channel-1/messages/msg-1/reactions/${encodeURIComponent("test_emoji")}:emoji-1/@me`
 		);
 	});
 

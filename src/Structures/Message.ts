@@ -256,9 +256,9 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	async react(input: string | Emoji | {id: string, name: string}): Promise<void> {
 		let encodedEmoji: string;
 		if (typeof input === 'string') {
-			encodedEmoji = encodeURI(input);
+			encodedEmoji = encodeURIComponent(input);
 		} else {
-			encodedEmoji = encodeURI(input.name + ':' + input.id);
+			encodedEmoji = `${encodeURIComponent(input.name)}:${input.id}`;
 		}
 		await this.client.rest.put(`/channels/${this.channelId}/messages/${this.id}/reactions/${encodedEmoji}/@me`, null)
 	}
