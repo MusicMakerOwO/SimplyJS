@@ -48,5 +48,8 @@ export function CreateInteraction(client: Client, data: DiscordInteraction): Any
 
 		case InteractionTypes.MODAL_SUBMIT:
 			return new ModalInteraction(client, data);
+
+		default:
+			throw new Error(`Unrecognized interaction type: ${(data as { type: unknown }).type}`);
 	}
 }
