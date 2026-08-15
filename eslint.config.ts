@@ -1,5 +1,5 @@
 import { defineConfig } from "eslint/config";
-import { Plugin } from "@eslint/core";
+import type { Plugin } from "@eslint/core";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import unicorn from "eslint-plugin-unicorn";
