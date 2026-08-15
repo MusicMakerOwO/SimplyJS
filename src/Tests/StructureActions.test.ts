@@ -1962,13 +1962,13 @@ describe("User.send() DM flow", () => {
 			expect(body).toEqual({ max_age: 3600 });
 		});
 
-		it("delete() calls DELETE /guilds/:guildId/invites/:code with empty headers when no reason", async () => {
+		it("delete() calls DELETE /invites/:code with empty headers when no reason", async () => {
 			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
 
 			await guild.invites.delete("test-code");
 
 			expect(spy).toHaveBeenCalledOnce();
-			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/invites/test-code`, {});
+			expect(spy).toHaveBeenCalledWith(`/invites/test-code`, {});
 		});
 
 		it("delete() sends X-Audit-Log-Reason header when reason is provided", async () => {
@@ -1977,18 +1977,18 @@ describe("User.send() DM flow", () => {
 			await guild.invites.delete("spam-code", "spam invite");
 
 			expect(spy).toHaveBeenCalledWith(
-				`/guilds/${guild.id}/invites/spam-code`,
+				`/invites/spam-code`,
 				{ "X-Audit-Log-Reason": "spam invite" }
 			);
 		});
 
-		it("fetch() with code calls GET /guilds/:guildId/invites/:code and returns a single Invite", async () => {
+		it("fetch() with code calls GET /invites/:code and returns a single Invite", async () => {
 			const spy = vi.spyOn(client.rest, "get").mockResolvedValue(inviteData("test-code"));
 
 			const result = await guild.invites.fetch("test-code");
 
 			expect(spy).toHaveBeenCalledOnce();
-			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/invites/test-code`);
+			expect(spy).toHaveBeenCalledWith(`/invites/test-code`);
 			expect(result).toBeInstanceOf(Invite);
 		});
 

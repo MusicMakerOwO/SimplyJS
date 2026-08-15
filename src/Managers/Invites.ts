@@ -66,7 +66,7 @@ export class GuildInviteManager {
 	 * @param reason Optional audit log reason.
 	 */
 	async delete(code: string, reason?: string): Promise<void> {
-		await this.client.rest.delete(`/guilds/${this.guild.id}/invites/${code}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
+		await this.client.rest.delete(`/invites/${code}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
 	}
 
 	/**
@@ -80,7 +80,7 @@ export class GuildInviteManager {
 	async fetch(): Promise<Invite[]>;
 	async fetch(code?: string): Promise<Invite | Invite[]> {
 		if (typeof code === 'string') {
-			const response = await this.client.rest.get<DiscordInvite>(`/guilds/${this.guild.id}/invites/${code}`);
+			const response = await this.client.rest.get<DiscordInvite>(`/invites/${code}`);
 			return new Invite(this.client, response);
 		} else {
 			const response = await this.client.rest.get<DiscordInvite[]>(`/guilds/${this.guild.id}/invites`);
