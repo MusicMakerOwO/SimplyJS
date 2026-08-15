@@ -195,14 +195,12 @@ export class EmbedBuilder implements Embed {
 	setColor(value: number | string): this {
 		if (typeof value === "number") {
 			this.color = value;
-		} else if (typeof value === "string") {
+		} else {
 			// hex color code
 			const hexRegex = /^#[0-9a-fA-F]{6}$/;
 			if (!hexRegex.test(value)) throw new Error("Must be a hex color code (#123456)");
 
 			this.color = parseInt(value.slice(1), 16);
-		} else {
-			throw new Error('Supported color formats are hex numbers (0x123456) and hex codes ("#123456")');
 		}
 		return this;
 	}
