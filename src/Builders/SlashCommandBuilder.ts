@@ -430,6 +430,13 @@ export class SlashCommandBuilder extends OptionsHolder<ApplicationCommandOption>
 	}
 
 	/**
+	 * Validates this builder's current state against Discord's constraints
+	 */
+	validate(): void {
+		SlashCommandBuilder.validate(this.toJSON());
+	}
+
+	/**
 	 * Serializes this builder into the raw {@link ApplicationCommand} payload Discord expects
 	 */
 	toJSON(): ApplicationCommand {
