@@ -1,5 +1,8 @@
 import { EventEmitter } from "node:events";
 import { Awaitable } from "./Types/HelperTypes.js";
+import type { Client } from "./Client.js";
+import type { WSClient, WSEvents } from "./WSClient.js";
+import type { ClientEventMap } from "./Types/SimplyJSTypes.js";
 
 /** Predicate deciding whether an emitted event's arguments should be collected */
 export type CollectorFilter<TArgs extends unknown[]> = (...args: TArgs) => Awaitable<boolean>;
@@ -187,6 +190,28 @@ export class Collector<TArgs extends unknown[] = unknown[]> extends EventEmitter
  * collector.on("end", (collected, reason) => console.log(collected.length, reason));
  * ```
  */
+// The `Client`/`WSClient` overloads exist because TypeScript cannot infer `TMap` from
+// `EventEmitter<TMap>` when the argument is a *subclass* of `EventEmitter` - node types it as
+// `EventEmitter<T extends EventMap<T>>`, an F-bounded constraint where `T` never appears in an
+// inferable position, so inference silently falls back to the constraint and every collected
+// argument comes out as `unknown`. Naming the two emitters the library actually ships restores
+// full inference for them; the generic signature below still covers any other typed emitter,
+// where the argument's type *is* the `EventEmitter<...>` reference and inference works.
+export function createCollector<TEvent extends keyof ClientEventMap & string>(
+	emitter: Client,
+	event: TEvent,
+	options?: CollectorOptions<ClientEventMap[TEvent]>
+): Collector<ClientEventMap[TEvent]>;
+export function createCollector<TEvent extends keyof WSEvents & string>(
+	emitter: WSClient,
+	event: TEvent,
+	options?: CollectorOptions<WSEvents[TEvent]>
+): Collector<WSEvents[TEvent]>;
+export function createCollector<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
+	emitter: EventEmitter<TMap>,
+	event: TEvent,
+	options?: CollectorOptions<TMap[TEvent]>
+): Collector<TMap[TEvent]>;
 export function createCollector<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
 	emitter: EventEmitter<TMap>,
 	event: TEvent,
@@ -208,12 +233,28 @@ export function createCollector<TMap extends Record<string, unknown[]>, TEvent e
  * });
  * ```
  */
+// Same overload set as `createCollector`, and for the same inference reason - see the comment there.
+export function awaitEvent<TEvent extends keyof ClientEventMap & string>(
+	emitter: Client,
+	event: TEvent,
+	options?: Omit<CollectorOptions<ClientEventMap[TEvent]>, "max">
+): Promise<ClientEventMap[TEvent]>;
+export function awaitEvent<TEvent extends keyof WSEvents & string>(
+	emitter: WSClient,
+	event: TEvent,
+	options?: Omit<CollectorOptions<WSEvents[TEvent]>, "max">
+): Promise<WSEvents[TEvent]>;
+export function awaitEvent<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
+	emitter: EventEmitter<TMap>,
+	event: TEvent,
+	options?: Omit<CollectorOptions<TMap[TEvent]>, "max">
+): Promise<TMap[TEvent]>;
 export async function awaitEvent<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
 	emitter: EventEmitter<TMap>,
 	event: TEvent,
 	options: Omit<CollectorOptions<TMap[TEvent]>, "max"> = {}
 ): Promise<TMap[TEvent]> {
-	const collector = createCollector(emitter, event, { ...options, max: 1 });
+	const collector = createCollector<TMap, TEvent>(emitter, event, { ...options, max: 1 });
 	try {
 		return await collector.next;
 	} finally {
