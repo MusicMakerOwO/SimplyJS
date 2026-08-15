@@ -180,7 +180,7 @@ export const ClientEvents = {
 	 * Fired when a guild sticker sync contains changed stickers.
 	 * Listener arguments: `guild` ({@link Guild}), `oldSticker` ({@link Sticker} | `undefined`), `newSticker` ({@link Sticker}).
 	 */
-	StickerUpdate: "StickersUpdate",
+	StickerUpdate: "StickerUpdate",
 	/**
 	 * Fired when a guild sticker sync removes stickers.
 	 * Listener arguments: `guild` ({@link Guild}), `sticker` ({@link Sticker} | {@link DiscordSticker}).
