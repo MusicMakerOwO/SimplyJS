@@ -96,6 +96,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** Logs the bot out and clears cache. Promise resolves after WebSocket fully closes */
 	async destroy(): Promise<void> {
 		this.guilds.clear();
+		this.users.clear();
 		this.socket.destroy();
 		while(true) {
 			if (!this.socket.ready) return;
