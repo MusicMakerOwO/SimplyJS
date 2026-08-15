@@ -10,12 +10,30 @@ const MAX_BUTTONS = 5;
 
 /**
  * Anything that can be nested inside an {@link ActionRowBuilder} - a raw {@link ActionRowChild}
- * payload or any of the matching builders, which are assignable to it.
+ * payload, or any builder that serializes to one through `toJSON()`.
  *
- * @deprecated Prefer {@link ActionRowChild} directly - this alias only exists for the previous
- * builder-only spelling and resolves to the same type.
+ * Matched structurally rather than by listing the builders, so this file doesn't have to import
+ * every component builder (and so third-party builders work too).
+ */
+export type ActionRowChildResolvable<T extends ActionRowChild = ActionRowChild> = T | { toJSON(): T };
+
+/**
+ * Anything that can be nested inside an {@link ActionRowBuilder} - a raw {@link ActionRowChild}
+ * payload or any of the matching builders.
+ *
+ * @deprecated Prefer {@link ActionRowChildResolvable} - this alias only exists for the previous
+ * builder-only spelling.
  */
 export type ActionRowComponent = ActionRowChild;
+
+/**
+ * Normalizes a child into its raw payload. Builders carry camelCase fields (`customId`) while the
+ * wire format is snake_case (`custom_id`), so a builder has to be serialized before it's stored -
+ * otherwise the validators, which read the wire format, see a component missing every field.
+ */
+function resolveActionRowChild<T extends ActionRowChild>(component: ActionRowChildResolvable<T>): T {
+	return "toJSON" in component && typeof component.toJSON === "function" ? component.toJSON() : component as T;
+}
 
 /** Dispatches a child to the right static `validate`, which works for builders and raw payloads alike */
 function validateActionRowChild(component: ActionRowChild): void {
@@ -57,8 +75,8 @@ function validateActionRowShape(components: ActionRowChild[]): void {
 
 /**
  * Fluent builder for an action row - a container holding up to 5 buttons, or a single select
- * menu. The builder *is* an {@link ActionRow} payload, and its children are typed as payloads
- * too, so builders and plain objects can be mixed freely:
+ * menu. The builder *is* an {@link ActionRow} payload, and child builders are serialized to their
+ * payloads as they're added, so builders and plain objects can be mixed freely:
  *
  * ```ts
  * new ActionRowBuilder().addComponents(
@@ -74,7 +92,7 @@ export class ActionRowBuilder<T extends ActionRowChild = ActionRowChild> impleme
 	/**
 	 * Creates a builder from an existing list of components
 	 */
-	static from<T extends ActionRowChild = ActionRowChild>(components: T[]): ActionRowBuilder<T> {
+	static from<T extends ActionRowChild = ActionRowChild>(components: ActionRowChildResolvable<T>[]): ActionRowBuilder<T> {
 		return new ActionRowBuilder<T>().setComponents(components);
 	}
 
@@ -92,16 +110,16 @@ export class ActionRowBuilder<T extends ActionRowChild = ActionRowChild> impleme
 	/**
 	 * Appends components to the row
 	 */
-	addComponents(...components: T[]): this {
-		this.components.push(...components);
+	addComponents(...components: ActionRowChildResolvable<T>[]): this {
+		this.components.push(...components.map(resolveActionRowChild));
 		return this;
 	}
 
 	/**
 	 * Replaces the row's component list
 	 */
-	setComponents(components: T[]): this {
-		this.components = components;
+	setComponents(components: ActionRowChildResolvable<T>[]): this {
+		this.components = components.map(resolveActionRowChild);
 		return this;
 	}
 

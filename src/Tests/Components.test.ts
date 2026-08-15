@@ -915,6 +915,21 @@ describe("ActionRowBuilder", () => {
 		expect(builder.components).toEqual([first.toJSON(), second.toJSON()]);
 	});
 
+	it("accepts child builders and stores their serialized payloads", () => {
+		const button = makeButton("from-builder");
+		const builder = new ActionRowBuilder<Button>().addComponents(button);
+
+		expect(builder.components).toEqual([button.toJSON()]);
+		expect(() => builder.validate()).not.toThrow();
+	});
+
+	it("accepts child builders in setComponents and static from", () => {
+		const button = makeButton("from-builder");
+
+		expect(new ActionRowBuilder<Button>().setComponents([button]).components).toEqual([button.toJSON()]);
+		expect(ActionRowBuilder.from([button]).components).toEqual([button.toJSON()]);
+	});
+
 	it("replaces the component list via setComponents", () => {
 		const button = makeButton();
 		const builder = new ActionRowBuilder<Button>().addComponents(makeButton("stale").toJSON()).setComponents([button.toJSON()]);
