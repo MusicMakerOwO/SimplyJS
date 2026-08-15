@@ -181,14 +181,15 @@ describe("ResolvePermissions", () => {
 		expect(resolved.has("SEND_MESSAGES")).toBe(true);
 	});
 
-	it("throws when the member references a role missing from guild cache", () => {
+	it("skips roles missing from guild cache instead of throwing", () => {
 		const client = makeClient();
 		const guild = makeGuild(client, {
-			roles: [makeRole("guild-1", 0n)],
+			roles: [makeRole("guild-1", DiscordPermissions.SEND_MESSAGES)],
 		});
 		const member = makeMember(client, guild, "user-1", ["ghost-role"]);
 
-		expect(() => ResolvePermissions(guild, member)).toThrow("Role does not exist in cache");
+		const resolved = ResolvePermissions(guild, member);
+		expect(resolved.has("SEND_MESSAGES")).toBe(true);
 	});
 
 	it("ignores channels that carry no permission overwrite manager", () => {

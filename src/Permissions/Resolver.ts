@@ -57,12 +57,12 @@ export function ResolvePermissions(guild: Guild, member: Member, channel?: Chann
 
 	let permissions = 0n;
 
-	const everyoneRole = guild.roles.get(guild.id)!;
-	permissions |= everyoneRole.permissions.value;
+	const everyoneRole = guild.roles.get(guild.id);
+	if (everyoneRole) permissions |= everyoneRole.permissions.value;
 
 	for (const roleId of member.roles) {
 		const role = guild.roles.get(roleId);
-		if (!role) throw new Error("Role does not exist in cache");
+		if (!role) continue; // cache gap - role hasn't streamed in yet, treat as granting nothing
 
 		permissions |= role.permissions.value;
 		if (permissions & DiscordPermissions.ADMINISTRATOR) {
