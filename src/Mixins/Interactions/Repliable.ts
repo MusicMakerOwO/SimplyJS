@@ -46,7 +46,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 			}
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-				data: resolveReplyPayload(content),
+				data: payload,
 			});
 		}
 
