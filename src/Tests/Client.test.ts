@@ -29,6 +29,7 @@ describe("Client methods", () => {
 
     it("setStatus() updates status and sends a presence payload with no activities when activity is null", () => {
         const sendSpy = vi.spyOn(client.socket, "send").mockImplementation(() => {});
+        client.socket.ready = true;
 
         client.setStatus(Status.IDLE);
 
@@ -44,6 +45,7 @@ describe("Client methods", () => {
 
     it("setStatusMessage() creates a non-CUSTOM activity and sends it in presence payload", () => {
         const sendSpy = vi.spyOn(client.socket, "send").mockImplementation(() => {});
+        client.socket.ready = true;
 
         client.setStatusMessage(ActivityType.PLAYING, "Cool Game");
 
@@ -62,6 +64,7 @@ describe("Client methods", () => {
 
     it("setStatusMessage() creates a CUSTOM activity with provided state", () => {
         const sendSpy = vi.spyOn(client.socket, "send").mockImplementation(() => {});
+        client.socket.ready = true;
 
         client.setStatusMessage(ActivityType.CUSTOM, "custom-state");
 

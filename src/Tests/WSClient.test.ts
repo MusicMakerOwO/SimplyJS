@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { WSClient } from "../WSClient.js";
 import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
-import { DiscordUser } from "../Types/DiscordAPITypes.js";
+import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 
 type MessageHandler = (data: { toString(): string }) => void;
 type CloseHandler = () => void;
@@ -153,6 +153,37 @@ describe("WSClient lifecycle", () => {
 
 		expect(client.socket.ready).toBe(true);
 		expect(client.user?.id).toBe(user.id);
+	});
+
+	it("does not send presence updates from setStatus()/setStatusMessage() until login() completes", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds
+		});
+
+		const loginPromise = client.login();
+		const mockSocket = wsMockState.instances[0]!;
+
+		client.setStatus(Status.IDLE);
+		client.setStatusMessage(ActivityType.PLAYING, "Cool Game");
+
+		expect(mockSocket.sent.some((raw) => (JSON.parse(raw) as GatewayPayload).op === GatewayOpCodes.PresenceUpdate)).toBe(false);
+
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+		await loginPromise;
+
+		client.setStatus(Status.DND);
+
+		const presencePayloads = mockSocket.sent
+			.map((raw) => JSON.parse(raw) as GatewayPayload)
+			.filter((payload) => payload.op === GatewayOpCodes.PresenceUpdate);
+		expect(presencePayloads.length).toBeGreaterThan(0);
+		expect((presencePayloads.at(-1)!.d as Record<string, unknown>).status).toBe(Status.DND);
 	});
 
 	it("resets ready state when socket closes", () => {

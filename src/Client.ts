@@ -91,6 +91,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 			if (this.socket.ready) return;
 			await new Promise(r => setTimeout(r, 1).unref() );
 		}
+		if (this.status || this.activity) return this.#updatePresence();
 	}
 
 	/** Logs the bot out and clears cache. Promise resolves after WebSocket fully closes */
@@ -107,7 +108,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** Sets the client's status: online, offline, idle, or dnd */
 	setStatus(status: ObjectValues<typeof Status>): void {
 		this.status = status;
-		this.#updatePresence();
+		if (this.socket.ready) this.#updatePresence();
 	}
 
 	/** Sets a status message to be displayed. Activities can also be done through this */
@@ -125,7 +126,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 				type: type
 			}
 		}
-		this.#updatePresence();
+		if (this.socket.ready) this.#updatePresence();
 	}
 
 	/** Sends the current `status`/`activity` to Discord via a gateway `Presence Update` payload */

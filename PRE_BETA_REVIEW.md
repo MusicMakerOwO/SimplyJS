@@ -107,7 +107,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   before stringifying gets the camelCase object. The `as unknown as` casts are what hide this
   from `tsc`. Make the `toJSON()` calls explicit before compat tests pin the behavior.
 
-- [ ] **LOW-MED — Presence set before login throws the wrong error.** `src/Client.ts:107-142`
+- [x] **LOW-MED — Presence set before login throws the wrong error.** `src/Client.ts:107-142`
   `#updatePressence` → `socket.send` → `#checkInitialization` → `"Rest client not initialized"`.
   The natural call order (construct → `setStatus` → `login`) hits this. And `Client.status`/
   `activity` are never included in the IDENTIFY payload (`src/WSClient.ts:234-247`), so state set
