@@ -27,7 +27,7 @@ export abstract class GlobalCache<K, V, API> extends Map<K, V> {
  * Cache structure that lives on a Guild.
  * This helps to maintain ownership and ties the object lifetime to the parent guild.
  */
-export abstract class GuildCache<K, V, API> extends Map<K, V> {
+export abstract class GuildScopedCache<K, V, API> extends Map<K, V> {
 	protected constructor(protected readonly client: Client, protected readonly guild: Guild) {
 		super();
 	}

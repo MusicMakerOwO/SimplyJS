@@ -1,11 +1,11 @@
 import { Member } from "../Structures/Member.js";
-import { GuildCache } from "../Contracts/CacheStructure.js";
+import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordMember } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 
 /** Cache of a single guild's {@link Member}s, keyed by user id. */
-export class MemberCache extends GuildCache<string, Member, DiscordMember> {
+export class MemberCache extends GuildScopedCache<string, Member, DiscordMember> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);
 	}

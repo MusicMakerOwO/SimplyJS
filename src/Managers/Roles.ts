@@ -1,5 +1,5 @@
 import { Role } from "../Structures/Role.js";
-import { GuildCache } from "../Contracts/CacheStructure.js";
+import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordRole } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
@@ -9,7 +9,7 @@ import { JSONObject } from "../Types/index.js";
 import { SerializeBitFieldValue } from "../Utils.js";
 
 /** Cache of a single guild's {@link Role}s. */
-export class RoleCache extends GuildCache<string, Role, DiscordRole> {
+export class RoleCache extends GuildScopedCache<string, Role, DiscordRole> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);
 	}

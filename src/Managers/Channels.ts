@@ -1,4 +1,4 @@
-import { GuildCache } from "../Contracts/CacheStructure.js";
+import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import {
 	DiscordChannel,
@@ -16,7 +16,7 @@ import { Channel, JSONObject } from "../Types/index.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
 
 /** Cache of a single guild's {@link Channel}s, including threads. */
-export class ChannelCache extends GuildCache<string, Channel, DiscordChannel> {
+export class ChannelCache extends GuildScopedCache<string, Channel, DiscordChannel> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);
 	}
