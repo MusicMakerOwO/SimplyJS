@@ -194,7 +194,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		await this.client.rest.patch(`/guilds/${this.guild.id}/members/${this.user.id}`, {
 			communication_disabled_until: expires
 				? expires.toISOString()
-				: new Date().toISOString(),
+				: null,
 		}, reason
 			? { "X-Audit-Log-Reason": reason }
 			: {}

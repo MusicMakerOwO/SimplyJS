@@ -1431,14 +1431,13 @@ describe("Member action methods", () => {
 		);
 	});
 
-	it("timeoutUntil() sends an ISO string for null (clear) — not null in the field", async () => {
+	it("timeoutUntil() sends null in the field to clear — matching the documented API contract", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
 		await member.timeoutUntil(null);
 
-		const [, body] = spy.mock.calls[0]! as [string, { communication_disabled_until: string }];
-		expect(typeof body.communication_disabled_until).toBe("string");
-		expect(() => new Date(body.communication_disabled_until)).not.toThrow();
+		const [, body] = spy.mock.calls[0]! as [string, { communication_disabled_until: null }];
+		expect(body.communication_disabled_until).toBeNull();
 	});
 
 	it("timeoutUntil() sends X-Audit-Log-Reason in headers — not in body", async () => {
