@@ -49,6 +49,10 @@ export class WSClient extends EventEmitter<WSEvents> {
 	#token: string | null = null;
 	#socket: WebSocket | null;
 	#sequence: number | null;
+	#heartbeatTimer: NodeJS.Timeout | null = null;
+	#heartbeatAcked: boolean = true;
+	#sessionId: string | null = null;
+	#resumeGatewayUrl: string | null = null;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -95,14 +99,34 @@ export class WSClient extends EventEmitter<WSEvents> {
 		if (this.#token === null) throw new Error("No token provided - Did you add one via setToken()?");
 		if (this.#socket) return; // already connected / connecting
 
-		const socket = new WebSocket("wss://gateway.discord.gg");
+		const socket = new WebSocket(this.#resumeGatewayUrl ?? "wss://gateway.discord.gg");
 		this.#socket = socket;
 
 		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
 		socket.on("close", () => {
 			this.ready = false;
 			this.heartbeatInterval = -1;
+			this.#socket = null;
+			if (this.#heartbeatTimer) {
+				clearInterval(this.#heartbeatTimer);
+				this.#heartbeatTimer = null;
+			}
 		});
+	}
+
+	/** Closes the current socket and opens a new one, resuming the session if one is available */
+	#reconnect(): void {
+		if (this.#socket) {
+			this.#socket.removeAllListeners();
+			this.#socket.close();
+			this.#socket = null;
+		}
+		if (this.#heartbeatTimer) {
+			clearInterval(this.#heartbeatTimer);
+			this.#heartbeatTimer = null;
+		}
+		this.ready = false;
+		this.initialize();
 	}
 
 	/** Send a message to discord via gateway */
@@ -120,19 +144,43 @@ export class WSClient extends EventEmitter<WSEvents> {
 		this.emit("RAW", data);
 
 		if (typeof data.s === "number") this.#sequence = data.s;
-		if (data.op === GatewayOpCodes.Hello) return this.#handleHello(data.d);
+
+		switch (data.op) {
+			case GatewayOpCodes.Hello:
+				return this.#handleHello(data.d);
+			case GatewayOpCodes.Heartbeat:
+				// gateway is asking for an out-of-cycle heartbeat
+				this.#sendHeartbeat();
+				return;
+			case GatewayOpCodes.HeartbeatACK:
+				this.#heartbeatAcked = true;
+				this.emit("HEARTBEAT_ACK");
+				return;
+			case GatewayOpCodes.Reconnect:
+				this.#reconnect();
+				return;
+			case GatewayOpCodes.InvalidSession:
+				// d indicates whether the session is resumable; if not, drop it and re-identify
+				if (data.d !== true) {
+					this.#sessionId = null;
+					this.#resumeGatewayUrl = null;
+				}
+				this.#reconnect();
+				return;
+		}
 
 		if (!data.t) {
-			// not sure if I need to do anything here lol
 			return;
 		}
 		if (!data.d || typeof data.d !== "object") {
-			// not sure if I need to do anything here lol
 			return;
 		}
 
 		if (data.t === "READY") {
 			this.ready = true;
+			const readyData = data.d as JSONObject;
+			if (typeof readyData.session_id === "string") this.#sessionId = readyData.session_id;
+			if (typeof readyData.resume_gateway_url === "string") this.#resumeGatewayUrl = readyData.resume_gateway_url;
 		}
 
 		this.dispatch(this.client, data.t, data.d as JSONObject);
@@ -146,16 +194,30 @@ export class WSClient extends EventEmitter<WSEvents> {
 		if (!this.#isHelloPayload(data)) return;
 
 		this.heartbeatInterval = data.heartbeat_interval;
+		this.#heartbeatAcked = true;
 
-		setInterval(() => {
+		this.#heartbeatTimer = setInterval(() => {
+			if (!this.#heartbeatAcked) {
+				// gateway never acked the last heartbeat - connection is dead, reconnect
+				this.#reconnect();
+				return;
+			}
+			this.#sendHeartbeat();
+		}, this.heartbeatInterval * this.jitter).unref();
+
+		if (this.#sessionId) {
 			this.send({
-				op: GatewayOpCodes.Heartbeat,
-				d: this.#sequence,
+				op: GatewayOpCodes.Resume,
+				d: {
+					token: this.#token,
+					session_id: this.#sessionId,
+					seq: this.#sequence
+				},
 				t: null,
 				s: null
 			});
-			this.emit("HEARTBEAT");
-		}, this.heartbeatInterval * this.jitter).unref();
+			return;
+		}
 
 		this.send({
 			op: GatewayOpCodes.Identify,
@@ -173,6 +235,18 @@ export class WSClient extends EventEmitter<WSEvents> {
 		});
 	}
 
+	/** Sends a heartbeat payload and marks the current one as unacknowledged until `HeartbeatACK` arrives */
+	#sendHeartbeat(): void {
+		this.#heartbeatAcked = false;
+		this.send({
+			op: GatewayOpCodes.Heartbeat,
+			d: this.#sequence,
+			t: null,
+			s: null
+		});
+		this.emit("HEARTBEAT");
+	}
+
 	/** Type guard confirming a `HELLO` payload carries a numeric `heartbeat_interval` */
 	#isHelloPayload(data: unknown): data is { heartbeat_interval: number } {
 		if (typeof data !== "object" || data === null) return false;
@@ -188,6 +262,12 @@ export class WSClient extends EventEmitter<WSEvents> {
 
 	/** Kills the websocket connection and logs out */
 	destroy(): void {
+		if (this.#heartbeatTimer) {
+			clearInterval(this.#heartbeatTimer);
+			this.#heartbeatTimer = null;
+		}
+		this.#sessionId = null;
+		this.#resumeGatewayUrl = null;
 		if (this.#socket) this.#socket.close()
 	}
 }
