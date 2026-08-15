@@ -45,7 +45,7 @@ export class ButtonBuilder {
 	static from(value: InteractiveButton): ButtonBuilder {
 		const button = new ButtonBuilder(value.style);
 
-		button.setLabel(value.label);
+		if (value.label) button.setLabel(value.label);
 		button.setCustomId(value.custom_id);
 		if (value.emoji) button.setEmoji(value.emoji);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);

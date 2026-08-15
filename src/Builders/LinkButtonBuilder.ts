@@ -28,7 +28,7 @@ export class LinkButtonBuilder implements LinkButton {
 	static from(value: LinkButton): LinkButtonBuilder {
 		const button = new LinkButtonBuilder();
 
-		button.setLabel(value.label);
+		if (value.label) button.setLabel(value.label);
 		button.setURL(value.url);
 		if (value.emoji) button.setEmoji(value.emoji);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);
