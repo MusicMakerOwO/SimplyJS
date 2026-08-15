@@ -2125,20 +2125,28 @@ describe("User.send() DM flow", () => {
 			expect(url).toBe(user.defaultAvatarURL());
 		});
 
-		it("returns webp with animated=true when animated is true", () => {
+		it("returns gif when animated is true and avatar hash is animated", () => {
 			const user = makeUser(client, "111111111");
 			user.avatar = "a_1234567890abcdef";
 
 			const url = user.avatarURL(true);
-			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.webp?size=1024&animated=true`);
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.gif?size=1024`);
 		});
 
-		it("returns webp with animated=true when animated is undefined (default)", () => {
+		it("returns gif when animated is undefined (default) and avatar hash is animated", () => {
 			const user = makeUser(client, "111111111");
 			user.avatar = "a_1234567890abcdef";
 
 			const url = user.avatarURL();
-			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.webp?size=1024&animated=true`);
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111111/a_1234567890abcdef.gif?size=1024`);
+		});
+
+		it("returns png when animated is requested but avatar hash isn't animated", () => {
+			const user = makeUser(client, "111111112");
+			user.avatar = "1234567890abcdef";
+
+			const url = user.avatarURL(true);
+			expect(url).toBe(`https://cdn.discordapp.com/avatars/111111112/1234567890abcdef.png?size=1024`);
 		});
 
 		it("returns png when animated is false", () => {
@@ -2175,15 +2183,13 @@ describe("User.send() DM flow", () => {
 
 		it("returns different formats based on animated parameter", () => {
 			const user = makeUser(client, "666666666");
-			user.avatar = "1234567890abcdef";
+			user.avatar = "a_1234567890abcdef";
 
-			const webpUrl = user.avatarURL(true);
+			const gifUrl = user.avatarURL(true);
 			const pngUrl = user.avatarURL(false);
 
-			expect(webpUrl).toContain(".webp");
-			expect(webpUrl).toContain("animated=true");
+			expect(gifUrl).toContain(".gif");
 			expect(pngUrl).toContain(".png");
-			expect(pngUrl).not.toContain("animated=");
 		});
 	});
 });

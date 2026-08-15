@@ -148,14 +148,15 @@ export class User extends APIClientStructure<DiscordUser> {
 	/**
 	 * Builds the URL for this user's custom avatar, or falls back to
 	 * {@link User.defaultAvatarURL} when none is set.
-	 * @param animated Whether to request the animated `.webp` variant instead of `.png`.
+	 * @param animated Whether to request the animated `.gif` variant when the avatar supports it.
 	 * @default true
 	 * @returns The avatar image URL.
 	 */
 	avatarURL(animated?: boolean): string {
 		if (!this.avatar) return this.defaultAvatarURL();
-		return (animated ?? true) // nullish collation, only overrides `undefined`
-			? `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.webp?size=1024&animated=true`
+		const isAnimated = (animated ?? true) && this.avatar.startsWith("a_"); // nullish collation, only overrides `undefined`
+		return isAnimated
+			? `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.gif?size=1024`
 			: `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.png?size=1024`
 	}
 
