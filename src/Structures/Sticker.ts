@@ -85,7 +85,8 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 		 */
 		tags?: string | string[]
 	}): Promise<void> {
-		if (Array.isArray(options.tags)) options.tags = options.tags.join(',');
-		await this.client.rest.patch(`/guilds/${this.guild.id}/stickers/${this.id}`, options)
+		const payload: typeof options = { ...options };
+		if (Array.isArray(payload.tags)) payload.tags = payload.tags.join(',');
+		await this.client.rest.patch(`/guilds/${this.guild.id}/stickers/${this.id}`, payload)
 	}
 }
