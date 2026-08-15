@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DiscordInteraction` type (`src/Types/Interactions.ts`, renamed from `Interaction` to match the `Discord*` naming convention used by other API types)
 - Test coverage for interaction classes, mixins, and the `InteractionCreate` event handler (`src/Tests/Interactions.test.ts`)
 
+#### Collectors
+- `createCollector(emitter, event, options)` / `awaitEvent(emitter, event, options)` (`src/Collector.ts`) — temporary, filtered event listeners that resolve or auto-cleanup after a `time`/`idle`/`max` bound, for flows like "wait for the next message from this user" without wiring up a permanent handler
+- `examples/14-collectors` — example project demonstrating collector usage
+- Test coverage for collector lifecycle and cleanup behavior (`src/Tests/Collector.test.ts`)
+
+#### Gateway
+- `WSClient` now handles `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes the session (via `GatewayOpCodes.Resume`) instead of re-identifying from scratch when possible
+- `WSClient` now tracks heartbeat ACK state and reconnects if the gateway never acknowledges a heartbeat, instead of heartbeating into a dead connection indefinitely
+- `WSEvents` gained `RECONNECT`, `INVALID_SESSION`, and `HELLO`, mirroring the corresponding `GatewayOpCodes` alongside the existing `RAW`/`HEARTBEAT`/`HEARTBEAT_ACK` events
+
 ### Changed
 
 - `EmbedBuilder` now implements `Embed` directly for improved type safety
@@ -40,10 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ActionRowBuilder`, `LabelBuilder`, and `ModalBuilder` are now generic over their component payload types rather than builder types, so raw payload objects and builders can be mixed freely within them
 - All builders now implement their corresponding JSON payload interface directly, for improved type safety
 - Minimum supported Node version raised from 18 to 20, matching what the test suite actually requires
-
-### Fixed
-
-- Most builders (`ActionRowBuilder`, `ButtonBuilder`, all select menu builders, `ModalBuilder`, etc.) are now exported from the package root — previously only `EmbedBuilder` and `SlashCommandBuilder` were reachable
+- **Breaking:** structure and type fields renamed from Discord's wire-format snake_case to camelCase with an `Id` suffix across the library (e.g. `channel_id` → `channelId`, `guild_id` → `guildId`, `mention_everyone` → `mentionEveryone`), for consistency with the rest of the public API
 
 ## [1.1.0-alpha] - 2026 July 31
 

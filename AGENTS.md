@@ -8,7 +8,9 @@
 - Core protocol constants are centralized in `src/Types/DiscordGateway.ts` (`GatewayOpCodes`, `GatewayIntents`, `GatewayEvents`, `GatewayPayload`).
 - Runtime bootstrapping currently flows through `src/Client.ts`: constructor sets token on both `WSClient` and `Rest`, resolves intents via `ResolveIntents`, instantiates top-level caches (`GuildCache`, `UserCache`), and exposes `login()` / `destroy()`. `login()` polls `socket.ready`; `destroy()` calls `socket.destroy()` and polls until disconnected.
 - `WSClient` stores resolved intents on `socket.intents`, and Identify in `WSClient.#handleHello` sends `this.intents`.
-- `WSClient` extends `EventEmitter<WSEvents>` (typed events: `RAW`, `HEARTBEAT`, `HEARTBEAT_ACK`) and creates a dispatch function with `CreateDispatch()`; gateway dispatches flow through `this.dispatch(this.client, data.t, data.d)`.
+- `WSClient` extends `EventEmitter<WSEvents>` (typed events mirroring `GatewayOpCodes`: `RAW`, `HEARTBEAT`, `RECONNECT`, `INVALID_SESSION`, `HELLO`, `HEARTBEAT_ACK`) and creates a dispatch function with `CreateDispatch()`; gateway dispatches flow through `this.dispatch(this.client, data.t, data.d)`.
+- `WSClient` tracks `session_id`/`resume_gateway_url` from `READY` and heartbeat ACK state; `GatewayOpCodes.Reconnect`/`InvalidSession` and an unacked heartbeat all route through `WSClient.#reconnect()`, which resumes via `GatewayOpCodes.Resume` when a session is available and re-identifies otherwise. There is no backoff/max-retry policy yet — `#reconnect()` retries immediately and indefinitely.
+- `src/Collector.ts` provides `createCollector(emitter, event, options)` / `awaitEvent(emitter, event, options)` — filtered, self-cleaning temporary listeners (`time`/`idle`/`max` bounds) built on `Collector extends EventEmitter`. Overloads are defined for `Client` and `WSClient` specifically (see the comment in that file) because TypeScript can't infer the event map generic through node's `EventEmitter<T>` when the argument is a subclass instance.
 - Event-to-intent resolution lives in `src/Intents.ts` via `EventRequiredIntent`; this is the main cross-file bridge between gateway events and enabled intents.
 - Intent normalization helpers (`ResolveIntents`, `HasIntent`) convert mixed user input (number, key names, numeric array) into a bitfield.
 - Gateway dispatch flows: `WSClient.#handleMessage` → `CreateDispatch()` result from `src/EventDispatcher.ts` → handler module exported from `src/Events/index.ts` (e.g., `GuildCreate`) → updates `Client` cache or structure in `src/Structures/` (channel classes live under `src/Structures/Channels/`) or `src/Managers/`.
@@ -28,6 +30,7 @@
 - `src/EventDispatcher.ts` `CreateDispatch(...)` builds a handler map from `src/Events/index.ts` exports, detects duplicate event names, supports optional per-event overrides (used in tests), and invokes async handlers via `void handler(...)`.
 
 ## Conventions specific to this repo
+- Structure/type fields use camelCase with an `Id` suffix (`channelId`, `guildId`, `webhookId`), not Discord's wire-format snake_case (`channel_id`) — the wire format is only used at the REST/gateway payload boundary, before it's parsed into a structure.
 - Use ESM imports with explicit `.js` suffix even in `.ts` source (example: `import { GatewayEvents } from "./Types/DiscordGateway.js"`).
 - Prefer `const` object maps + `as const` for enum-like values (seen across `src/Types/*.ts`) rather than TypeScript `enum`.
 - Derive value unions from maps using `ObjectValues<typeof X>` for API field typing.
