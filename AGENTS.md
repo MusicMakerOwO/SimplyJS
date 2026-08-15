@@ -11,8 +11,7 @@
 - `WSClient` extends `EventEmitter<WSEvents>` (typed events mirroring `GatewayOpCodes`: `RAW`, `HEARTBEAT`, `RECONNECT`, `INVALID_SESSION`, `HELLO`, `HEARTBEAT_ACK`) and creates a dispatch function with `CreateDispatch()`; gateway dispatches flow through `this.dispatch(this.client, data.t, data.d)`.
 - `WSClient` tracks `session_id`/`resume_gateway_url` from `READY` and heartbeat ACK state; `GatewayOpCodes.Reconnect`/`InvalidSession` and an unacked heartbeat all route through `WSClient.#reconnect()`, which resumes via `GatewayOpCodes.Resume` when a session is available and re-identifies otherwise. There is no backoff/max-retry policy yet — `#reconnect()` retries immediately and indefinitely.
 - `src/Collector.ts` provides `createCollector(emitter, event, options)` / `awaitEvent(emitter, event, options)` — filtered, self-cleaning temporary listeners (`time`/`idle`/`max` bounds) built on `Collector extends EventEmitter`. Overloads are defined for `Client` and `WSClient` specifically (see the comment in that file) because TypeScript can't infer the event map generic through node's `EventEmitter<T>` when the argument is a subclass instance.
-- Event-to-intent resolution lives in `src/Intents.ts` via `EventRequiredIntent`; this is the main cross-file bridge between gateway events and enabled intents.
-- Intent normalization helpers (`ResolveIntents`, `HasIntent`) convert mixed user input (number, key names, numeric array) into a bitfield.
+- Intent normalization helpers (`ResolveIntents`, `HasIntent`) in `src/Intents.ts` convert mixed user input (number, key names, numeric array) into a bitfield. `HasIntent` is currently unused internally, reserved for future event-to-intent gating.
 - Gateway dispatch flows: `WSClient.#handleMessage` → `CreateDispatch()` result from `src/EventDispatcher.ts` → handler module exported from `src/Events/index.ts` (e.g., `GuildCreate`) → updates `Client` cache or structure in `src/Structures/` (channel classes live under `src/Structures/Channels/`) or `src/Managers/`.
 - Gateway handlers then emit the public client event surface from `src/Types/SimplyJSTypes.ts` (`ClientEvents` / `ClientEventMap`) via `Client.emit(...)`.
 - `Client.guilds` and `Client.users` are top-level caches (`GuildCache`, `UserCache`, both extending `GlobalCache<string, V, API>`); `fetch(id)` uses REST and `upsert()` to patch/create entries, and `Guild` owns nested caches for `channels`, `roles`, `emojis`, `stickers`, and `members`.
@@ -20,7 +19,7 @@
 - Abstract base classes in `src/Contracts/` define the structural contracts:
   - `APIClientStructure<T>` — client-bound structures needing `client` access (holds `protected readonly client: Client`)
   - `APIGuildStructure<T>` — guild-owned structures needing both `client` and `guild` access (holds `protected readonly client: Client` and `protected readonly guild: Guild`)
-  - `GlobalCache<K,V,API>` / `GuildCache<K,V,API>` — typed Maps with `abstract upsert(data: API): V` and `abstract fetch(key: K): Promise<V>` for top-level and guild-scoped caches respectively
+  - `GlobalCache<K,V,API>` / `GuildScopedCache<K,V,API>` — typed Maps with `abstract upsert(data: API): V` and `abstract fetch(key: K): Promise<V>` for top-level and guild-scoped caches respectively
   - `ComponentBuilder<T>` — builder contract requiring `from(value: T)` and `validate()` methods
 - Domain model types for Discord REST/gateway payloads are in `src/Types/DiscordAPITypes.ts` and `src/Types/MessageComponents.ts`.
 - Gateway packet envelope typing (including Hello/Ready payload shapes) is in `src/Types/DiscordGateway.ts` via `GatewayPayload<T>`.
@@ -67,10 +66,10 @@
 ## Practical guidance for new agents
 - Review `CODE_STYLE_AND_RULES.md` before editing code so new changes stay aligned with the documented style and behavioral rules.
 - Check `TODO.md` when planning work; if you discover an obvious missing feature or cleanup item while editing, add it there so the backlog stays current.
-- Implement runtime behavior by extending existing typed protocol surfaces first (start from `GatewayPayload`, `GatewayEvents`, `EventRequiredIntent`).
+- Implement runtime behavior by extending existing typed protocol surfaces first (start from `GatewayPayload`, `GatewayEvents`, `src/Intents.ts`).
 - When adding new Discord constants/types, follow the existing `as const` + `ObjectValues` pattern for consistency.
 - If adding timers in future `Client`/`Rest` code, chain `.unref()` immediately to satisfy lint and avoid process hang.
 - Add tests under `src/Tests/` or Vitest will not discover them.
 - To handle a new gateway dispatch event: create/update a handler in `src/Events/` using `defineEvent(...)`, then export it from `src/Events/index.ts`; `EventDispatcher` auto-registers exported handlers.
-- `Rest` targets `https://discord.com/api/v9`; use `client.rest.get<T>(path)` / `.post<T>(path, body)` etc. in cache `fetch()` impls.
+- `Rest` targets `https://discord.com/api/v10`; use `client.rest.get<T>(path)` / `.post<T>(path, body)` etc. in cache `fetch()` impls.
 - For public API changes, update exports in `src/index.ts` (it already re-exports builders/cache/events/structures/types and core runtime modules).

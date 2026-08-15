@@ -309,7 +309,7 @@ Gateway messages flow through a fixed pipeline: `WSClient` (`src/WSClient.ts`) o
 Non-obvious design notes:
 
 > **HINT**\
-> **Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a bitfield. The same file maps each gateway event to the intent required to receive it via `EventRequiredIntent`, so a missing intent fails loudly instead of silently dropping events.
+> **Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a bitfield. There's no event-to-intent gating yet, so a missing intent currently drops events silently rather than failing loudly.
 
 > **NOTE**\
 > **Permissions and intents are bigint bitfields, not enums.** The generic `BitField` class (`src/DataStructures/BitField.ts`) backs things like `Role.permissions`. Raw Discord permission flag values live in `Constants.ts`.
@@ -323,7 +323,7 @@ Non-obvious design notes:
 > **WARNING**\
 > **Timers are required to call `.unref()`.** This is enforced by a custom ESLint rule, `local/require-unref-on-timers` (`eslint.config.ts`). The polling loops in `Client.login()`/`Client.destroy()` are the reference examples if you're adding a new timer.
 
-Structures and caches also split along ownership: `APIClientStructure<T>` holds a reference to `client` only, `APIGuildStructure<T>` holds both `client` and `guild` (`src/Contracts/DiscordStructure.ts`), and caches mirror the split via `GlobalCache`/`GuildCache` (`src/Contracts/CacheStructure.ts`). See `CODE_STYLE_AND_RULES.md` for the full reasoning behind these patterns.
+Structures and caches also split along ownership: `APIClientStructure<T>` holds a reference to `client` only, `APIGuildStructure<T>` holds both `client` and `guild` (`src/Contracts/DiscordStructure.ts`), and caches mirror the split via `GlobalCache`/`GuildScopedCache` (`src/Contracts/CacheStructure.ts`). See `CODE_STYLE_AND_RULES.md` for the full reasoning behind these patterns.
 
 ## Development
 
@@ -350,7 +350,7 @@ The project is alpha software; gateway resiliency and Discord API coverage are s
 Before opening a PR:
 
 - Read `CODE_STYLE_AND_RULES.md` — it documents the actual patterns this codebase expects (event handler shape, `as const` + `ObjectValues` instead of enums, getter-vs-method rules, `.unref()` on timers, etc.), and PRs that don't follow it will need rework.
-- Run `npm run check` (lint + typecheck) and `npm test` locally — the CI workflow (`.github/workflows/node.js.yml`) runs `npm run build` and `npm run test` on Node 20, 22, and 24 for every push/PR to `main`, so failures there will block merge anyway.
+- Run `npm run check` (lint + typecheck) and `npm test` locally — the CI workflows (`.github/workflows/node.js.yml`, `bun.yml`, `deno.yml`) build and test the project on Node 20/22/24, Bun, and Deno for every push/PR to `main`, so failures there will block merge anyway.
 - If you're adding a new gateway event handler, cache, or structure, make sure it's exported from the right barrel file (`src/Events/index.ts`, `src/index.ts`, etc.) — see section 11 of `CODE_STYLE_AND_RULES.md`.
 - If you fix or add something meaningful, add an entry to `CHANGELOG.md` and check off (or add) the matching item in `TODO.md`.
 

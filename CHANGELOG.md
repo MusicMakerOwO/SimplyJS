@@ -43,14 +43,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WSClient` now tracks heartbeat ACK state and reconnects if the gateway never acknowledges a heartbeat, instead of heartbeating into a dead connection indefinitely
 - `WSEvents` gained `RECONNECT`, `INVALID_SESSION`, and `HELLO`, mirroring the corresponding `GatewayOpCodes` alongside the existing `RAW`/`HEARTBEAT`/`HEARTBEAT_ACK` events
 
+#### Tooling
+- CI workflows for Bun (`.github/workflows/bun.yml`) and Deno (`.github/workflows/deno.yml`) run the build and test suite on every push/PR to `main`, alongside the existing Node workflow
+
+#### Public API
+- `Utils`, `Contracts`, `Factory`, and `Mixins` now exported from the package root, alongside `ChannelPermissionManager`, `GuildBanManager`, `GuildInviteManager`, and `SlashCommandOptions`
+- `SlashCommandBuilder` gained an instance `validate()` method
+
 ### Changed
 
 - `EmbedBuilder` now implements `Embed` directly for improved type safety
 - Audit log type updated to properly reference the new slash command types
 - `ActionRowBuilder`, `LabelBuilder`, and `ModalBuilder` are now generic over their component payload types rather than builder types, so raw payload objects and builders can be mixed freely within them
+
+### Fixed
+
+- `eslint.config.ts` imports `Plugin` from `@eslint/core` as a type-only import, since that package only ships types and no runtime logic
 - All builders now implement their corresponding JSON payload interface directly, for improved type safety
 - Minimum supported Node version raised from 18 to 20, matching what the test suite actually requires
 - **Breaking:** structure and type fields renamed from Discord's wire-format snake_case to camelCase with an `Id` suffix across the library (e.g. `channel_id` → `channelId`, `guild_id` → `guildId`, `mention_everyone` → `mentionEveryone`), for consistency with the rest of the public API
+- `GuildBanManager.delete()` now takes a user id instead of unbanning the whole guild
+- Invite `fetch()`/`delete()` now hit `/invites/:code` instead of a nonexistent guild-scoped route
+- `Member.timeoutUntil(null)` now sends `null` instead of the current timestamp
+- `Member.setNickname()` now sends the `nick` field instead of `nickname`
+- Guild ban event handlers no longer assume the guild is cached
+- Default avatar URLs now resolve under `/embed/avatars/` instead of an incorrect path
+- `User.avatarURL()` now only returns a `.gif` extension for avatars with an animated hash
+- REST requests now target Discord API v10 and include a `User-Agent` header
+- `Message.react()` now URL-encodes the emoji with `encodeURIComponent` instead of `encodeURI`
+- `ReactionAdd` now looks up the channel by channel id instead of guild id
+- Channel permission overwrites, position, and topic no longer crash on partial channel payloads
+- `Message.patch()` now updates `guildId` and `member` instead of locking them to their first-seen value
+- Smart getters on `Message` and `Invite` are now recoverable after a cache-miss memoization
+- `ResolvePermissions` no longer throws when a role or `@everyone` is missing from cache
+- Role sorting was broken: `highest()`/`lowest()` were inverted and `toSorted()` mutated cached positions
+- `BitField` now throws a clear error on unknown flag names instead of a `BigInt` `SyntaxError`
+- `CreateInteraction()` now throws on an unrecognized interaction type instead of returning `undefined`
+- `ButtonBuilder.from()` and `LinkButtonBuilder.from()` no longer crash on a missing label
+- Removed the duplicate `EPHEMERAL_FLAG` constant in favor of `MessageFlags.EPHEMERAL`
+- Interaction `reply()` now sends the payload it built instead of rebuilding and discarding it
+- `EmbedBuilder.setColor()` no longer has an unreachable `else` branch
+- `GuildStickerManager.modify()` no longer mutates the caller's options object
+- Async gateway event handler rejections are now caught, so a failing handler no longer floods stderr with unhandled-event warnings
+- `ClientEvents` member and role events now use their own key names instead of the raw gateway event names
+- Fixed `ClientEvents.StickerUpdate` value, which was `StickersUpdate` and didn't match its key
+- `Client.destroy()` now clears the user cache in addition to the guild cache
+- Renamed the abstract per-guild cache base to `GuildScopedCache` to resolve a naming collision with the top-level `GuildCache`
 
 ## [1.1.0-alpha] - 2026 July 31
 
