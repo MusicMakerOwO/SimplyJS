@@ -19,3 +19,17 @@ export * from "./EventDispatcher.js";
 export * from "./Intents.js";
 export * from "./Rest.js";
 export * from "./WSClient.js";
+export * from "./Utils.js";
+
+export * from "./Contracts/CacheStructure.js";
+export * from "./Contracts/DiscordStructure.js";
+
+export * from "./Factory/CreateChannel.js";
+export * from "./Factory/CreateInteraction.js";
+
+export * from "./Mixins/Channels/Messageable.js";
+export * from "./Mixins/Channels/Moveable.js";
+export * from "./Mixins/Channels/PermissionOverwrites.js";
+export * from "./Mixins/Interactions/ModalShowable.js";
+export * from "./Mixins/Interactions/Repliable.js";
+export * from "./Mixins/Interactions/Updateable.js";
