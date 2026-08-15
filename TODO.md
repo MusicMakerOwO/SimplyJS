@@ -12,11 +12,11 @@
 	- Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
 	- Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
 - [x] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
-- [ ] Add collectors, name pending
+- [x] Add collectors, name pending
   - Temporary filtered event listeners that await matching events over a time period and auto-cleanup
   - Useful for interactions like "wait for the next message from this user"
-lol
-- [ ] Add examples showcasing interactions
+  - `createCollector()` / `awaitEvent()` in `src/Collector.ts`, with `Client`/`WSClient` overloads for argument inference
+- [x] Add examples showcasing interactions
   - [x] Creating/Registering commands
   - [x] Responding to commands
   - [x] Responding to other components (buttons, select menus, modals)
@@ -24,13 +24,14 @@ lol
   - [x] Introduce the idea of button args
     - split `interaction.customId` on `_`
     - Allows for state management on buttons themselves, without collectors
-  - [ ] Introduce collectors
+  - [x] Introduce collectors
      - BE SURE TO WARN THAT COLLECTORS DO NOT PERSIST AFTER RESTART. This is the #1 trouble point for beginners, they assume the button will always exist. This is the point of handlers and button args, they are permanant due to attached to the button directly
      - Pagination is a great example
+     - `examples/14-collectors` covers this
 
 
 ### Quality of Life
-- [ ] Harden gateway reconnect/session handling in `src/WSClient.ts`
+- [x] Harden gateway reconnect/session handling in `src/WSClient.ts`
   - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
   - Track and reuse `session_id` / `resume_gateway_url` from READY
   - Track and clear heartbeat timers on close/destroy
@@ -75,8 +76,6 @@ lol
   - Thread the new types through any application metadata consumers once they exist
 
 ## Discord gateway event implementation status
-
-Only events already modeled in `src/Types/DiscordGateway.ts` are listed. Events Discord sends that aren't modeled at all here (e.g. `INTERACTION_CREATE`, `VOICE_SERVER_UPDATE`, `USER_UPDATE`) are tracked separately under "Further planning".
 
 | Discord event                     | Implemented |
 |-----------------------------------|-------------|
