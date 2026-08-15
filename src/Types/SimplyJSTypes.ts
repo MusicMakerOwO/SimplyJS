@@ -143,17 +143,17 @@ export const ClientEvents = {
 	 * Fired when a member joins a guild.
 	 * Listener arguments: `member` ({@link Member}).
 	 */
-	MemberCreate: "GuildMemberAdd",
+	MemberCreate: "MemberCreate",
 	/**
 	 * Fired when guild member data changes.
 	 * Listener arguments: `oldMember` ({@link Member} | `undefined`), `newMember` ({@link Member}).
 	 */
-	MemberUpdate: "GuildMemberUpdate",
+	MemberUpdate: "MemberUpdate",
 	/**
 	 * Fired when a member leaves or is removed from a guild.
 	 * Listener arguments: `member` ({@link Member} | {@link DiscordUser}).
 	 */
-	MemberDelete: "GuildMemberRemove",
+	MemberDelete: "MemberDelete",
 
 	/**
 	 * Fired when a guild emoji sync contains newly added emojis.
@@ -191,17 +191,17 @@ export const ClientEvents = {
 	 * Fired when a role is created in a guild.
 	 * Listener arguments: `role` ({@link Role}).
 	 */
-	RoleCreate: "GuildRoleCreate",
+	RoleCreate: "RoleCreate",
 	/**
 	 * Fired when role data changes.
 	 * Listener arguments: `oldRole` ({@link Role} | `undefined`), `newRole` ({@link Role}).
 	 */
-	RoleUpdate: "GuildRoleUpdate",
+	RoleUpdate: "RoleUpdate",
 	/**
 	 * Fired when a role is deleted from a guild.
 	 * Listener arguments: `role` ({@link Role} | {@link DiscordRole}).
 	 */
-	RoleDelete: "GuildRoleDelete",
+	RoleDelete: "RoleDelete",
 
 	/**
 	 * Fired when a message is created.
