@@ -62,7 +62,7 @@ export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 	}
 
 	/**
-	 * Tests if the current channel is a thread (could be public, private, or announcements - check `Channel.type` for more precission)
+	 * Tests if the current channel is a thread (could be public, private, or announcements - check `Channel.type` for more precision)
 	 */
 	isThreadChannel(): this is GuildThreadChannel {
 		return this.type === DiscordChannelTypes.PUBLIC_THREAD ||

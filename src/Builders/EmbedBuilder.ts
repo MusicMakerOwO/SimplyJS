@@ -117,7 +117,7 @@ export class EmbedBuilder implements Embed {
 	 */
 	setDescription(value: string): this {
 		if (value.length === 0 || value.length > 4096) {
-			throw new Error(`Description must be between 1 and 4,096 characters long - Recieved ${value.length} characters`);
+			throw new Error(`Description must be between 1 and 4,096 characters long - Received ${value.length} characters`);
 		}
 		this.description = value;
 		return this;

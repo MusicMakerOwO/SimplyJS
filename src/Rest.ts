@@ -61,7 +61,7 @@ export type RestOptions = {
 	 * Adjusts how long to wait after a limit.
 	 * A value of `1.0` is the default, `2.0` means wait twice as long to be safe.
 	 *
-	 * @warning If you use a value less than `1.0` you are at risk of rate limits and assumed to manage them anually in your logic.
+	 * @warning If you use a value less than `1.0` you are at risk of rate limits and assumed to manage them manually in your logic.
 	 *
 	 * @default 1.0
 	 */

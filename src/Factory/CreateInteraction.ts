@@ -39,7 +39,7 @@ export function CreateInteraction(client: Client, data: DiscordInteraction): Any
 			return new AutocompleteInteraction(client, data);
 
 		case InteractionTypes.MESSAGE_COMPONENT:
-			// I with there was a better way to differentiate them, thanks Discord :')
+			// I wish there was a better way to differentiate them, thanks Discord :')
 			if (data.data.component_type === ComponentTypes.BUTTON) {
 				return new ButtonInteraction(client, data);
 			} else {

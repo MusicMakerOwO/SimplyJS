@@ -34,10 +34,10 @@ export type WSOptions = {
 	 */
 	jitterOverride?: number;
 	/**
-	 * A bitfield of desiree gateway intents.
+	 * A bitfield of desired gateway intents.
 	 * Some may require special access from Discord.
 	 *
-	 * These intents dictate what events you are able to recieve.
+	 * These intents dictate what events you are able to receive.
 	 *
 	 * @see {GatewayIntents}
 	 */

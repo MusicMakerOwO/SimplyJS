@@ -107,7 +107,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** Sets the client's status: online, offline, idle, or dnd */
 	setStatus(status: ObjectValues<typeof Status>): void {
 		this.status = status;
-		this.#updatePressence();
+		this.#updatePresence();
 	}
 
 	/** Sets a status message to be displayed. Activities can also be done through this */
@@ -125,11 +125,11 @@ export class Client extends EventEmitter<ClientEventMap> {
 				type: type
 			}
 		}
-		this.#updatePressence();
+		this.#updatePresence();
 	}
 
 	/** Sends the current `status`/`activity` to Discord via a gateway `Presence Update` payload */
-	#updatePressence() {
+	#updatePresence() {
 		const payload = {
 			op: GatewayOpCodes.PresenceUpdate,
 			d: {
