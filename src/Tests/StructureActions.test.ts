@@ -1768,22 +1768,22 @@ describe("User.send() DM flow", () => {
 			);
 		});
 
-		it("delete() calls DELETE /guilds/:guildId/bans/:guildId with empty headers when no reason", async () => {
+		it("delete() calls DELETE /guilds/:guildId/bans/:userId with empty headers when no reason", async () => {
 			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
 
-			await guild.bans.delete();
+			await guild.bans.delete("user-1");
 
 			expect(spy).toHaveBeenCalledOnce();
-			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/${guild.id}`, {});
+			expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/bans/user-1`, {});
 		});
 
 		it("delete() sends X-Audit-Log-Reason header when reason is provided", async () => {
 			const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
 
-			await guild.bans.delete("user reformed");
+			await guild.bans.delete("user-1", "user reformed");
 
 			expect(spy).toHaveBeenCalledWith(
-				`/guilds/${guild.id}/bans/${guild.id}`,
+				`/guilds/${guild.id}/bans/user-1`,
 				{ "X-Audit-Log-Reason": "user reformed" }
 			);
 		});

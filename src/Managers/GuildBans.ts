@@ -35,10 +35,12 @@ export class GuildBanManager {
 
 	/**
 	 * Removes a ban (unbans a user). Requires the `BAN_MEMBERS` permission.
+	 * @param user The user to unban, or their id.
 	 * @param reason Optional audit log reason.
 	 */
-	async delete(reason?: string): Promise<void> {
-		await this.client.rest.delete(`/guilds/${this.guild.id}/bans/${this.guild.id}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
+	async delete(user: User | DiscordUser | string, reason?: string): Promise<void> {
+		const userId = typeof user === 'object' ? user.id : user;
+		await this.client.rest.delete(`/guilds/${this.guild.id}/bans/${userId}`, reason ? { 'X-Audit-Log-Reason': reason } : {} );
 	}
 
 	/**
