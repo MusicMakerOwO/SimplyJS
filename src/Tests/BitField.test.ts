@@ -158,12 +158,12 @@ describe("BitField", () => {
 		.toBe(TestFlags.MANAGE_MESSAGES.toString());
 	});
 
-	it("throws when given an unknown flag name", () => {
+	it("throws a clear error when given an unknown flag name", () => {
 		const bitfield = new BitField(TestFlags, 0);
 
 		expect(() => bitfield.has("NOT_A_REAL_FLAG" as keyof typeof TestFlags))
 		.toThrow(
-			'Cannot convert NOT_A_REAL_FLAG to a BigInt'
+			'Unknown flag name: "NOT_A_REAL_FLAG"'
 		);
 	});
 

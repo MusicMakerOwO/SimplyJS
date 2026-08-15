@@ -98,7 +98,10 @@ export class BitField<TFlags extends Record<string, bigint>> {
 	private resolve(...flags: FlagInput<TFlags>): bigint {
 		let bits = 0n;
 		for (const flag of flags) {
-			bits |= typeof flag === "string" && flag in this.flags
+			if (typeof flag === "string" && !(flag in this.flags)) {
+				throw new Error(`Unknown flag name: "${flag}"`);
+			}
+			bits |= typeof flag === "string"
 				? this.flags[flag as keyof TFlags]
 				: this.parseBit(flag as FlagValue);
 		}
