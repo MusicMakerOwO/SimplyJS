@@ -12,8 +12,9 @@ import { PingInteraction } from "../Structures/index.js";
 export const InteractionCreate = defineEvent({
 	name: GatewayEvents.InteractionCreate,
 	handler: (client, data: DiscordInteraction) => {
-		// The gateway never sends a PING interaction (that variant only occurs over the HTTP
-		// interactions endpoint), so the factory's wider return type can be narrowed here.
+		// The factory's return type includes PingInteraction for the HTTP interactions endpoint,
+		// which this gateway handler never actually receives - this check exists purely to
+		// narrow that wider type back down to `AnyInteraction` for everything below.
 		const interaction = CreateInteraction(client, data);
 		if (interaction instanceof PingInteraction) return void interaction.pong();
 
