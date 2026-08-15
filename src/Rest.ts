@@ -1,7 +1,8 @@
 import { JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 
-const DISCORD_API_BASE = "https://discord.com/api/v9";
+const DISCORD_API_BASE = "https://discord.com/api/v10";
+const USER_AGENT = "DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, 1.2.0-alpha)";
 const DEFAULT_RETRY_COUNT = 3;
 const TRANSIENT_HTTP_STATUS = new Set([500, 502, 503, 504]);
 const EMPTY_RESPONSE_STATUS = new Set([204, 205, 304]);
@@ -250,6 +251,7 @@ export class Rest {
 				method,
 				headers: {
 					"Content-Type": "application/json",
+					"User-Agent": USER_AGENT,
 					Authorization: `Bot ${this.#token}`,
 					...options.headers
 				},
