@@ -162,8 +162,8 @@ export class Message extends APIClientStructure<DiscordMessage> {
 		if ("call" in data && data.call !== undefined) this.call = data.call;
 		if ("shared_client_theme" in data && data.shared_client_theme !== undefined) this.sharedClientTheme = data.shared_client_theme;
 
-		if ("guild_id" in data) this.guildId ??= data.guild_id;
-		if ("member" in data) this.member ??= data.member;
+		if ("guild_id" in data) this.guildId = data.guild_id;
+		if ("member" in data) this.member = data.member;
 	}
 
 	/**
