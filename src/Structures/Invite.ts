@@ -160,7 +160,8 @@ export class Invite extends APIClientStructure<AnyInviteData> {
 	get guild(): Guild | null {
 		const value = (this.guildId ? this.client.guilds.get(this.guildId) : undefined) ?? null;
 		Object.defineProperty(this, 'guild', {
-			value: value
+			value: value,
+			configurable: true
 		});
 		return value;
 	}
@@ -171,7 +172,8 @@ export class Invite extends APIClientStructure<AnyInviteData> {
 	get channel(): Channel | null {
 		const value = (this.channelId ? this.guild?.channels.get(this.channelId) : undefined) ?? null;
 		Object.defineProperty(this, 'channel', {
-			value: value
+			value: value,
+			configurable: true
 		});
 		return value;
 	}
@@ -192,7 +194,8 @@ export class Invite extends APIClientStructure<AnyInviteData> {
 		}
 
 		Object.defineProperty(this, 'roles', {
-			value: value
+			value: value,
+			configurable: true
 		});
 		return value;
 	}

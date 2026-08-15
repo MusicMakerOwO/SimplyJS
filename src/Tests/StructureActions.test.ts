@@ -1623,7 +1623,7 @@ describe("Message action methods", () => {
 		const descriptor = Object.getOwnPropertyDescriptor(message, 'guild');
 		expect(descriptor).toBeDefined();
 		expect(descriptor?.value).toBe(guild);
-		expect(descriptor?.configurable).toBe(false);
+		expect(descriptor?.configurable).toBe(true); // recoverable - a stale/incorrect memoized value can be redefined
 
 		// Second access should use the cached property, not go through cache
 		client.guilds.delete(guild.id);  // Remove from cache
@@ -1659,7 +1659,7 @@ describe("Message action methods", () => {
 		const descriptor = Object.getOwnPropertyDescriptor(message, 'channel');
 		expect(descriptor).toBeDefined();
 		expect(descriptor?.value).toBe(channel);
-		expect(descriptor?.configurable).toBe(false);
+		expect(descriptor?.configurable).toBe(true); // recoverable - a stale/incorrect memoized value can be redefined
 
 		// Second access should use the cached property, not go through cache
 		guild.channels.delete(channel.id);  // Remove from cache

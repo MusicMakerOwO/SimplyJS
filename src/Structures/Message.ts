@@ -170,9 +170,10 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * A smart getter that reads the guild from cache on first read and overwrites itself on consecutive reads
 	 */
 	get guild(): Guild | null {
-		const value = this.client.guilds.get(this.guildId!) ?? null;
+		const value = this.guildId ? this.client.guilds.get(this.guildId) ?? null : null;
 		Object.defineProperty(this, 'guild', {
-			value: value
+			value: value,
+			configurable: true
 		});
 		return value;
 	}
@@ -184,7 +185,8 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	get channel(): MessageableChannel | null {
 		const value = (this.guild?.channels.get(this.channelId) ?? null) as MessageableChannel | null;
 		Object.defineProperty(this, 'channel', {
-			value: value
+			value: value,
+			configurable: true
 		});
 		return value;
 	}
