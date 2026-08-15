@@ -5,9 +5,6 @@ import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { InteractionCallbackMessages, InteractionCallbackTypes } from "../../Types/Interactions.js";
 import { MessageFlags } from "../../Types/index.js";
 
-/** Message flag bit for an ephemeral (invoking-user-only) response */
-const EPHEMERAL_FLAG = 1 << 6;
-
 /** Full reply payload, or a plain string shorthand for `{ content }` */
 export type InteractionReplyPayload = InteractionCallbackMessages | string;
 
@@ -58,7 +55,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		async deferReply(ephemeral = false): Promise<void> {
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-				...(ephemeral ? { data: { flags: EPHEMERAL_FLAG } } : {}),
+				...(ephemeral ? { data: { flags: MessageFlags.EPHEMERAL } } : {}),
 			});
 		}
 
