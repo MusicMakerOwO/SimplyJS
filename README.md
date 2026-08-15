@@ -161,7 +161,7 @@ async function resolveMember(client: FullClient, guildId: string, input?: string
 Moderation actions are methods directly on the structure:
 
 ```ts
-const member = await resolveMember(client, message.guild_id!, args.shift());
+const member = await resolveMember(client, message.guildId!, args.shift());
 if (!member) return message.reply("Couldn't find that member");
 
 try {
@@ -293,6 +293,12 @@ Full end-to-end projects live in [`examples/`](./examples):
 | [`6-embeds`](./examples/6-embeds) | `EmbedBuilder` usage, including error-style embeds |
 | [`7-fetching-and-moderation`](./examples/7-fetching-and-moderation) | Member resolution, kicks, bans, timeouts, role management |
 | [`8-event-handler`](./examples/8-event-handler) | One-file-per-event handler structure |
+| [`9-slash-commands-basics`](./examples/9-slash-commands-basics) | Registering and responding to a single slash command |
+| [`10-slash-command-handler`](./examples/10-slash-command-handler) | Multi-file slash command registry, same pattern as `4-prefix-handler` |
+| [`11-buttons-and-selects`](./examples/11-buttons-and-selects) | Responding to button and select menu interactions |
+| [`12-button-args`](./examples/12-button-args) | Encoding state in `customId` to avoid needing collectors |
+| [`13-all-handlers`](./examples/13-all-handlers) | Commands, buttons, selects, and event handlers wired together |
+| [`14-collectors`](./examples/14-collectors) | `createCollector`/`awaitEvent` for temporary, filtered event listeners |
 
 ## Advanced / Internals
 
@@ -334,8 +340,7 @@ npm run linecount   # top 10 largest .ts files by line count
 
 The project is alpha software; gateway resiliency and Discord API coverage are still being built out (tracked in `TODO.md`). Notably:
 
-- No reconnect/resume handling yet. `GatewayOpCodes.Reconnect` / `InvalidSession` aren't handled, and `session_id`/`resume_gateway_url` from `READY` aren't tracked or reused, so a dropped connection re-identifies from scratch rather than resuming.
-- No close-code-aware backoff or max-retry/terminal-failure detection for reconnects.
+- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. There's still no close-code-aware backoff or max-retry/terminal-failure detection - a dead connection reconnects immediately and indefinitely.
 - Gateway event coverage is partial. Dispatch handlers exist for guilds, channels, members, roles, messages, reactions, emojis, stickers, and invites, but events like `PresenceUpdate`, `TypingStart`, `VoiceStateUpdate`, threads, bans, and interactions are not yet handled.
 - No interaction/slash-command support. Only traditional message-based (prefix) commands are demonstrated, since component/interaction payloads (`src/Types/Internal.ts`) are placeholders for a later update.
 - Large portions of `src/` still lack JSDoc coverage (tracked file-by-file in `docs.md`).
