@@ -1391,24 +1391,24 @@ describe("Member action methods", () => {
 		expect(headers).toEqual({});
 	});
 
-	it("setNickname() sends PATCH with {nickname} field — not nick or username", async () => {
+	it("setNickname() sends PATCH with {nick} field — the Modify Guild Member field name", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
 		await member.setNickname("cool nick");
 
 		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/members/${member.user.id}`, {
-			nickname: "cool nick",
+			nick: "cool nick",
 		});
 	});
 
-	it("setNickname() sends {nickname: null} to clear — not delete or omit the field", async () => {
+	it("setNickname() sends {nick: null} to clear — not delete or omit the field", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
 
 		await member.setNickname(null);
 
-		const [, body] = spy.mock.calls[0]! as [string, { nickname: null }];
-		expect(body).toEqual({ nickname: null });
-		expect("nickname" in body).toBe(true);           // field present, value null
+		const [, body] = spy.mock.calls[0]! as [string, { nick: null }];
+		expect(body).toEqual({ nick: null });
+		expect("nick" in body).toBe(true);           // field present, value null
 	});
 
 	it("timeoutUntil() sends communication_disabled_until as ISO 8601 string in PATCH body", async () => {

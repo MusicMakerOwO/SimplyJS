@@ -229,7 +229,7 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	 */
 	async setNickname(name: string | null): Promise<void> {
 		await this.client.rest.patch(`/guilds/${this.guild.id}/members/${this.user.id}`, {
-			nickname: name,
+			nick: name,
 		});
 	}
 }
