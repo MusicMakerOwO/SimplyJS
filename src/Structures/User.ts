@@ -142,7 +142,7 @@ export class User extends APIClientStructure<DiscordUser> {
 			? (BigInt(this.id) >> 22n) % 6n
 			: BigInt(this.id) % 5n
 
-		return `https://cdn.discordapp.com/embeds/avatar/${index}.png`;
+		return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 	}
 
 	/**

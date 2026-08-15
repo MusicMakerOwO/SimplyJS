@@ -2050,7 +2050,7 @@ describe("User.send() DM flow", () => {
 			user.discriminator = "0";
 
 			const url = user.defaultAvatarURL();
-			expect(url).toMatch(/^https:\/\/cdn\.discordapp\.com\/embeds\/avatar\/\d+\.png$/);
+			expect(url).toMatch(/^https:\/\/cdn\.discordapp\.com\/embed\/avatars\/\d+\.png$/);
 		});
 
 		it("uses (id >> 22) % 6 for discriminator 0", () => {
@@ -2059,7 +2059,7 @@ describe("User.send() DM flow", () => {
 
 			const url = user.defaultAvatarURL();
 			const index = (BigInt("123456789") >> 22n) % 6n;
-			expect(url).toBe(`https://cdn.discordapp.com/embeds/avatar/${index}.png`);
+			expect(url).toBe(`https://cdn.discordapp.com/embed/avatars/${index}.png`);
 		});
 
 		it("uses id % 5 for users with non-zero discriminator", () => {
@@ -2068,7 +2068,7 @@ describe("User.send() DM flow", () => {
 
 			const url = user.defaultAvatarURL();
 			const index = BigInt("987654321") % 5n;
-			expect(url).toBe(`https://cdn.discordapp.com/embeds/avatar/${index}.png`);
+			expect(url).toBe(`https://cdn.discordapp.com/embed/avatars/${index}.png`);
 		});
 
 		it("returns indices 0-5 for discriminator 0", () => {
