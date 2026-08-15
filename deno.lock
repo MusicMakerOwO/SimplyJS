@@ -1,0 +1,29 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@deno/installer-shell-setup@*": "0.3.4"
+  },
+  "jsr": {
+    "@deno/installer-shell-setup@0.3.4": {
+      "integrity": "48665d1a737d487cce6874bc97bba70a5aeffa7053aca3f60df93c6fab8963b4"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@eslint/core@^1.2.1",
+        "npm:@eslint/js@^10.0.1",
+        "npm:@types/node@^25.6.0",
+        "npm:@types/ws@^8.18.1",
+        "npm:eslint-plugin-unicorn@64",
+        "npm:eslint@^10.4.0",
+        "npm:jiti@^2.7.0",
+        "npm:tsup@^8.5.1",
+        "npm:typescript-eslint@^8.59.0",
+        "npm:typescript@^5.5.3",
+        "npm:vitest@^4.1.5",
+        "npm:ws@^8.20.0"
+      ]
+    }
+  }
+}
