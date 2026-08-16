@@ -1,15 +1,16 @@
 import { Rest } from "./Rest.js";
-import { WSClient, WSOptions } from "./WSClient.js";
+import { WSClient, WSOptions, WSEvents } from "./WSClient.js";
 import { ResolveIntents } from "./Intents.js";
 import { ObjectValues } from "./Types/HelperTypes.js";
 import { GatewayIntents, GatewayOpCodes } from "./Types/DiscordGateway.js";
 import { GuildCache } from "./Managers/Guilds.js";
 import { EventEmitter } from "node:events";
-import type { ClientEventMap } from "./Types/SimplyJSTypes.js";
+import { ClientEventMap } from "./Types/SimplyJSTypes.js";
 import { User } from "./Structures/User.js";
 import { UserCache } from "./Managers/Users.js";
 import { ActivityType, ClientActivity, Status } from "./Types/DiscordAPITypes.js";
 import { ApplicationCommand, JSONArray } from "./Types/index.js";
+import { awaitEvent } from "./Collector.js";
 
 type ClientOptions = {
 	/** Bot token used to authenticate both the REST client and the gateway websocket */
@@ -87,9 +88,13 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** Start the WebSocket connection, promise resolves when authorization finishes */
 	async login(): Promise<void> {
 		this.socket.initialize();
-		while(true) {
-			if (this.socket.ready) return;
-			await new Promise(r => setTimeout(r, 1).unref() );
+		try {
+			// pause execution until a ready event is recieved
+			await awaitEvent(this.socket, WSEvents.Ready, {
+				time: 10_000
+			});
+		} catch {
+			throw new Error("No ready event recieved within 10 seconds - Discord may be having an outage");
 		}
 		if (this.status || this.activity) return this.#updatePresence();
 	}

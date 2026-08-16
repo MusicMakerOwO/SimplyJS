@@ -155,6 +155,41 @@ describe("WSClient lifecycle", () => {
 		expect(client.user?.id).toBe(user.id);
 	});
 
+	it("login() does not resolve until the READY dispatch is received", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds
+		});
+
+		let resolved = false;
+		const loginPromise = client.login().then(() => {
+			resolved = true;
+		});
+		const mockSocket = wsMockState.instances[0]!;
+
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Hello,
+			d: { heartbeat_interval: 45_000 },
+			s: null,
+			t: null
+		});
+		await Promise.resolve();
+
+		expect(resolved).toBe(false);
+		expect(client.socket.ready).toBe(false);
+
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+		await loginPromise;
+
+		expect(resolved).toBe(true);
+		expect(client.socket.ready).toBe(true);
+	});
+
 	it("does not send presence updates from setStatus()/setStatusMessage() until login() completes", async () => {
 		const client = new Client({
 			token: "token",
