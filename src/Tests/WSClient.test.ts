@@ -5,7 +5,7 @@ import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from ".
 import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 
 type MessageHandler = (data: { toString(): string }) => void;
-type CloseHandler = () => void;
+type CloseHandler = (code?: number) => void;
 type ErrorHandler = (err: Error) => void;
 
 const wsMockState = vi.hoisted(() => {
@@ -56,15 +56,16 @@ const wsMockState = vi.hoisted(() => {
 			}
 		}
 
-		close(): void {
+		close(code?: number): void {
 			for (const handler of this.#closeHandlers) {
-				handler();
+				handler(code);
 			}
 		}
 
 		removeAllListeners(): void {
 			this.#messageHandlers = [];
 			this.#closeHandlers = [];
+			this.#errorHandlers = [];
 		}
 	}
 
@@ -141,6 +142,7 @@ describe("WSClient lifecycle", () => {
 	});
 
 	it("appends gateway version and encoding to the resume URL", () => {
+		vi.useFakeTimers();
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		client.socket.initialize();
 		wsMockState.instances[0]!.emitMessage({
@@ -151,6 +153,7 @@ describe("WSClient lifecycle", () => {
 		});
 
 		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+		vi.advanceTimersByTime(0);
 
 		expect(wsMockState.instances[1]!.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
 	});
@@ -183,6 +186,8 @@ describe("WSClient lifecycle", () => {
 		});
 
 		mockSocket.emitMessage({ op: GatewayOpCodes.InvalidSession, d: false, s: null, t: null });
+		// op 9 waits out its mandated 1-5s before reconnecting
+		vi.advanceTimersByTime(5000);
 
 		mockSocket = wsMockState.instances[1]!;
 		mockSocket.emitMessage({
@@ -329,6 +334,19 @@ describe("WSClient lifecycle", () => {
 		expect(client.socket.ready).toBe(true);
 	});
 
+	it("login() rejects with Discord's reason when the token is rejected", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds
+		});
+
+		const loginPromise = client.login();
+		// 4004 is fatal, so waiting out the full ten second timeout would only produce a misleading error
+		wsMockState.instances[0]!.close(4004);
+
+		await expect(loginPromise).rejects.toThrow("4004");
+	});
+
 	it("does not send presence updates from setStatus()/setStatusMessage() until login() completes", async () => {
 		const client = new Client({
 			token: "token",
@@ -376,6 +394,7 @@ describe("WSClient lifecycle", () => {
 	});
 
 	it("reconnects automatically after an unexpected socket close", () => {
+		vi.useFakeTimers();
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");
 		socket.initialize();
@@ -383,11 +402,13 @@ describe("WSClient lifecycle", () => {
 		expect(wsMockState.instances).toHaveLength(1);
 
 		wsMockState.instances[0]!.close();
+		vi.advanceTimersByTime(0);
 
 		expect(wsMockState.instances).toHaveLength(2);
 	});
 
 	it("becomes ready again after a RESUMED dispatch following a resume", () => {
+		vi.useFakeTimers();
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		const socket = client.socket;
@@ -407,6 +428,7 @@ describe("WSClient lifecycle", () => {
 		// gateway asks for a reconnect+resume
 		firstSocket.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
 		expect(socket.ready).toBe(false);
+		vi.advanceTimersByTime(0);
 		expect(wsMockState.instances).toHaveLength(2);
 
 		const secondSocket = wsMockState.instances[1]!;
@@ -435,5 +457,149 @@ describe("WSClient lifecycle", () => {
 		socket.destroy();
 
 		expect(wsMockState.instances).toHaveLength(1);
+	});
+
+	it("backs off exponentially between consecutive reconnects", () => {
+		vi.useFakeTimers();
+		// full jitter multiplies the backoff by Math.random(), so pin it to the top of the window
+		vi.spyOn(Math, "random").mockReturnValue(1);
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+
+		// first drop reconnects immediately - a one-off blip should not cost the user a second of downtime
+		wsMockState.instances[0]!.close();
+		vi.advanceTimersByTime(0);
+		expect(wsMockState.instances).toHaveLength(2);
+
+		// second consecutive drop waits a second
+		wsMockState.instances[1]!.close();
+		vi.advanceTimersByTime(999);
+		expect(wsMockState.instances).toHaveLength(2);
+		vi.advanceTimersByTime(1);
+		expect(wsMockState.instances).toHaveLength(3);
+
+		// third doubles it
+		wsMockState.instances[2]!.close();
+		vi.advanceTimersByTime(1999);
+		expect(wsMockState.instances).toHaveLength(3);
+		vi.advanceTimersByTime(1);
+		expect(wsMockState.instances).toHaveLength(4);
+	});
+
+	it("resets the backoff once a connection reaches READY", () => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(1);
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
+		client.socket.initialize();
+
+		wsMockState.instances[0]!.close();
+		vi.advanceTimersByTime(0);
+		wsMockState.instances[1]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+
+		// the successful connection wiped the attempt counter, so this drop reconnects immediately again
+		wsMockState.instances[1]!.close();
+		vi.advanceTimersByTime(0);
+		expect(wsMockState.instances).toHaveLength(3);
+	});
+
+	it("gives up after maxReconnectAttempts consecutive failures", () => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(0);
+		const socket = new WSClient({} as Client, { jitterOverride: 1, maxReconnectAttempts: 2 });
+		socket.setToken("token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		for (let attempt = 0; attempt < 2; attempt++) {
+			wsMockState.instances.at(-1)!.close();
+			vi.advanceTimersByTime(0);
+		}
+		expect(wsMockState.instances).toHaveLength(3);
+		expect(disconnectSpy).not.toHaveBeenCalled();
+
+		wsMockState.instances.at(-1)!.close();
+		vi.advanceTimersByTime(60_000);
+
+		expect(wsMockState.instances).toHaveLength(3);
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("2 attempts"), null);
+		expect(socket.ready).toBe(false);
+	});
+
+	it("stops reconnecting on a fatal close code instead of spinning", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("bad-token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		// 4004: authentication failed - the token is wrong, so every retry sends the same bad IDENTIFY
+		wsMockState.instances[0]!.close(4004);
+		vi.advanceTimersByTime(60_000);
+
+		expect(wsMockState.instances).toHaveLength(1);
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("4004"), 4004);
+	});
+
+	it("stops reconnecting when the requested intents are disallowed", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		// 4014: a privileged intent was requested without enabling it in the Developer Portal
+		wsMockState.instances[0]!.close(4014);
+		vi.advanceTimersByTime(60_000);
+
+		expect(wsMockState.instances).toHaveLength(1);
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("4014"), 4014);
+	});
+
+	it("identifies instead of resuming after a session-invalidating close code", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
+		client.socket.initialize();
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 7,
+			t: GatewayEvents.Ready
+		});
+
+		// 4009: the session timed out, so the stored session_id can no longer be resumed
+		wsMockState.instances[0]!.close(4009);
+		vi.advanceTimersByTime(0);
+
+		const secondSocket = wsMockState.instances[1]!;
+		secondSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+
+		const ops = secondSocket.sent.map((raw) => (JSON.parse(raw) as GatewayPayload).op);
+		expect(ops).toContain(GatewayOpCodes.Identify);
+		expect(ops).not.toContain(GatewayOpCodes.Resume);
+	});
+
+	it("waits out the mandated delay before re-identifying on InvalidSession", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.InvalidSession, d: false, s: null, t: null });
+
+		// Discord requires a randomized 1-5s wait; reconnecting sooner burns the session start limit
+		vi.advanceTimersByTime(999);
+		expect(wsMockState.instances).toHaveLength(1);
+
+		vi.advanceTimersByTime(4001);
+		expect(wsMockState.instances).toHaveLength(2);
 	});
 });

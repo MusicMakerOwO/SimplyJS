@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { platform } from "node:os";
 import WebSocket from "ws";
-import { GatewayOpCodes, GatewayPayload } from "./Types/DiscordGateway.js";
+import { GatewayCloseCodes, GatewayOpCodes, GatewayPayload } from "./Types/DiscordGateway.js";
 import { Client } from "./Client.js";
 import { CreateDispatch, DispatchFunction, EventCallback } from "./EventDispatcher.js";
 import { GatewayEventName, JSONObject } from "./Types/Internal.js";
@@ -29,6 +29,12 @@ export const WSEvents = {
 	Resumed: "Resumed",
 	/** Fired when the underlying `ws` socket emits an `error` (ECONNRESET, TLS failure, bad handshake, etc) */
 	Error: "Error",
+	/**
+	 * Fired when the client stops reconnecting for good - either Discord rejected the connection in a
+	 * way retrying cannot fix (bad token, disallowed intents) or every reconnect attempt was used up.
+	 * The socket is dead at this point and will not come back without another `initialize()`.
+	 */
+	Disconnect: "Disconnect",
 } as const;
 
 export type WSEventMap = {
@@ -41,7 +47,38 @@ export type WSEventMap = {
 	[WSEvents.Ready]: [];
 	[WSEvents.Resumed]: [];
 	[WSEvents.Error]: [error: Error];
+	[WSEvents.Disconnect]: [reason: string, code: number | null];
 };
+
+/**
+ * Close codes where reconnecting is pointless - the `IDENTIFY` payload itself is the problem, so
+ * every retry fails identically while eating into the daily session start limit.
+ */
+const FATAL_CLOSE_CODES: ReadonlySet<number> = new Set([
+	GatewayCloseCodes.AuthenticationFailed,
+	GatewayCloseCodes.InvalidShard,
+	GatewayCloseCodes.ShardingRequired,
+	GatewayCloseCodes.InvalidAPIVersion,
+	GatewayCloseCodes.InvalidIntents,
+	GatewayCloseCodes.DisallowedIntents
+]);
+
+/** Close codes that kill the session but not the credentials - reconnect, but `IDENTIFY` instead of `RESUME` */
+const NON_RESUMABLE_CLOSE_CODES: ReadonlySet<number> = new Set([
+	GatewayCloseCodes.InvalidSeq,
+	GatewayCloseCodes.SessionTimedOut
+]);
+
+/** Delay before the second reconnect attempt; each further attempt doubles it up to `RECONNECT_MAX_DELAY` */
+const RECONNECT_BASE_DELAY = 1_000;
+/** Ceiling for a single reconnect delay, no matter how many attempts have failed */
+const RECONNECT_MAX_DELAY = 60_000;
+/**
+ * Discord requires a randomized 1-5 second wait after an `INVALID_SESSION` before re-identifying,
+ * so that a mass invalidation does not turn into a synchronized stampede of `IDENTIFY`s.
+ */
+const INVALID_SESSION_MIN_DELAY = 1_000;
+const INVALID_SESSION_MAX_DELAY = 5_000;
 
 export type WSOptions = {
 	/**
@@ -67,6 +104,17 @@ export type WSOptions = {
 	 * built-in handler for that event. Passed straight through to {@link CreateDispatch}.
 	 */
 	eventOverrides?: Partial<Record<GatewayEventName, EventCallback>>
+
+	/**
+	 * How many times to retry a dropped connection before giving up and emitting
+	 * {@link WSEvents.Disconnect}. The counter resets on every successful `READY`/`RESUMED`,
+	 * so this is a cap on consecutive failures, not on reconnects over the client's lifetime.
+	 *
+	 * Retries use exponential backoff with jitter, starting at one second and capping at one minute.
+	 *
+	 * @default 10
+	 */
+	maxReconnectAttempts?: number;
 }
 
 /**
@@ -82,6 +130,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#sessionId: string | null = null;
 	#resumeGatewayUrl: string | null = null;
 	#destroyed: boolean = false;
+	#reconnectTimer: NodeJS.Timeout | null = null;
+	#reconnectAttempts: number = 0;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -89,6 +139,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	jitter: number;
 	/** Gateway intents bitfield sent on `IDENTIFY`, controlling which events Discord sends */
 	intents: number;
+	/** Consecutive reconnect attempts allowed before the client gives up, see {@link WSOptions.maxReconnectAttempts} */
+	maxReconnectAttempts: number;
 
 	/** Whether Discord authentication has completed */
 	ready: boolean;
@@ -108,6 +160,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.heartbeatInterval = -1;
 		this.jitter = options.jitterOverride ?? Math.random();
 		this.intents = options.intents ?? 0;
+		this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
 
 		this.ready = false;
 
@@ -129,6 +182,11 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		if (this.#socket) return; // already connected / connecting
 
 		this.#destroyed = false;
+		// connecting now supersedes any reconnect that was still waiting out its backoff
+		if (this.#reconnectTimer) {
+			clearTimeout(this.#reconnectTimer);
+			this.#reconnectTimer = null;
+		}
 
 		const baseUrl = this.#resumeGatewayUrl ?? "wss://gateway.discord.gg";
 		const socket = new WebSocket(`${baseUrl}?v=10&encoding=json`);
@@ -136,24 +194,67 @@ export class WSClient extends EventEmitter<WSEventMap> {
 
 		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
 		socket.on("error", (err) => this.emit(WSEvents.Error, err));
-		socket.on("close", () => {
-			this.ready = false;
-			this.heartbeatInterval = -1;
-			this.#socket = null;
-			if (this.#heartbeatTimer) {
-				clearInterval(this.#heartbeatTimer);
-				this.#heartbeatTimer = null;
-			}
-			// An unexpected close (network drop, Discord-initiated close, etc.)
-			// Reconnect unless this close was requested by destroy(). Paths that close the socket
-			// deliberately (#reconnect, op 7/9) call removeAllListeners() first, so they
-			// never reach this handler.
-			if (!this.#destroyed) this.#reconnect();
-		});
+		socket.on("close", (code?: number) => this.#handleClose(code));
 	}
 
-	/** Closes the current socket and opens a new one, resuming the session if one is available */
-	#reconnect(): void {
+	/**
+	 * Handles an unexpected close (network drop, Discord-initiated close, etc). Paths that close the
+	 * socket deliberately (`#reconnect`, op 7/9) call `removeAllListeners()` first, so they never
+	 * reach here - anything that does was not our doing, and the close code decides what happens next.
+	 */
+	#handleClose(code?: number): void {
+		this.#teardownConnection();
+
+		// closed by destroy() - stay down
+		if (this.#destroyed) return;
+
+		if (typeof code === "number" && FATAL_CLOSE_CODES.has(code)) {
+			// Discord rejected the IDENTIFY itself; retrying sends the same bad payload forever
+			// and burns the session start limit doing it, so stop here.
+			this.#giveUp(`Gateway closed with code ${code}, which cannot be recovered by reconnecting`, code);
+			return;
+		}
+
+		if (typeof code === "number" && NON_RESUMABLE_CLOSE_CODES.has(code)) this.#invalidateSession();
+
+		this.#reconnect();
+	}
+
+	/**
+	 * Closes the current socket and schedules a new one, resuming the session if one is available.
+	 *
+	 * Each consecutive attempt waits longer than the last (exponential backoff with jitter, capped at
+	 * {@link RECONNECT_MAX_DELAY}) so a gateway that keeps hanging up is not hammered, and the client
+	 * gives up entirely after {@link maxReconnectAttempts}. The counter resets once a connection
+	 * succeeds, see {@link #connectionSucceeded}.
+	 *
+	 * @param minimumDelay Floor for the wait, used where the protocol mandates one (op 9 -> 1-5s)
+	 */
+	#reconnect(minimumDelay: number = 0): void {
+		this.#teardownConnection();
+
+		if (this.#reconnectAttempts >= this.maxReconnectAttempts) {
+			this.#giveUp(`Failed to reconnect to the gateway after ${this.#reconnectAttempts} attempts`, null);
+			return;
+		}
+
+		// full jitter: attempt 0 reconnects immediately, later ones spread out over their window so
+		// a fleet of clients dropped by the same outage does not come back in lockstep
+		const backoff = this.#reconnectAttempts === 0
+			? 0
+			: Math.min(RECONNECT_BASE_DELAY * 2 ** (this.#reconnectAttempts - 1), RECONNECT_MAX_DELAY) * Math.random();
+
+		this.#reconnectAttempts++;
+
+		this.#reconnectTimer = setTimeout(() => {
+			this.#reconnectTimer = null;
+			if (this.#destroyed) return;
+			this.initialize();
+		}, Math.max(minimumDelay, backoff)).unref();
+	}
+
+	/** Clears everything tied to the current connection, leaving the session (if any) intact for a resume */
+	#teardownConnection(): void {
 		if (this.#socket) {
 			this.#socket.removeAllListeners();
 			this.#socket.close();
@@ -164,7 +265,28 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			this.#heartbeatTimer = null;
 		}
 		this.ready = false;
-		this.initialize();
+		this.heartbeatInterval = -1;
+	}
+
+	/** Drops the resume state so the next `HELLO` sends a fresh `IDENTIFY` instead of a `RESUME` */
+	#invalidateSession(): void {
+		this.#sessionId = null;
+		this.#resumeGatewayUrl = null;
+		this.#sequence = null;
+	}
+
+	/** Stops reconnecting for good and tells listeners why */
+	#giveUp(reason: string, code: number | null): void {
+		this.#destroyed = true;
+		this.#invalidateSession();
+		this.#reconnectAttempts = 0;
+		this.emit(WSEvents.Disconnect, reason, code);
+	}
+
+	/** Marks the connection as authenticated, clearing the backoff so the next drop retries promptly */
+	#connectionSucceeded(): void {
+		this.ready = true;
+		this.#reconnectAttempts = 0;
 	}
 
 	/** Send a message to discord via gateway */
@@ -207,12 +329,12 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			case GatewayOpCodes.InvalidSession:
 				// d indicates whether the session is resumable; if not, drop it and re-identify
 				this.emit(WSEvents.InvalidSession, data.d === true);
-				if (data.d !== true) {
-					this.#sessionId = null;
-					this.#resumeGatewayUrl = null;
-					this.#sequence = null;
-				}
-				this.#reconnect();
+				if (data.d !== true) this.#invalidateSession();
+				// Discord mandates a randomized 1-5s wait here before reconnecting, otherwise the
+				// re-IDENTIFY counts against the session start limit as an abusive burst
+				this.#reconnect(
+					INVALID_SESSION_MIN_DELAY + Math.random() * (INVALID_SESSION_MAX_DELAY - INVALID_SESSION_MIN_DELAY)
+				);
 				return;
 		}
 
@@ -221,7 +343,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		}
 
 		if (data.t === "RESUMED") {
-			this.ready = true;
+			this.#connectionSucceeded();
 			this.emit(WSEvents.Resumed);
 			return;
 		}
@@ -231,7 +353,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		}
 
 		if (data.t === "READY") {
-			this.ready = true;
+			this.#connectionSucceeded();
 			this.emit(WSEvents.Ready);
 			const readyData = data.d as JSONObject;
 			if (typeof readyData.session_id === "string") this.#sessionId = readyData.session_id;
@@ -329,6 +451,11 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			clearInterval(this.#heartbeatTimer);
 			this.#heartbeatTimer = null;
 		}
+		if (this.#reconnectTimer) {
+			clearTimeout(this.#reconnectTimer);
+			this.#reconnectTimer = null;
+		}
+		this.#reconnectAttempts = 0;
 		this.#sessionId = null;
 		this.#resumeGatewayUrl = null;
 		if (this.#socket) this.#socket.close()
