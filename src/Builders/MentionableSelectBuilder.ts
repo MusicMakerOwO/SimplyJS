@@ -31,7 +31,7 @@ export class MentionableSelectBuilder extends EntitySelectBuilder<typeof Compone
 	}
 
 	readonly type = ComponentTypes.MENTIONABLE_SELECT;
-	protected readonly selectLabel = "Mentionable select";
+	protected get selectLabel(): string { return "Mentionable select"; }
 
 	/**
 	 * Appends pre-filled users by id

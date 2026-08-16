@@ -31,7 +31,7 @@ export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 	}
 
 	readonly type = ComponentTypes.USER_SELECT;
-	protected readonly selectLabel = "User select";
+	protected get selectLabel(): string { return "User select"; }
 
 	/**
 	 * Appends pre-filled users by id

@@ -1400,3 +1400,94 @@ describe("ModalBuilder", () => {
 		});
 	});
 });
+// ---------------------------------------------------------------------------
+// Wire-format compatibility
+//
+// Every builder *is* its payload type - no `toJSON()` hook, no camelCase fields that only get
+// renamed on the way out. These tests pin that: a builder's own enumerable properties are exactly
+// the payload Discord expects, so inspecting, cloning, or logging one before it's serialized
+// yields the same thing REST sends.
+// ---------------------------------------------------------------------------
+
+describe("builders are their wire payloads", () => {
+	function fullySetBuilders(): Record<string, object> {
+		return {
+			ButtonBuilder: new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete").setDisabled(),
+			LinkButtonBuilder: new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com"),
+			SKUButtonBuilder: new SKUButtonBuilder().setSkuId("1234567890").setDisabled(),
+			StringSelectBuilder: new StringSelectBuilder().setCustomId("pick").setMinValues(1).setMaxValues(2).addOption("One", "one"),
+			UserSelectBuilder: new UserSelectBuilder().setCustomId("pick-user").setMaxValues(2).addDefaultUsers("1"),
+			RoleSelectBuilder: new RoleSelectBuilder().setCustomId("pick-role").addDefaultRoles("2"),
+			MentionableSelectBuilder: new MentionableSelectBuilder().setCustomId("pick-mention").addDefaultUsers("3"),
+			ChannelSelectBuilder: new ChannelSelectBuilder().setCustomId("pick-channel").setChannelTypes(DiscordChannelTypes.GUILD_TEXT),
+			TextInputBuilder: new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT).setMinLength(1).setMaxLength(10),
+			LabelBuilder: new LabelBuilder().setLabel("Feedback").setComponent(
+				new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT)
+			),
+			ActionRowBuilder: new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel("Click me").setCustomId("click")),
+			ModalBuilder: new ModalBuilder().addField("Feedback", new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT))
+		};
+	}
+
+	it("expose no toJSON hook to depend on", () => {
+		for (const [name, builder] of Object.entries(fullySetBuilders())) {
+			expect(builder, name).not.toHaveProperty("toJSON");
+		}
+	});
+
+	it("carry only snake_case wire keys, at every level of nesting", () => {
+		const camelCase = /[a-z][A-Z]/;
+
+		function assertWireKeys(value: unknown, path: string): void {
+			if (Array.isArray(value)) {
+				for (const [index, item] of value.entries()) assertWireKeys(item, `${path}[${index}]`);
+				return;
+			}
+			if (value === null || typeof value !== "object") return;
+
+			for (const [key, nested] of Object.entries(value)) {
+				expect(key, `${path}.${key}`).not.toMatch(camelCase);
+				assertWireKeys(nested, `${path}.${key}`);
+			}
+		}
+
+		for (const [name, builder] of Object.entries(fullySetBuilders())) assertWireKeys(builder, name);
+	});
+
+	it("survive a stringify round-trip unchanged - nothing is added or renamed on the way out", () => {
+		for (const [name, builder] of Object.entries(fullySetBuilders())) {
+			expect(JSON.parse(JSON.stringify(builder)), name).toEqual({ ...builder });
+		}
+	});
+
+	it("produce the exact payloads Discord documents", () => {
+		expect({ ...new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete") }).toEqual({
+			type: ComponentTypes.BUTTON,
+			style: ButtonStyles.DANGER,
+			label: "Delete",
+			custom_id: "delete"
+		});
+
+		expect({ ...new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.PARAGRAPH).setMaxLength(200) }).toEqual({
+			type: ComponentTypes.TEXT_INPUT,
+			custom_id: "feedback",
+			style: TextInputStyles.PARAGRAPH,
+			max_length: 200
+		});
+
+		expect({ ...new ModalBuilder().setCustomId("feedback-modal").setTitle("Feedback").addField(
+			"How did we do?",
+			new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT)
+		) }).toEqual({
+			custom_id: "feedback-modal",
+			title: "Feedback",
+			components: [
+				{
+					type: ComponentTypes.LABEL,
+					label: "How did we do?",
+					component: { type: ComponentTypes.TEXT_INPUT, custom_id: "feedback", style: TextInputStyles.SHORT }
+				}
+			]
+		});
+	});
+});

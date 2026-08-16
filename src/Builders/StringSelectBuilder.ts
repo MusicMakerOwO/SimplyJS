@@ -50,7 +50,7 @@ export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes
 	}
 
 	readonly type = ComponentTypes.STRING_SELECT;
-	protected readonly selectLabel = "String select";
+	protected get selectLabel(): string { return "String select"; }
 	/** Choices in the select, max 25 - only populated once set, see {@link StringSelectBuilder#validate} */
 	options!: SelectOption[];
 

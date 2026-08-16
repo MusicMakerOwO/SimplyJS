@@ -31,7 +31,7 @@ export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 	}
 
 	readonly type = ComponentTypes.ROLE_SELECT;
-	protected readonly selectLabel = "Role select";
+	protected get selectLabel(): string { return "Role select"; }
 
 	/**
 	 * Appends pre-filled roles by id

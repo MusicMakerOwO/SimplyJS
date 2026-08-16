@@ -52,8 +52,13 @@ export abstract class BaseSelectBuilder<TType extends ComponentType> {
 	/** Whether the select is disabled, message-only, defaults to false */
 	disabled?: boolean;
 
-	/** Human-readable name used in validation error messages, e.g. "User select" */
-	protected abstract readonly selectLabel: string;
+	/**
+	 * Human-readable name used in validation error messages, e.g. "User select".
+	 *
+	 * Declared as an accessor rather than a field so it lives on the prototype - a builder *is*
+	 * its payload, so any own enumerable property would be sent to Discord as an unknown key.
+	 */
+	protected abstract get selectLabel(): string;
 
 	/**
 	 * Sets the select's customId

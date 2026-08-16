@@ -34,7 +34,7 @@ export class ChannelSelectBuilder extends EntitySelectBuilder<typeof ComponentTy
 	}
 
 	readonly type = ComponentTypes.CHANNEL_SELECT;
-	protected readonly selectLabel = "Channel select";
+	protected get selectLabel(): string { return "Channel select"; }
 	/** Restricts the channel types shown in the picker */
 	channel_types?: ObjectValues<typeof DiscordChannelTypes>[];
 
