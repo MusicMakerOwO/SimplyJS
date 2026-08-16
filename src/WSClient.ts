@@ -210,6 +210,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 				if (data.d !== true) {
 					this.#sessionId = null;
 					this.#resumeGatewayUrl = null;
+					this.#sequence = null;
 				}
 				this.#reconnect();
 				return;

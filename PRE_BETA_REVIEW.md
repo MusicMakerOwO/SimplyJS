@@ -37,17 +37,18 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   heartbeats every ~2s forever → gateway rate limit (120 payloads/60s) → forced disconnect.
   The JSDoc at `:68` already describes the intended behavior; code and doc disagree.
 
-- [ ] **HIGH — `login()` can never fail.** `src/Client.ts:88-94`
+- [x] **HIGH — `login()` can never fail.** `src/Client.ts:88-94`
   A 1ms busy-poll on `socket.ready` with no timeout and no rejection path.
   *Trigger:* bad token, missing privileged intent, or unreachable gateway. `await client.login()`
   hangs forever at ~1000 wakeups/sec instead of throwing. Combined with the two items above, the
   failure is completely silent.
+  *Note:* already resolved — `Client.ts` uses `awaitEvent` with a 10s timeout that rejects.
 
 - [x] **HIGH — Gateway URL has no version or encoding.** `src/WSClient.ts:111`
   Missing `?v=10&encoding=json` on both the initial connect and the resume URL. Unversioned
   connections get Discord's legacy default.
 
-- [ ] **MED — Sequence number survives a session it no longer belongs to.**
+- [x] **MED — Sequence number survives a session it no longer belongs to.**
   `src/WSClient.ts:155,172-180`
   On op 9 with `d: false`, `#sessionId`/`#resumeGatewayUrl` are cleared but `#sequence` is not.
   *Trigger:* invalid-session → fresh IDENTIFY → the first heartbeat (`:255`) sends

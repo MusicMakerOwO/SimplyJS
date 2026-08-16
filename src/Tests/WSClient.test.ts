@@ -169,6 +169,40 @@ describe("WSClient lifecycle", () => {
 		expect(errorSpy).toHaveBeenCalledWith(err);
 	});
 
+	it("clears the stale sequence number on a non-resumable InvalidSession", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+
+		socket.initialize();
+		let mockSocket = wsMockState.instances[0]!;
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 42,
+			t: GatewayEvents.Ready
+		});
+
+		mockSocket.emitMessage({ op: GatewayOpCodes.InvalidSession, d: false, s: null, t: null });
+
+		mockSocket = wsMockState.instances[1]!;
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Hello,
+			d: { heartbeat_interval: 1000 },
+			s: null,
+			t: null
+		});
+
+		mockSocket.sent.length = 0;
+		// jitterOverride: 1 => first heartbeat fires after the full interval
+		vi.advanceTimersByTime(1000);
+
+		const heartbeatPayload = mockSocket.sent
+			.map((raw) => JSON.parse(raw) as GatewayPayload)
+			.find((payload) => payload.op === GatewayOpCodes.Heartbeat);
+		expect(heartbeatPayload?.d).toBeNull();
+	});
+
 	it("drops a malformed frame instead of throwing", () => {
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");
