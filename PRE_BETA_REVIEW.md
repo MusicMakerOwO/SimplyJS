@@ -18,13 +18,6 @@ backwards-compatibility tests land.
 This cluster is the difference between a library that survives a night and one that doesn't.
 Worth fixing as a single pass over `WSClient.ts` rather than item by item.
 
-- [x] **HIGH — A dropped connection is permanent.** `src/WSClient.ts:115-123`
-  The `close` handler nulls the socket and clears the heartbeat but never reconnects, and
-  `initialize()` is never re-entered.
-  *Trigger:* any network drop, Discord-initiated close (4000/1001), or process suspend. The bot
-  goes silent forever with no error and no event. Only the three explicit paths (op 7, op 9,
-  missed ACK) reconnect.
-
 - [ ] **HIGH — No `error` listener on the socket.** `src/WSClient.ts:114`
   `ws` emits `error` on ECONNRESET / TLS failure / bad handshake. With no listener, Node's
   `EventEmitter` throws it and takes the process down.
@@ -44,16 +37,6 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   heartbeats every ~2s forever → gateway rate limit (120 payloads/60s) → forced disconnect.
   The JSDoc at `:68` already describes the intended behavior; code and doc disagree.
 
-- [x] **HIGH — `ready` never becomes true again after a resume.**
-  `src/WSClient.ts:190-195`, `src/Client.ts:88-94`
-  `ready = true` is only set on a `READY` dispatch. A successful resume yields `RESUMED`, which
-  isn't in `GatewayEvents` (`src/Types/DiscordGateway.ts:317`) at all — not typed, not handled,
-  and it trips the `console.warn` in `EventDispatcher.ts:40`.
-  *Trigger:* op 7 → `#reconnect()` (sets `ready = false` at `:137`) → hello → resume → `RESUMED`.
-  `client.socket.ready` stays `false` for the rest of the process. `Client.destroy()`
-  (`Client.ts:100-103`) reads the same flag, so its "wait for close" loop returns instantly on a
-  live socket.
-
 - [ ] **HIGH — `login()` can never fail.** `src/Client.ts:88-94`
   A 1ms busy-poll on `socket.ready` with no timeout and no rejection path.
   *Trigger:* bad token, missing privileged intent, or unreachable gateway. `await client.login()`
@@ -70,16 +53,6 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   *Trigger:* invalid-session → fresh IDENTIFY → the first heartbeat (`:255`) sends
   `d: <old session's sequence>`. Sequence is session-scoped; a stale value on a new session is a
   protocol violation. Reset `#sequence` to `null` alongside the session id.
-
-- [x] **MED — `JSON.parse` in the message handler is unguarded.** `src/WSClient.ts:152`
-  A malformed frame throws inside the `ws` `message` callback.
-
-- [x] **LOW — Wrong error message.** `src/WSClient.ts:272`
-  The websocket client's own guard throws `"Rest client not initialized"`.
-
-- [x] **LOW — Identify `properties` are joke strings.** `src/WSClient.ts:239-241`
-  `"i use arch btw"` / `"python sucks"` / `"ur mom"` are sent to Discord on every connect. Worth
-  a decision before 1.0.
 
 ---
 
@@ -106,9 +79,3 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   the wire payload won't have — and any future path that inspects, clones, or logs the payload
   before stringifying gets the camelCase object. The `as unknown as` casts are what hide this
   from `tsc`. Make the `toJSON()` calls explicit before compat tests pin the behavior.
-
-- [x] **LOW-MED — Presence set before login throws the wrong error.** `src/Client.ts:107-142`
-  `#updatePressence` → `socket.send` → `#checkInitialization` → `"Rest client not initialized"`.
-  The natural call order (construct → `setStatus` → `login`) hits this. And `Client.status`/
-  `activity` are never included in the IDENTIFY payload (`src/WSClient.ts:234-247`), so state set
-  before connect is dropped even if you reorder around the throw.
