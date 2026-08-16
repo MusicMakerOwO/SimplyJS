@@ -57,10 +57,11 @@
   - invalid session resume-vs-identify branching
   - heartbeat ACK timeout + timer cleanup on close/destroy
   - session_id and resume_gateway_url tracking
-- [ ] `src/Tests/Rest.test.ts`
-  - 429 retry using JSON body `retry_after`
-  - 429 retry using rate-limit headers
-  - transient 5xx retry policy and terminal failure behavior
+- [x] `src/Tests/Rest.test.ts`
+  - [x] 429 retry using JSON body `retry_after`
+  - [x] 429 retry using rate-limit headers
+  - [x] transient 5xx retry policy and terminal failure behavior
+  - [x] pre-emptive backoff on an exhausted bucket, per-bucket request serialization, global limits
 - [ ] `src/Tests/CacheOperations.test.ts`
   - Guild cache upsert/fetch/update
   - User cache upsert/fetch/update

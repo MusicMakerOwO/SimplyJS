@@ -29,7 +29,17 @@ Ordered by suggested triage.
   Also: op 9 with `d: false` reconnects immediately, but Discord requires a 1–5s randomized wait
   before re-identifying. Hammering IDENTIFY burns the session-start rate limit.
 
-- [ ] **MED — Rate limiting is reactive-only, with no request serialization.** `src/Rest.ts:241-276`
+- [x] **MED — Rate limiting is reactive-only, with no request serialization.** `src/Rest.ts:241-276`
+  *Fixed on both counts. `#recordRateLimitHeaders()` now runs on every response, not just a 429: an
+  `X-RateLimit-Remaining: 0` stores the bucket's `X-RateLimit-Reset-After` window, so the next
+  request sleeps it out instead of walking into the limit. `#request()` splits into a queue entry
+  point and `#execute()`, with `#enqueue()` chaining requests per rate limit key so a burst against
+  one bucket goes out one at a time and each request sees the previous one's headers (skipped when
+  `perRouteRateLimits` is off - that option means the caller is pacing themselves). A rejected
+  request does not poison its queue, and keys are dropped once nothing is queued behind them.
+  Also fixed while in here: a global 429 was being recorded under `"global"` but only ever read by
+  clients with `perRouteRateLimits` off - `#remainingRateLimitWait()` now checks the route's key and
+  the global key and waits out whichever is longer.*
   `routeRateLimits` is written *only* on a 429 (`:271`). The `X-RateLimit-Remaining: 0` +
   `X-RateLimit-Reset-After` headers are read in `#resolveRateLimitWaitMilliseconds`, but that runs
   only in the 429 branch, so the client never pre-emptively backs off.

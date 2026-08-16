@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- REST rate limiting is no longer reactive-only. An `X-RateLimit-Remaining: 0` on any response now records the bucket's reset window pre-emptively, and requests sharing a rate limit key are serialized through a per-bucket queue, so a burst of concurrent calls paces itself instead of all passing the limit check together, hitting Discord together, and coming back `429` together
+- A global rate limit now pauses every bucket. It was recorded but only ever honoured by clients running with `perRouteRateLimits` disabled
 - `WSClient.#reconnect()` no longer retries immediately and forever. Reconnects are scheduled with exponential backoff and full jitter (1s base, 60s cap, first attempt still immediate) and stop after `maxReconnectAttempts`. Fatal close codes (4004 authentication failed, 4010–4014 invalid shard/sharding required/invalid API version/invalid or disallowed intents) now stop reconnecting entirely instead of replaying a rejected `IDENTIFY` in a tight loop, and `4007`/`4009` drop the stale session so the next connection identifies rather than resuming
 - `GatewayOpCodes.InvalidSession` now waits Discord's mandated randomized 1–5 seconds before reconnecting, instead of re-identifying instantly and burning the session start rate limit
 - `Client.login()` now rejects with the gateway's actual failure reason when the connection is rejected outright (bad token, disallowed intents), instead of waiting the full ten seconds to blame a Discord outage
