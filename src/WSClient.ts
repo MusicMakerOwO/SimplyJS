@@ -307,7 +307,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	/** Guards against sending before {@link setToken} and {@link initialize} have both run */
 	#checkInitialization(): void {
 		if (!this.#token) throw new Error("Token not provided");
-		if (!this.#socket) throw new Error("Rest client not initialized");
+		if (!this.#socket) throw new Error("Websocket client not initialized");
 	}
 
 	/** Kills the websocket connection and logs out */

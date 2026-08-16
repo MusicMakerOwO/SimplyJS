@@ -74,7 +74,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
 - [x] **MED — `JSON.parse` in the message handler is unguarded.** `src/WSClient.ts:152`
   A malformed frame throws inside the `ws` `message` callback.
 
-- [ ] **LOW — Wrong error message.** `src/WSClient.ts:272`
+- [x] **LOW — Wrong error message.** `src/WSClient.ts:272`
   The websocket client's own guard throws `"Rest client not initialized"`.
 
 - [x] **LOW — Identify `properties` are joke strings.** `src/WSClient.ts:239-241`
