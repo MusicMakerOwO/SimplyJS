@@ -46,6 +46,50 @@ export const GatewayOpCodes = {
 } as const;
 
 /**
+ * Gateway close codes (`code`) sent by Discord when it closes the websocket.
+ *
+ * These split into two groups, and the split is what decides how a client should react:
+ * - **Recoverable** (`UnknownError` through `SessionTimedOut`) - the connection died but the
+ *   credentials are fine, so reconnecting works. `InvalidSeq` and `SessionTimedOut` also
+ *   invalidate the session, meaning the client must `Identify` fresh rather than `Resume`.
+ * - **Fatal** (`AuthenticationFailed` and everything after it) - the `Identify` payload itself
+ *   is wrong (bad token, missing intents, bad shard config). Reconnecting will fail the same
+ *   way every time, so the client should stop instead of burning its session start limit.
+ *
+ * @see https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-close-event-codes
+ */
+export const GatewayCloseCodes = {
+	/** Unknown error - the gateway is unsure what went wrong. Reconnect and resume. */
+	UnknownError: 4000,
+	/** An invalid opcode or payload structure was sent. */
+	UnknownOpcode: 4001,
+	/** An invalid payload was sent and could not be decoded. */
+	DecodeError: 4002,
+	/** A payload was sent before `Identify`. */
+	NotAuthenticated: 4003,
+	/** The token sent in `Identify` was invalid. **Fatal.** */
+	AuthenticationFailed: 4004,
+	/** More than one `Identify` was sent on the same connection. */
+	AlreadyAuthenticated: 4005,
+	/** The sequence sent when resuming was invalid - the session is gone, identify fresh. */
+	InvalidSeq: 4007,
+	/** Payloads were sent too quickly and the connection was cut. */
+	RateLimited: 4008,
+	/** The session timed out - the session is gone, identify fresh. */
+	SessionTimedOut: 4009,
+	/** An invalid shard was sent in `Identify`. **Fatal.** */
+	InvalidShard: 4010,
+	/** The session would have handled too many guilds - sharding is required. **Fatal.** */
+	ShardingRequired: 4011,
+	/** An invalid gateway API version was requested. **Fatal.** */
+	InvalidAPIVersion: 4012,
+	/** The intents bitfield sent in `Identify` was invalid. **Fatal.** */
+	InvalidIntents: 4013,
+	/** A privileged intent was requested that has not been enabled in the Developer Portal. **Fatal.** */
+	DisallowedIntents: 4014,
+} as const;
+
+/**
  * Generic shape used by Discord gateway payloads.
  *
  * This models the shared envelope all gateway packets use:
