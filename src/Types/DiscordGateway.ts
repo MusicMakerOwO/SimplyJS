@@ -326,6 +326,12 @@ export const GatewayEvents = {
 	 * Required intent: none (sent regardless of intents)	 */
 	Ready: "READY",
 	/**
+	 * Emitted after a successful session resume, in place of `READY`.
+	 *
+	 * Required intent: none (sent regardless of intents)
+	 */
+	Resumed: "RESUMED",
+	/**
 	 * Emitted when the bot either joins a guild or during initial connection with all existing guilds
 	 *
 	 * Required intent: `GatewayIntents.Guilds`

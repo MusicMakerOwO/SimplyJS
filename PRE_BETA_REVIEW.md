@@ -44,7 +44,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   heartbeats every ~2s forever → gateway rate limit (120 payloads/60s) → forced disconnect.
   The JSDoc at `:68` already describes the intended behavior; code and doc disagree.
 
-- [ ] **HIGH — `ready` never becomes true again after a resume.**
+- [x] **HIGH — `ready` never becomes true again after a resume.**
   `src/WSClient.ts:190-195`, `src/Client.ts:88-94`
   `ready = true` is only set on a `READY` dispatch. A successful resume yields `RESUMED`, which
   isn't in `GatewayEvents` (`src/Types/DiscordGateway.ts:317`) at all — not typed, not handled,

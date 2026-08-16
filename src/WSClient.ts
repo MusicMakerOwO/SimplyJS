@@ -25,6 +25,8 @@ export const WSEvents = {
 	HeartbeatAck: "HeartbeatAck",
 	/** Fired when the gateway sends the `READY` dispatch, indicating successful authentication */
 	Ready: "Ready",
+	/** Fired when the gateway sends the `RESUMED` dispatch, indicating a successful session resume */
+	Resumed: "Resumed",
 } as const;
 
 export type WSEventMap = {
@@ -35,6 +37,7 @@ export type WSEventMap = {
 	[WSEvents.Hello]: [heartbeatInterval: number];
 	[WSEvents.HeartbeatAck]: [];
 	[WSEvents.Ready]: [];
+	[WSEvents.Resumed]: [];
 };
 
 export type WSOptions = {
@@ -204,6 +207,13 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		if (!data.t) {
 			return;
 		}
+
+		if (data.t === "RESUMED") {
+			this.ready = true;
+			this.emit(WSEvents.Resumed);
+			return;
+		}
+
 		if (!data.d || typeof data.d !== "object") {
 			return;
 		}

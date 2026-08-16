@@ -253,6 +253,44 @@ describe("WSClient lifecycle", () => {
 		expect(wsMockState.instances).toHaveLength(2);
 	});
 
+	it("becomes ready again after a RESUMED dispatch following a resume", () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		const resumedSpy = vi.fn();
+		socket.on(WSEvents.Resumed, resumedSpy);
+
+		socket.initialize();
+		const firstSocket = wsMockState.instances[0]!;
+		firstSocket.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+		expect(socket.ready).toBe(true);
+
+		// gateway asks for a reconnect+resume
+		firstSocket.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+		expect(socket.ready).toBe(false);
+		expect(wsMockState.instances).toHaveLength(2);
+
+		const secondSocket = wsMockState.instances[1]!;
+		secondSocket.emitMessage({
+			op: GatewayOpCodes.Hello,
+			d: { heartbeat_interval: 45_000 },
+			s: null,
+			t: null
+		});
+		expect(secondSocket.sent.map((raw) => (JSON.parse(raw) as GatewayPayload).op)).toContain(GatewayOpCodes.Resume);
+
+		secondSocket.emitMessage({ op: GatewayOpCodes.Dispatch, d: null, s: 2, t: "RESUMED" });
+
+		expect(socket.ready).toBe(true);
+		expect(resumedSpy).toHaveBeenCalledTimes(1);
+		expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("RESUMED"));
+	});
+
 	it("does not reconnect after destroy()", () => {
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");
