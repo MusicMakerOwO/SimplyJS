@@ -71,7 +71,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   `d: <old session's sequence>`. Sequence is session-scoped; a stale value on a new session is a
   protocol violation. Reset `#sequence` to `null` alongside the session id.
 
-- [ ] **MED — `JSON.parse` in the message handler is unguarded.** `src/WSClient.ts:152`
+- [x] **MED — `JSON.parse` in the message handler is unguarded.** `src/WSClient.ts:152`
   A malformed frame throws inside the `ws` `message` callback.
 
 - [ ] **LOW — Wrong error message.** `src/WSClient.ts:272`

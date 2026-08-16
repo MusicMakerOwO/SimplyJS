@@ -31,7 +31,10 @@ const wsMockState = vi.hoisted(() => {
 		}
 
 		emitMessage(payload: GatewayPayload): void {
-			const packet = JSON.stringify(payload);
+			this.emitRaw(JSON.stringify(payload));
+		}
+
+		emitRaw(packet: string): void {
 			for (const handler of this.#messageHandlers) {
 				handler({
 					toString: () => packet
@@ -111,7 +114,24 @@ describe("WSClient lifecycle", () => {
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");
 
-		expect(() => socket.send({ op: GatewayOpCodes.Heartbeat, d: null, s: null, t: null })).toThrow(/not initialized/i);
+		expect(() => socket.send({ op: GatewayOpCodes.Heartbeat, d: null, s: null, t: null })).toThrow(/websocket client not initialized/i);
+	});
+
+	it("drops a malformed frame instead of throwing", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+
+		expect(() => mockSocket.emitRaw("not json{")).not.toThrow();
+
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Hello,
+			d: { heartbeat_interval: 45_000 },
+			s: null,
+			t: null
+		});
+		expect(socket.heartbeatInterval).toBe(45_000);
 	});
 
 	it("handles HELLO by sending identify and scheduling heartbeats", async () => {

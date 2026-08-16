@@ -173,7 +173,13 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	 * otherwise forwards named dispatch events to {@link dispatch}.
 	 */
 	#handleMessage(rawData: string): void {
-		const data = JSON.parse(rawData) as GatewayPayload;
+		let data: GatewayPayload;
+		try {
+			data = JSON.parse(rawData) as GatewayPayload;
+		} catch {
+			// malformed frame - not a protocol violation worth reconnecting over, just drop it
+			return;
+		}
 		this.emit(WSEvents.Raw, data);
 
 		if (typeof data.s === "number") this.#sequence = data.s;
