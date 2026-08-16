@@ -44,6 +44,11 @@ const wsMockState = vi.hoisted(() => {
 				handler();
 			}
 		}
+
+		removeAllListeners(): void {
+			this.#messageHandlers = [];
+			this.#closeHandlers = [];
+		}
 	}
 
 	return {
@@ -234,5 +239,29 @@ describe("WSClient lifecycle", () => {
 
 		expect(client.socket.ready).toBe(false);
 		expect(client.socket.heartbeatInterval).toBe(-1);
+	});
+
+	it("reconnects automatically after an unexpected socket close", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		socket.initialize();
+
+		expect(wsMockState.instances).toHaveLength(1);
+
+		wsMockState.instances[0]!.close();
+
+		expect(wsMockState.instances).toHaveLength(2);
+	});
+
+	it("does not reconnect after destroy()", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		socket.initialize();
+
+		expect(wsMockState.instances).toHaveLength(1);
+
+		socket.destroy();
+
+		expect(wsMockState.instances).toHaveLength(1);
 	});
 });

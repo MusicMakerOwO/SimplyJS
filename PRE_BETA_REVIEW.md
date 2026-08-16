@@ -18,7 +18,7 @@ backwards-compatibility tests land.
 This cluster is the difference between a library that survives a night and one that doesn't.
 Worth fixing as a single pass over `WSClient.ts` rather than item by item.
 
-- [ ] **HIGH — A dropped connection is permanent.** `src/WSClient.ts:115-123`
+- [x] **HIGH — A dropped connection is permanent.** `src/WSClient.ts:115-123`
   The `close` handler nulls the socket and clears the heartbeat but never reconnects, and
   `initialize()` is never re-entered.
   *Trigger:* any network drop, Discord-initiated close (4000/1001), or process suspend. The bot

@@ -75,6 +75,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#heartbeatAcked: boolean = true;
 	#sessionId: string | null = null;
 	#resumeGatewayUrl: string | null = null;
+	#destroyed: boolean = false;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -121,6 +122,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		if (this.#token === null) throw new Error("No token provided - Did you add one via setToken()?");
 		if (this.#socket) return; // already connected / connecting
 
+		this.#destroyed = false;
+
 		const socket = new WebSocket(this.#resumeGatewayUrl ?? "wss://gateway.discord.gg");
 		this.#socket = socket;
 
@@ -133,6 +136,11 @@ export class WSClient extends EventEmitter<WSEventMap> {
 				clearInterval(this.#heartbeatTimer);
 				this.#heartbeatTimer = null;
 			}
+			// An unexpected close (network drop, Discord-initiated close, etc.)
+			// Reconnect unless this close was requested by destroy(). Paths that close the socket
+			// deliberately (#reconnect, op 7/9) call removeAllListeners() first, so they
+			// never reach this handler.
+			if (!this.#destroyed) this.#reconnect();
 		});
 	}
 
@@ -288,6 +296,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 
 	/** Kills the websocket connection and logs out */
 	destroy(): void {
+		this.#destroyed = true;
 		if (this.#heartbeatTimer) {
 			clearInterval(this.#heartbeatTimer);
 			this.#heartbeatTimer = null;
