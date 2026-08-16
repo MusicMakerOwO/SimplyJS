@@ -504,8 +504,8 @@ describe("ModalShowable mixin", () => {
 	it("showModal() validates the modal and posts a MODAL callback", async () => {
 		const interaction = new SlashCommandInteraction(client, slashCommandData());
 		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+		const validateSpy = vi.spyOn(ModalBuilder, "validate");
 		const modal = makeModal();
-		const validateSpy = vi.spyOn(modal, "validate");
 
 		await interaction.showModal(modal);
 
@@ -513,6 +513,48 @@ describe("ModalShowable mixin", () => {
 		const [route, body] = spy.mock.calls[0]! as [string, { type: number; data: unknown }];
 		expect(route).toBe(`/interactions/${interaction.id}/${interaction.token}/callback`);
 		expect(body.type).toBe(InteractionCallbackTypes.MODAL);
+	});
+
+	it("showModal() posts the builder in wire format, without relying on JSON.stringify", async () => {
+		const interaction = new SlashCommandInteraction(client, slashCommandData());
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		await interaction.showModal(makeModal());
+
+		const [, body] = spy.mock.calls[0]! as [string, { data: InteractionCallbackModal }];
+		// the payload the mixin hands to REST is already snake_case, before anything serializes it
+		expect(body.data).toEqual({
+			custom_id: "feedback-modal",
+			title: "Feedback",
+			components: [
+				{
+					type: ComponentTypes.LABEL,
+					label: "Feedback",
+					component: { type: ComponentTypes.TEXT_INPUT, custom_id: "feedback", style: TextInputStyles.SHORT },
+				},
+			],
+		});
+	});
+
+	it("showModal() accepts a raw modal payload as well as a builder", async () => {
+		const interaction = new SlashCommandInteraction(client, slashCommandData());
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+		const payload: InteractionCallbackModal = {
+			custom_id: "feedback-modal",
+			title: "Feedback",
+			components: [
+				{
+					type: ComponentTypes.LABEL,
+					label: "Feedback",
+					component: { type: ComponentTypes.TEXT_INPUT, custom_id: "feedback", style: TextInputStyles.SHORT },
+				},
+			],
+		};
+
+		await interaction.showModal(payload);
+
+		const [, body] = spy.mock.calls[0]! as [string, { data: InteractionCallbackModal }];
+		expect(body.data).toBe(payload);
 	});
 
 	it("showModal() throws and never calls REST when the modal is invalid", async () => {

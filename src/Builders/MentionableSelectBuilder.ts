@@ -1,9 +1,11 @@
 import { ComponentTypes, MentionableSelect } from "../Types/Components.js";
-import { omitUndefined } from "./BaseSelectBuilder.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
-/** Fluent builder for a select menu that picks from a server's users and roles, validating limits as they're set. */
-export class MentionableSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.MENTIONABLE_SELECT> {
+/**
+ * Fluent builder for a select menu that picks from a server's users and roles, validating limits
+ * as they're set. The builder *is* a {@link MentionableSelect} payload, so it can be sent as-is.
+ */
+export class MentionableSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.MENTIONABLE_SELECT> implements MentionableSelect {
 	/**
 	 * Creates a builder from an existing mentionable select payload
 	 */
@@ -25,20 +27,11 @@ export class MentionableSelectBuilder extends EntitySelectBuilder<typeof Compone
 	 * Validates a mentionable select payload against Discord's constraints
 	 */
 	static validate(select: MentionableSelect): void {
-		validateEntitySelectShape(
-			{
-				customId: select.custom_id,
-				placeholder: select.placeholder,
-				minValues: select.min_values,
-				maxValues: select.max_values,
-				defaultValues: select.default_values
-			},
-			"Mentionable select"
-		);
+		validateEntitySelectShape(select, "Mentionable select");
 	}
 
 	readonly type = ComponentTypes.MENTIONABLE_SELECT;
-	protected readonly selectLabel = "Mentionable select";
+	protected get selectLabel(): string { return "Mentionable select"; }
 
 	/**
 	 * Appends pre-filled users by id
@@ -56,21 +49,5 @@ export class MentionableSelectBuilder extends EntitySelectBuilder<typeof Compone
 
 	validate(): void {
 		validateEntitySelectShape(this, this.selectLabel);
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link MentionableSelect} payload Discord expects
-	 */
-	toJSON(): MentionableSelect {
-		return omitUndefined<MentionableSelect>({
-			type: this.type,
-			custom_id: this.customId,
-			placeholder: this.placeholder,
-			min_values: this.minValues,
-			max_values: this.maxValues,
-			required: this.required,
-			disabled: this.disabled,
-			default_values: this.defaultValues
-		});
 	}
 }

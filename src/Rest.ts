@@ -108,6 +108,14 @@ export class Rest {
 	 */
 	routeToBucket: Map<string, string>;
 
+	/**
+	 * Tail of the in-flight request chain for each rate limit key, see `#enqueue`.
+	 *
+	 * Entries are removed as soon as nothing is queued behind them, so this only ever holds keys
+	 * with requests currently in flight.
+	 */
+	#requestQueues: Map<string, Promise<void>> = new Map();
+
 	constructor(options: RestOptions = {}) {
 		this.retryAfterRateLimit = options.retryAfterRateLimit ?? true;
 		this.rateLimitDurationMultiplier = options.rateLimitDurationMultiplier ?? 1;
@@ -169,6 +177,45 @@ export class Rest {
 		return `bucket:${bucket}:${MajorResourceKey(route)}`;
 	}
 
+	/** Reads a header holding a duration in seconds as milliseconds, scaled by {@link rateLimitDurationMultiplier} */
+	#parseSecondsHeader(response: Response, name: string): number | null {
+		const value = response.headers.get(name);
+		if (value === null) return null;
+		const seconds = Number.parseFloat(value);
+		if (!Number.isFinite(seconds)) return null;
+		return Math.max(0, Math.ceil(seconds * 1000 * this.rateLimitDurationMultiplier));
+	}
+
+	/**
+	 * Records the bucket's exhausted window from *any* response, not just a `429`.
+	 *
+	 * Discord reports how many requests are left in the current window on every response, so a
+	 * `X-RateLimit-Remaining: 0` says the next request in that bucket is guaranteed to be limited.
+	 * Storing the reset window here means whatever is queued behind it sleeps the window out instead
+	 * of walking into the limit and spending a retry to learn what the headers already said.
+	 */
+	#recordRateLimitHeaders(response: Response, cacheKey: string): void {
+		const remaining = response.headers.get("X-RateLimit-Remaining");
+		if (remaining === null) return;
+
+		const requestsLeft = Number.parseInt(remaining, 10);
+		if (!Number.isFinite(requestsLeft) || requestsLeft > 0) return;
+
+		const resetAfter = this.#parseSecondsHeader(response, "X-RateLimit-Reset-After");
+		if (resetAfter === null || resetAfter <= 0) return;
+
+		this.routeRateLimits.set(cacheKey, resetAfter, resetAfter);
+	}
+
+	/** How long to wait before sending, honouring the route's own limit and any global one, whichever is longer */
+	#remainingRateLimitWait(cacheKey: string): number {
+		const routeWait = this.routeRateLimits.remainingTTL(cacheKey) ?? 0;
+		// a global limit pauses every bucket, not just the one that happened to trip it
+		const globalWait = cacheKey === "global" ? 0 : (this.routeRateLimits.remainingTTL("global") ?? 0);
+
+		return Math.max(routeWait, globalWait);
+	}
+
 	/**
 	 * Determines how long to wait after a `429`, preferring the response body's `retry_after`,
 	 * then the `X-RateLimit-Reset-After`/`Retry-After` headers, then the `X-RateLimit-Reset`
@@ -180,18 +227,10 @@ export class Rest {
 			return Math.max(0, Math.ceil(fromBody * 1000 * this.rateLimitDurationMultiplier));
 		}
 
-		const parseSecondsHeader = (name: string): number | null => {
-			const value = response.headers.get(name);
-			if (value === null) return null;
-			const seconds = Number.parseFloat(value);
-			if (!Number.isFinite(seconds)) return null;
-			return Math.max(0, Math.ceil(seconds * 1000 * this.rateLimitDurationMultiplier));
-		};
-
-		const fromResetAfter = parseSecondsHeader("X-RateLimit-Reset-After");
+		const fromResetAfter = this.#parseSecondsHeader(response, "X-RateLimit-Reset-After");
 		if (fromResetAfter !== null) return fromResetAfter;
 
-		const fromRetryAfter = parseSecondsHeader("Retry-After");
+		const fromRetryAfter = this.#parseSecondsHeader(response, "Retry-After");
 		if (fromRetryAfter !== null) return fromRetryAfter;
 
 		const resetEpoch = response.headers.get("X-RateLimit-Reset");
@@ -221,13 +260,34 @@ export class Rest {
 	}
 
 	/**
-	 * Core request implementation shared by `get()`/`post()`/`patch()`/`delete()`/`put()`.
+	 * Runs `task` once every request already queued under `key` has settled, and becomes the new
+	 * tail of that key's queue.
 	 *
-	 * Sleeps out any known rate limit window before sending, retries transient `5xx` responses
-	 * with exponential backoff, and on `429` records the wait time before retrying (or throwing
-	 * immediately if {@link retryAfterRateLimit} is `false` or retries are exhausted).
+	 * A rejected request does not poison the queue - whatever is behind it runs either way.
 	 */
-	async #request<T>(
+	#enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
+		const previous = this.#requestQueues.get(key) ?? Promise.resolve();
+		const result = previous.then(task);
+		const settled = result.then(() => undefined, () => undefined);
+
+		this.#requestQueues.set(key, settled);
+		void settled.then(() => {
+			// drop the key once nothing is queued behind this request, so the map cannot grow forever
+			if (this.#requestQueues.get(key) === settled) this.#requestQueues.delete(key);
+		});
+
+		return result;
+	}
+
+	/**
+	 * Entry point shared by `get()`/`post()`/`patch()`/`delete()`/`put()`, which serializes the
+	 * request against others sharing its rate limit bucket before handing off to `#execute`.
+	 *
+	 * Without this, a burst fired in the same tick all passes the rate limit check together, hits
+	 * Discord together, and comes back `429` together - then wakes in the same tick and does it
+	 * again. Serialized, each request sees the limit headers the one before it came back with.
+	 */
+	#request<T>(
 		method: RestMethod,
 		route: string,
 		data: JSONObject | JSONArray | null,
@@ -236,16 +296,35 @@ export class Rest {
 		this.isAuthenticated();
 
 		const normalizedRoute = route.startsWith("/") ? route : `/${route}`;
+
+		// with per-route limits off the caller has taken responsibility for pacing, so stay out of the way
+		if (!this.perRouteRateLimits) return this.#execute<T>(method, normalizedRoute, data, options);
+
+		return this.#enqueue(
+			this.#resolveRateLimitCacheKey(method, normalizedRoute),
+			() => this.#execute<T>(method, normalizedRoute, data, options)
+		);
+	}
+
+	/**
+	 * Core request implementation.
+	 *
+	 * Sleeps out any known rate limit window before sending, retries transient `5xx` responses
+	 * with exponential backoff, and on `429` records the wait time before retrying (or throwing
+	 * immediately if {@link retryAfterRateLimit} is `false` or retries are exhausted).
+	 */
+	async #execute<T>(
+		method: RestMethod,
+		normalizedRoute: string,
+		data: JSONObject | JSONArray | null,
+		options: RestRequestOptions = {}
+	): Promise<T> {
 		let retriesRemaining = options.retryCount ?? DEFAULT_RETRY_COUNT;
 		let transientRetryAttempt = 0;
 
 		while (true) {
 			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(method, normalizedRoute);
-			const rateLimitTTL = this.routeRateLimits.remainingTTL(rateLimitCacheKey);
-
-			if (typeof rateLimitTTL === "number" && rateLimitTTL > 0) {
-				await this.#sleep(rateLimitTTL);
-			}
+			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey));
 
 			const response = await fetch(`${DISCORD_API_BASE}${normalizedRoute}`, {
 				method,
@@ -261,6 +340,7 @@ export class Rest {
 			const rawBody = await response.text();
 			const parsedBody = this.#parseResponseBody(rawBody);
 			const bucketCacheKey = this.#rememberBucket(method, normalizedRoute, response);
+			this.#recordRateLimitHeaders(response, bucketCacheKey ?? rateLimitCacheKey);
 
 			if (response.status === 429) {
 				if (!this.retryAfterRateLimit || retriesRemaining <= 0) {

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0-alpha]
 
 ### Added
 
@@ -16,17 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Client.registerPublicCommands(commands)` / `Client.registerGuildCommands(guildId, commands)` — replace all global or guild-scoped slash commands via REST
 
 #### Message components
+- Every builder **is** its wire payload — `ButtonBuilder implements InteractiveButton`, `ModalBuilder implements InteractionCallbackModal`, and so on — with fields stored under their snake_case wire names (`custom_id`, `min_values`, `default_values`). There is no `toJSON()`: builders can be sent, inspected, cloned, or logged as-is, nested builders need no conversion, and `components` is a plain array you can `push` to or splice
 - `ActionRowBuilder` (`src/Builders/ActionRowBuilder.ts`) — container builder for buttons and select menus, generic over the component payload type so builders and plain objects can be mixed freely
 - `ButtonBuilder`, `LinkButtonBuilder`, `SKUButtonBuilder` (`src/Builders/ButtonBuilder.ts`, `src/Builders/LinkButtonBuilder.ts`, `src/Builders/SKUButtonBuilder.ts`) — one builder per button style family (interactive, link, and SKU/premium), each only exposing the fields valid for its style
 - `ResolveButton()` / `ValidateButton()` (`src/Builders/ResolveButton.ts`) — build or validate the correct button builder for a payload whose style isn't known up front
 - `StringSelectBuilder`, `UserSelectBuilder`, `RoleSelectBuilder`, `ChannelSelectBuilder`, `MentionableSelectBuilder` (`src/Builders/*SelectBuilder.ts`) — all Discord select menu types, sharing common option/constraint logic via `BaseSelectBuilder` / `EntitySelectBuilder`
 - `ModalBuilder`, `LabelBuilder`, `TextInputBuilder` (`src/Builders/ModalBuilder.ts`, `src/Builders/LabelBuilder.ts`, `src/Builders/TextInputBuilder.ts`) — modal construction with labeled text input fields
 - `Components` type definitions (`src/Types/Components.ts`) — full typings for all message component kinds
-- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`, `src/Tests/SlashCommandOptions.test.ts`) for construction, validation, and JSON serialization of every builder
+- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`, `src/Tests/SlashCommandOptions.test.ts`) for construction and validation of every builder, plus a wire-format suite pinning that each builder's own properties are exactly the payload Discord expects
 
 #### Interactions
 - `BaseInteraction` (`src/Structures/Interactions/BaseInteraction.ts`) and per-type interaction classes — `PingInteraction`, `SlashCommandInteraction`, `AutocompleteInteraction`, `MessageComponentInteraction`, `SelectMenuInteraction`, `ButtonInteraction`, `ModalInteraction`, `UserContextMenuInteraction`, `MessageContextMenuInteraction`
-- `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types
+- `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types. `showModal()` accepts a `ModalBuilder` or a raw `InteractionCallbackModal`, since they're the same shape
 - `MessageFlags` constants (`src/Types/DiscordAPITypes.ts`) and an `ephemeral` shorthand on `reply()`/`update()` payloads, for responses only the invoking user can see
 - `CreateInteraction()` factory (`src/Factory/CreateInteraction.ts`) — builds the correct interaction class from a raw gateway payload; returns `AnyInteraction | PingInteraction`
 - `InteractionCreate` gateway event handler (`src/Events/Interactions.ts`) for `INTERACTION_CREATE`, emitting `ClientEvents.InteractionCreate`
@@ -42,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WSClient` now handles `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes the session (via `GatewayOpCodes.Resume`) instead of re-identifying from scratch when possible
 - `WSClient` now tracks heartbeat ACK state and reconnects if the gateway never acknowledges a heartbeat, instead of heartbeating into a dead connection indefinitely
 - `WSEvents` gained `RECONNECT`, `INVALID_SESSION`, and `HELLO`, mirroring the corresponding `GatewayOpCodes` alongside the existing `RAW`/`HEARTBEAT`/`HEARTBEAT_ACK` events
+- `GatewayCloseCodes` (`src/Types/DiscordGateway.ts`) — every gateway close code, documented by whether reconnecting can recover from it
+- `WSEvents.Disconnect` — fired with a reason and close code when the client stops reconnecting for good, either because Discord rejected the connection fatally or because every retry was used up
+- `WSOptions.maxReconnectAttempts` (default `10`) — cap on consecutive reconnect attempts before giving up; the counter resets on every successful `READY`/`RESUMED`
 
 #### Tooling
 - CI workflows for Bun (`.github/workflows/bun.yml`) and Deno (`.github/workflows/deno.yml`) run the build and test suite on every push/PR to `main`, alongside the existing Node workflow
@@ -58,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- REST rate limiting is no longer reactive-only. An `X-RateLimit-Remaining: 0` on any response now records the bucket's reset window pre-emptively, and requests sharing a rate limit key are serialized through a per-bucket queue, so a burst of concurrent calls paces itself instead of all passing the limit check together, hitting Discord together, and coming back `429` together
+- A global rate limit now pauses every bucket. It was recorded but only ever honoured by clients running with `perRouteRateLimits` disabled
+- `WSClient.#reconnect()` no longer retries immediately and forever. Reconnects are scheduled with exponential backoff and full jitter (1s base, 60s cap, first attempt still immediate) and stop after `maxReconnectAttempts`. Fatal close codes (4004 authentication failed, 4010–4014 invalid shard/sharding required/invalid API version/invalid or disallowed intents) now stop reconnecting entirely instead of replaying a rejected `IDENTIFY` in a tight loop, and `4007`/`4009` drop the stale session so the next connection identifies rather than resuming
+- `GatewayOpCodes.InvalidSession` now waits Discord's mandated randomized 1–5 seconds before reconnecting, instead of re-identifying instantly and burning the session start rate limit
+- `Client.login()` now rejects with the gateway's actual failure reason when the connection is rejected outright (bad token, disallowed intents), instead of waiting the full ten seconds to blame a Discord outage
 - `eslint.config.ts` imports `Plugin` from `@eslint/core` as a type-only import, since that package only ships types and no runtime logic
 - All builders now implement their corresponding JSON payload interface directly, for improved type safety
 - Minimum supported Node version raised from 18 to 20, matching what the test suite actually requires

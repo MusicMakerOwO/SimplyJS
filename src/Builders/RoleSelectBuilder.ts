@@ -1,9 +1,11 @@
 import { ComponentTypes, RoleSelect } from "../Types/Components.js";
-import { omitUndefined } from "./BaseSelectBuilder.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
-/** Fluent builder for a select menu that picks from a server's roles, validating limits as they're set. */
-export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.ROLE_SELECT> {
+/**
+ * Fluent builder for a select menu that picks from a server's roles, validating limits as they're
+ * set. The builder *is* a {@link RoleSelect} payload, so it can be sent as-is.
+ */
+export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.ROLE_SELECT> implements RoleSelect {
 	/**
 	 * Creates a builder from an existing role select payload
 	 */
@@ -25,20 +27,11 @@ export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 	 * Validates a role select payload against Discord's constraints
 	 */
 	static validate(select: RoleSelect): void {
-		validateEntitySelectShape(
-			{
-				customId: select.custom_id,
-				placeholder: select.placeholder,
-				minValues: select.min_values,
-				maxValues: select.max_values,
-				defaultValues: select.default_values
-			},
-			"Role select"
-		);
+		validateEntitySelectShape(select, "Role select");
 	}
 
 	readonly type = ComponentTypes.ROLE_SELECT;
-	protected readonly selectLabel = "Role select";
+	protected get selectLabel(): string { return "Role select"; }
 
 	/**
 	 * Appends pre-filled roles by id
@@ -49,21 +42,5 @@ export class RoleSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 
 	validate(): void {
 		validateEntitySelectShape(this, this.selectLabel);
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link RoleSelect} payload Discord expects
-	 */
-	toJSON(): RoleSelect {
-		return omitUndefined<RoleSelect>({
-			type: this.type,
-			custom_id: this.customId,
-			placeholder: this.placeholder,
-			min_values: this.minValues,
-			max_values: this.maxValues,
-			required: this.required,
-			disabled: this.disabled,
-			default_values: this.defaultValues
-		});
 	}
 }

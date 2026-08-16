@@ -55,7 +55,7 @@ describe("ButtonBuilder", () => {
 
 		expect(builder.style).toBe(ButtonStyles.DANGER);
 		expect(builder.label).toBe("Delete");
-		expect(builder.customId).toBe("delete");
+		expect(builder.custom_id).toBe("delete");
 	});
 
 	it("carries emoji and disabled through static from", () => {
@@ -88,7 +88,7 @@ describe("ButtonBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new ButtonBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.customId).toBe("a".repeat(100));
+		expect(builder.custom_id).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
@@ -151,12 +151,12 @@ describe("ButtonBuilder", () => {
 		});
 
 		it("is assignable to the payload type it mirrors", () => {
-			const button: InteractiveButton = new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete").toJSON();
+			const button: InteractiveButton = new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete");
 
 			expectTypeOf(button).toExtend<Button>();
 			// a builder stands in for a payload, and a payload can be read back into a builder
 			expect(() => ButtonBuilder.validate(button)).not.toThrow();
-			expect(ButtonBuilder.from(button).customId).toBe("delete");
+			expect(ButtonBuilder.from(button).custom_id).toBe("delete");
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -265,7 +265,7 @@ describe("ResolveButton", () => {
 	});
 
 	it("validates any button style, builder or payload alike", () => {
-		expect(() => ValidateButton(new ButtonBuilder().setLabel("Click me").setCustomId("click").toJSON())).not.toThrow();
+		expect(() => ValidateButton(new ButtonBuilder().setLabel("Click me").setCustomId("click"))).not.toThrow();
 		expect(() => ValidateButton(new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com"))).not.toThrow();
 		expect(() => ValidateButton({ type: ComponentTypes.BUTTON, style: ButtonStyles.PREMIUM, sku_id: "1234567890" })).not.toThrow();
 
@@ -288,7 +288,7 @@ describe("SKUButtonBuilder", () => {
 
 		const builder = SKUButtonBuilder.from(payload);
 
-		expect(builder.skuId).toBe("1234567890");
+		expect(builder.sku_id).toBe("1234567890");
 		expect(builder.disabled).toBeUndefined();
 	});
 
@@ -303,7 +303,7 @@ describe("SKUButtonBuilder", () => {
 	it("sets sku_id via setSkuId", () => {
 		const builder = new SKUButtonBuilder().setSkuId("1234567890");
 
-		expect(builder.skuId).toBe("1234567890");
+		expect(builder.sku_id).toBe("1234567890");
 	});
 
 	it("throws when sku_id is empty", () => {
@@ -336,11 +336,11 @@ describe("SKUButtonBuilder", () => {
 		});
 
 		it("is assignable to the payload type it mirrors", () => {
-			const button: PremiumButton = new SKUButtonBuilder().setSkuId("1234567890").toJSON();
+			const button: PremiumButton = new SKUButtonBuilder().setSkuId("1234567890");
 
 			expectTypeOf(button).toExtend<Button>();
 			expect(() => SKUButtonBuilder.validate(button)).not.toThrow();
-			expect(SKUButtonBuilder.from(button).skuId).toBe("1234567890");
+			expect(SKUButtonBuilder.from(button).sku_id).toBe("1234567890");
 		});
 
 		it("static validate matches instance validate behavior", () => {
@@ -372,10 +372,10 @@ describe("StringSelectBuilder", () => {
 
 		const builder = StringSelectBuilder.from(payload);
 
-		expect(builder.customId).toBe("pick");
+		expect(builder.custom_id).toBe("pick");
 		expect(builder.placeholder).toBe("Pick one");
-		expect(builder.minValues).toBe(1);
-		expect(builder.maxValues).toBe(3);
+		expect(builder.min_values).toBe(1);
+		expect(builder.max_values).toBe(3);
 		expect(builder.required).toBe(true);
 		expect(builder.disabled).toBe(false);
 		expect(builder.options).toEqual([{ label: "One", value: "one" }, { label: "Two", value: "two" }]);
@@ -390,7 +390,7 @@ describe("StringSelectBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new StringSelectBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.customId).toBe("a".repeat(100));
+		expect(builder.custom_id).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
@@ -415,8 +415,8 @@ describe("StringSelectBuilder", () => {
 	it("sets min_values and max_values within their allowed ranges", () => {
 		const builder = new StringSelectBuilder().setMinValues(0).setMaxValues(25);
 
-		expect(builder.minValues).toBe(0);
-		expect(builder.maxValues).toBe(25);
+		expect(builder.min_values).toBe(0);
+		expect(builder.max_values).toBe(25);
 	});
 
 	it("throws when min_values is out of range", () => {
@@ -579,13 +579,13 @@ describe("UserSelectBuilder", () => {
 
 		const builder = UserSelectBuilder.from(payload);
 
-		expect(builder.customId).toBe("pick");
+		expect(builder.custom_id).toBe("pick");
 		expect(builder.placeholder).toBe("Pick a user");
-		expect(builder.minValues).toBe(1);
-		expect(builder.maxValues).toBe(3);
+		expect(builder.min_values).toBe(1);
+		expect(builder.max_values).toBe(3);
 		expect(builder.required).toBe(true);
 		expect(builder.disabled).toBe(false);
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "user" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
@@ -597,7 +597,7 @@ describe("UserSelectBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new UserSelectBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.customId).toBe("a".repeat(100));
+		expect(builder.custom_id).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
@@ -620,8 +620,8 @@ describe("UserSelectBuilder", () => {
 	it("sets min_values and max_values within their allowed ranges", () => {
 		const builder = new UserSelectBuilder().setMinValues(0).setMaxValues(25);
 
-		expect(builder.minValues).toBe(0);
-		expect(builder.maxValues).toBe(25);
+		expect(builder.min_values).toBe(0);
+		expect(builder.max_values).toBe(25);
 	});
 
 	it("throws when min_values or max_values are out of range", () => {
@@ -640,7 +640,7 @@ describe("UserSelectBuilder", () => {
 		const values = [{ id: "1", type: "user" as const }];
 		const builder = new UserSelectBuilder().setDefaultValues(values);
 
-		expect(builder.defaultValues).toEqual(values);
+		expect(builder.default_values).toEqual(values);
 	});
 
 	it("appends default_values via addDefaultValues", () => {
@@ -648,13 +648,13 @@ describe("UserSelectBuilder", () => {
 			.addDefaultValues({ id: "1", type: "user" })
 			.addDefaultValues({ id: "2", type: "user" });
 
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
 	});
 
 	it("appends default users by id via addDefaultUsers", () => {
 		const builder = new UserSelectBuilder().addDefaultUsers("1", "2");
 
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "user" }]);
 	});
 
 	describe("validate", () => {
@@ -706,8 +706,8 @@ describe("RoleSelectBuilder", () => {
 
 		const builder = RoleSelectBuilder.from(payload);
 
-		expect(builder.customId).toBe("pick");
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "role" }]);
+		expect(builder.custom_id).toBe("pick");
+		expect(builder.default_values).toEqual([{ id: "1", type: "role" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
@@ -730,7 +730,7 @@ describe("RoleSelectBuilder", () => {
 	it("appends default roles by id via addDefaultRoles", () => {
 		const builder = new RoleSelectBuilder().addDefaultRoles("1", "2");
 
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "role" }, { id: "2", type: "role" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "role" }, { id: "2", type: "role" }]);
 	});
 
 	describe("validate", () => {
@@ -770,8 +770,8 @@ describe("MentionableSelectBuilder", () => {
 
 		const builder = MentionableSelectBuilder.from(payload);
 
-		expect(builder.customId).toBe("pick");
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
+		expect(builder.custom_id).toBe("pick");
+		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
@@ -789,7 +789,7 @@ describe("MentionableSelectBuilder", () => {
 	it("appends default users and roles via their respective setters", () => {
 		const builder = new MentionableSelectBuilder().addDefaultUsers("1").addDefaultRoles("2");
 
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "user" }, { id: "2", type: "role" }]);
 	});
 
 	describe("validate", () => {
@@ -830,9 +830,9 @@ describe("ChannelSelectBuilder", () => {
 
 		const builder = ChannelSelectBuilder.from(payload);
 
-		expect(builder.customId).toBe("pick");
-		expect(builder.channelTypes).toEqual([DiscordChannelTypes.GUILD_TEXT, DiscordChannelTypes.GUILD_VOICE]);
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "channel" }]);
+		expect(builder.custom_id).toBe("pick");
+		expect(builder.channel_types).toEqual([DiscordChannelTypes.GUILD_TEXT, DiscordChannelTypes.GUILD_VOICE]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "channel" }]);
 	});
 
 	it("throws from static from when provided invalid values", () => {
@@ -848,13 +848,13 @@ describe("ChannelSelectBuilder", () => {
 	it("sets channel_types via setChannelTypes", () => {
 		const builder = new ChannelSelectBuilder().setChannelTypes(DiscordChannelTypes.GUILD_TEXT);
 
-		expect(builder.channelTypes).toEqual([DiscordChannelTypes.GUILD_TEXT]);
+		expect(builder.channel_types).toEqual([DiscordChannelTypes.GUILD_TEXT]);
 	});
 
 	it("appends default channels by id via addDefaultChannels", () => {
 		const builder = new ChannelSelectBuilder().addDefaultChannels("1", "2");
 
-		expect(builder.defaultValues).toEqual([{ id: "1", type: "channel" }, { id: "2", type: "channel" }]);
+		expect(builder.default_values).toEqual([{ id: "1", type: "channel" }, { id: "2", type: "channel" }]);
 	});
 
 	describe("validate", () => {
@@ -902,51 +902,54 @@ describe("ActionRowBuilder", () => {
 
 	it("hydrates a builder from a component list using static from", () => {
 		const button = makeButton();
-		const builder = ActionRowBuilder.from([button.toJSON()]);
+		const builder = ActionRowBuilder.from([button]);
 
-		expect(builder.components).toEqual([button.toJSON()]);
+		expect(builder.components).toEqual([button]);
 	});
 
 	it("appends components via addComponents", () => {
 		const first = makeButton("first");
 		const second = makeButton("second");
-		const builder = new ActionRowBuilder<Button>().addComponents(first.toJSON()).addComponents(second.toJSON());
+		const builder = new ActionRowBuilder<Button>().addComponents(first).addComponents(second);
 
-		expect(builder.components).toEqual([first.toJSON(), second.toJSON()]);
+		expect(builder.components).toEqual([first, second]);
 	});
 
-	it("accepts child builders and stores their serialized payloads", () => {
+	it("stores child builders as-is, already in wire format", () => {
 		const button = makeButton("from-builder");
 		const builder = new ActionRowBuilder<Button>().addComponents(button);
 
-		expect(builder.components).toEqual([button.toJSON()]);
+		expect(builder.components[0]).toBe(button);
+		expect(builder.components).toEqual([
+			{ type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, label: "Click me", custom_id: "from-builder" }
+		]);
 		expect(() => builder.validate()).not.toThrow();
 	});
 
 	it("accepts child builders in setComponents and static from", () => {
 		const button = makeButton("from-builder");
 
-		expect(new ActionRowBuilder<Button>().setComponents([button]).components).toEqual([button.toJSON()]);
-		expect(ActionRowBuilder.from([button]).components).toEqual([button.toJSON()]);
+		expect(new ActionRowBuilder<Button>().setComponents([button]).components).toEqual([button]);
+		expect(ActionRowBuilder.from([button]).components).toEqual([button]);
 	});
 
 	it("replaces the component list via setComponents", () => {
 		const button = makeButton();
-		const builder = new ActionRowBuilder<Button>().addComponents(makeButton("stale").toJSON()).setComponents([button.toJSON()]);
+		const builder = new ActionRowBuilder<Button>().addComponents(makeButton("stale")).setComponents([button]);
 
-		expect(builder.components).toEqual([button.toJSON()]);
+		expect(builder.components).toEqual([button]);
 	});
 
 	describe("validate", () => {
 		it("passes for a row of up to 5 buttons", () => {
-			const buttons = Array.from({ length: 5 }, (_, index) => makeButton(`button-${index}`).toJSON());
+			const buttons = Array.from({ length: 5 }, (_, index) => makeButton(`button-${index}`));
 			const builder = new ActionRowBuilder<Button>().setComponents(buttons);
 
 			expect(() => builder.validate()).not.toThrow();
 		});
 
 		it("passes for a row with a single select menu", () => {
-			const builder = new ActionRowBuilder<StringSelect>().addComponents(makeSelect().toJSON());
+			const builder = new ActionRowBuilder<StringSelect>().addComponents(makeSelect());
 
 			expect(() => builder.validate()).not.toThrow();
 		});
@@ -958,27 +961,27 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("throws when the row has more than 5 buttons", () => {
-			const buttons = Array.from({ length: 6 }, (_, index) => makeButton(`button-${index}`).toJSON());
+			const buttons = Array.from({ length: 6 }, (_, index) => makeButton(`button-${index}`));
 			const builder = new ActionRowBuilder<Button>().setComponents(buttons);
 
 			expect(() => builder.validate()).toThrow(/Action row cannot have more than 5 buttons/);
 		});
 
 		it("throws when the row has more than 1 select menu", () => {
-			const builder = new ActionRowBuilder().setComponents([makeSelect("first").toJSON(), makeSelect("second").toJSON()]);
+			const builder = new ActionRowBuilder().setComponents([makeSelect("first"), makeSelect("second")]);
 
 			expect(() => builder.validate()).toThrow(/Action row can only contain 1 select menu/);
 		});
 
 		it("throws when the row mixes a select menu with buttons", () => {
-			const builder = new ActionRowBuilder().setComponents([makeButton().toJSON(), makeSelect().toJSON()]);
+			const builder = new ActionRowBuilder().setComponents([makeButton(), makeSelect()]);
 
 			expect(() => builder.validate()).toThrow(/Action row cannot mix a select menu with buttons/);
 		});
 
 		it("cascades validation into each child component", () => {
 			const invalidButton = new ButtonBuilder().setCustomId("click");
-			const builder = new ActionRowBuilder<Button>().addComponents(invalidButton.toJSON());
+			const builder = new ActionRowBuilder<Button>().addComponents(invalidButton);
 
 			expect(() => builder.validate()).toThrow(/Button must have a label/);
 		});
@@ -991,7 +994,7 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("accepts builders and raw payloads in the same row", () => {
-			const builder = new ActionRowBuilder().addComponents(makeButton("from-builder").toJSON(), {
+			const builder = new ActionRowBuilder().addComponents(makeButton("from-builder"), {
 				type: ComponentTypes.BUTTON,
 				style: ButtonStyles.LINK,
 				label: "Docs",
@@ -1003,16 +1006,16 @@ describe("ActionRowBuilder", () => {
 		});
 
 		it("is assignable to the ActionRow payload type", () => {
-			const row: ActionRow = new ActionRowBuilder().addComponents(makeButton().toJSON());
+			const row: ActionRow = new ActionRowBuilder().addComponents(makeButton());
 
 			expectTypeOf(row).toExtend<ActionRow>();
 			expect(row.type).toBe(ComponentTypes.ACTION_ROW);
 		});
 
 		it("static validate accepts a bare component list or a whole row", () => {
-			expect(() => ActionRowBuilder.validate([makeButton().toJSON()])).not.toThrow();
+			expect(() => ActionRowBuilder.validate([makeButton()])).not.toThrow();
 			expect(() => ActionRowBuilder.validate([])).toThrow(/Action row must have at least 1 component/);
-			expect(() => ActionRowBuilder.validate({ type: ComponentTypes.ACTION_ROW, components: [makeButton().toJSON()] })).not.toThrow();
+			expect(() => ActionRowBuilder.validate({ type: ComponentTypes.ACTION_ROW, components: [makeButton()] })).not.toThrow();
 		});
 	});
 });
@@ -1038,10 +1041,10 @@ describe("TextInputBuilder", () => {
 
 		const builder = TextInputBuilder.from(payload);
 
-		expect(builder.customId).toBe("feedback");
+		expect(builder.custom_id).toBe("feedback");
 		expect(builder.style).toBe(TextInputStyles.PARAGRAPH);
-		expect(builder.minLength).toBe(1);
-		expect(builder.maxLength).toBe(100);
+		expect(builder.min_length).toBe(1);
+		expect(builder.max_length).toBe(100);
 		expect(builder.required).toBe(true);
 		expect(builder.value).toBe("hello");
 		expect(builder.placeholder).toBe("Type here");
@@ -1056,7 +1059,7 @@ describe("TextInputBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new TextInputBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.customId).toBe("a".repeat(100));
+		expect(builder.custom_id).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
@@ -1075,8 +1078,8 @@ describe("TextInputBuilder", () => {
 	it("sets min_length and max_length within their allowed ranges", () => {
 		const builder = new TextInputBuilder().setMinLength(0).setMaxLength(4000);
 
-		expect(builder.minLength).toBe(0);
-		expect(builder.maxLength).toBe(4000);
+		expect(builder.min_length).toBe(0);
+		expect(builder.max_length).toBe(4000);
 	});
 
 	it("throws when min_length or max_length are out of range", () => {
@@ -1171,7 +1174,7 @@ describe("LabelBuilder", () => {
 		expect(builder.label).toBe("Feedback");
 		expect(builder.description).toBe("Tell us what you think");
 		expect(builder.component).toBeInstanceOf(TextInputBuilder);
-		expect((builder.component as TextInputBuilder).customId).toBe("feedback");
+		expect((builder.component as TextInputBuilder).custom_id).toBe("feedback");
 	});
 
 	it("hydrates a builder from a raw payload, inferring a select builder", () => {
@@ -1273,7 +1276,7 @@ describe("ModalBuilder", () => {
 
 		const builder = ModalBuilder.from(payload);
 
-		expect(builder.customId).toBe("feedback-modal");
+		expect(builder.custom_id).toBe("feedback-modal");
 		expect(builder.title).toBe("Feedback");
 		expect(builder.components).toHaveLength(1);
 		expect(builder.components[0]).toBeInstanceOf(LabelBuilder);
@@ -1292,7 +1295,7 @@ describe("ModalBuilder", () => {
 	it("sets custom_id within the allowed length", () => {
 		const builder = new ModalBuilder().setCustomId("a".repeat(100));
 
-		expect(builder.customId).toBe("a".repeat(100));
+		expect(builder.custom_id).toBe("a".repeat(100));
 	});
 
 	it("throws when custom_id is empty or exceeds 100 characters", () => {
@@ -1394,6 +1397,97 @@ describe("ModalBuilder", () => {
 			};
 
 			expect(() => ModalBuilder.validate(payload)).toThrow(/ModalBuilder only supports Label-wrapped fields, not action rows/);
+		});
+	});
+});
+// ---------------------------------------------------------------------------
+// Wire-format compatibility
+//
+// Every builder *is* its payload type - no `toJSON()` hook, no camelCase fields that only get
+// renamed on the way out. These tests pin that: a builder's own enumerable properties are exactly
+// the payload Discord expects, so inspecting, cloning, or logging one before it's serialized
+// yields the same thing REST sends.
+// ---------------------------------------------------------------------------
+
+describe("builders are their wire payloads", () => {
+	function fullySetBuilders(): Record<string, object> {
+		return {
+			ButtonBuilder: new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete").setDisabled(),
+			LinkButtonBuilder: new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com"),
+			SKUButtonBuilder: new SKUButtonBuilder().setSkuId("1234567890").setDisabled(),
+			StringSelectBuilder: new StringSelectBuilder().setCustomId("pick").setMinValues(1).setMaxValues(2).addOption("One", "one"),
+			UserSelectBuilder: new UserSelectBuilder().setCustomId("pick-user").setMaxValues(2).addDefaultUsers("1"),
+			RoleSelectBuilder: new RoleSelectBuilder().setCustomId("pick-role").addDefaultRoles("2"),
+			MentionableSelectBuilder: new MentionableSelectBuilder().setCustomId("pick-mention").addDefaultUsers("3"),
+			ChannelSelectBuilder: new ChannelSelectBuilder().setCustomId("pick-channel").setChannelTypes(DiscordChannelTypes.GUILD_TEXT),
+			TextInputBuilder: new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT).setMinLength(1).setMaxLength(10),
+			LabelBuilder: new LabelBuilder().setLabel("Feedback").setComponent(
+				new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT)
+			),
+			ActionRowBuilder: new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel("Click me").setCustomId("click")),
+			ModalBuilder: new ModalBuilder().addField("Feedback", new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT))
+		};
+	}
+
+	it("expose no toJSON hook to depend on", () => {
+		for (const [name, builder] of Object.entries(fullySetBuilders())) {
+			expect(builder, name).not.toHaveProperty("toJSON");
+		}
+	});
+
+	it("carry only snake_case wire keys, at every level of nesting", () => {
+		const camelCase = /[a-z][A-Z]/;
+
+		function assertWireKeys(value: unknown, path: string): void {
+			if (Array.isArray(value)) {
+				for (const [index, item] of value.entries()) assertWireKeys(item, `${path}[${index}]`);
+				return;
+			}
+			if (value === null || typeof value !== "object") return;
+
+			for (const [key, nested] of Object.entries(value)) {
+				expect(key, `${path}.${key}`).not.toMatch(camelCase);
+				assertWireKeys(nested, `${path}.${key}`);
+			}
+		}
+
+		for (const [name, builder] of Object.entries(fullySetBuilders())) assertWireKeys(builder, name);
+	});
+
+	it("survive a stringify round-trip unchanged - nothing is added or renamed on the way out", () => {
+		for (const [name, builder] of Object.entries(fullySetBuilders())) {
+			expect(JSON.parse(JSON.stringify(builder)), name).toEqual({ ...builder });
+		}
+	});
+
+	it("produce the exact payloads Discord documents", () => {
+		expect({ ...new ButtonBuilder(ButtonStyles.DANGER).setLabel("Delete").setCustomId("delete") }).toEqual({
+			type: ComponentTypes.BUTTON,
+			style: ButtonStyles.DANGER,
+			label: "Delete",
+			custom_id: "delete"
+		});
+
+		expect({ ...new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.PARAGRAPH).setMaxLength(200) }).toEqual({
+			type: ComponentTypes.TEXT_INPUT,
+			custom_id: "feedback",
+			style: TextInputStyles.PARAGRAPH,
+			max_length: 200
+		});
+
+		expect({ ...new ModalBuilder().setCustomId("feedback-modal").setTitle("Feedback").addField(
+			"How did we do?",
+			new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT)
+		) }).toEqual({
+			custom_id: "feedback-modal",
+			title: "Feedback",
+			components: [
+				{
+					type: ComponentTypes.LABEL,
+					label: "How did we do?",
+					component: { type: ComponentTypes.TEXT_INPUT, custom_id: "feedback", style: TextInputStyles.SHORT }
+				}
+			]
 		});
 	});
 });

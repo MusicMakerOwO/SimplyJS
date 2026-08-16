@@ -1,39 +1,26 @@
 import { ComponentType } from "../Types/Components.js";
 
-/**
- * Drops `undefined`-valued keys from a `toJSON()` result so the returned object satisfies raw
- * wire-format types under `exactOptionalPropertyTypes` (which treats `{ key: undefined }` as
- * distinct from an omitted key).
- */
-export function omitUndefined<T>(obj: Record<string, unknown>): T {
-	const out: Record<string, unknown> = {};
-	for (const key in obj) {
-		if (obj[key] !== undefined) out[key] = obj[key];
-	}
-	return out as T;
-}
-
 /** Runtime checks shared by every select builder's `validate`/static `validate` */
 export function validateBaseSelectShape(
 	select: {
-		customId?: string | undefined;
+		custom_id?: string | undefined;
 		placeholder?: string | undefined;
-		minValues?: number | undefined;
-		maxValues?: number | undefined;
+		min_values?: number | undefined;
+		max_values?: number | undefined;
 	},
 	label: string
 ): void {
-	if (!select.customId || select.customId.length === 0) throw new Error(`${label} must have a customId`);
-	if (select.customId.length > 100) {
-		throw new Error(`${label} customId must be 100 characters or fewer - Received ${select.customId.length} characters`);
+	if (!select.custom_id || select.custom_id.length === 0) throw new Error(`${label} must have a customId`);
+	if (select.custom_id.length > 100) {
+		throw new Error(`${label} customId must be 100 characters or fewer - Received ${select.custom_id.length} characters`);
 	}
 
 	if (select.placeholder && select.placeholder.length > 150) {
 		throw new Error(`${label} placeholder must be 150 characters or fewer - Received ${select.placeholder.length} characters`);
 	}
 
-	const minValues = select.minValues ?? 1;
-	const maxValues = select.maxValues ?? 1;
+	const minValues = select.min_values ?? 1;
+	const maxValues = select.max_values ?? 1;
 
 	if (minValues < 0 || minValues > 25) throw new Error(`${label} minValues must be between 0 and 25`);
 	if (maxValues < 1 || maxValues > 25) throw new Error(`${label} maxValues must be between 1 and 25`);
@@ -43,27 +30,35 @@ export function validateBaseSelectShape(
 /**
  * Shared fields/setters for every select menu component (string/user/role/mentionable/channel select).
  *
- * @note Entity selects (user/role/mentionable/channel) also carry `defaultValues` - see
+ * Fields carry their wire names (`custom_id`, `min_values`, ...) so every select builder *is* its
+ * payload type - see {@link StringSelectBuilder} and friends.
+ *
+ * @note Entity selects (user/role/mentionable/channel) also carry `default_values` - see
  * {@link EntitySelectBuilder}, which extends this with that field rather than putting it here,
  * since string select has developer-defined `options` instead.
  */
 export abstract class BaseSelectBuilder<TType extends ComponentType> {
 	abstract readonly type: TType;
 	/** Developer-defined identifier, max 100 characters, must be unique per message/modal - only populated once set, see `validate` */
-	customId!: string;
+	custom_id!: string;
 	/** Placeholder text shown when nothing is selected, max 150 characters */
 	placeholder?: string;
 	/** Minimum number of items that must be chosen, 0-25, defaults to 1 */
-	minValues?: number;
+	min_values?: number;
 	/** Maximum number of items that can be chosen, max 25, defaults to 1 */
-	maxValues?: number;
+	max_values?: number;
 	/** Whether the select is required to be answered, modal-only, defaults to true */
 	required?: boolean;
 	/** Whether the select is disabled, message-only, defaults to false */
 	disabled?: boolean;
 
-	/** Human-readable name used in validation error messages, e.g. "User select" */
-	protected abstract readonly selectLabel: string;
+	/**
+	 * Human-readable name used in validation error messages, e.g. "User select".
+	 *
+	 * Declared as an accessor rather than a field so it lives on the prototype - a builder *is*
+	 * its payload, so any own enumerable property would be sent to Discord as an unknown key.
+	 */
+	protected abstract get selectLabel(): string;
 
 	/**
 	 * Sets the select's customId
@@ -72,7 +67,7 @@ export abstract class BaseSelectBuilder<TType extends ComponentType> {
 		if (customId.length === 0 || customId.length > 100) {
 			throw new Error(`${this.selectLabel} customId must be between 1 and 100 characters long - Received ${customId.length} characters`);
 		}
-		this.customId = customId;
+		this.custom_id = customId;
 		return this;
 	}
 
@@ -92,7 +87,7 @@ export abstract class BaseSelectBuilder<TType extends ComponentType> {
 	 */
 	setMinValues(minValues: number): this {
 		if (minValues < 0 || minValues > 25) throw new Error(`${this.selectLabel} minValues must be between 0 and 25`);
-		this.minValues = minValues;
+		this.min_values = minValues;
 		return this;
 	}
 
@@ -101,7 +96,7 @@ export abstract class BaseSelectBuilder<TType extends ComponentType> {
 	 */
 	setMaxValues(maxValues: number): this {
 		if (maxValues < 1 || maxValues > 25) throw new Error(`${this.selectLabel} maxValues must be between 1 and 25`);
-		this.maxValues = maxValues;
+		this.max_values = maxValues;
 		return this;
 	}
 

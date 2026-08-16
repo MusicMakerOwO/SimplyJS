@@ -36,8 +36,8 @@
   - Track and reuse `session_id` / `resume_gateway_url` from READY
   - Track and clear heartbeat timers on close/destroy
   - Emit/handle heartbeat ACK state and add ACK timeout detection
-- [ ] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
-  - Include close-code aware backoff, max retries, and clear terminal failure state
+- [x] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
+  - [x] Include close-code aware backoff, max retries, and clear terminal failure state
 - [ ] Add more examples
   - [x] Sending a direct message to a user
   - [x] Sending a message in a guild channel
@@ -57,10 +57,11 @@
   - invalid session resume-vs-identify branching
   - heartbeat ACK timeout + timer cleanup on close/destroy
   - session_id and resume_gateway_url tracking
-- [ ] `src/Tests/Rest.test.ts`
-  - 429 retry using JSON body `retry_after`
-  - 429 retry using rate-limit headers
-  - transient 5xx retry policy and terminal failure behavior
+- [x] `src/Tests/Rest.test.ts`
+  - [x] 429 retry using JSON body `retry_after`
+  - [x] 429 retry using rate-limit headers
+  - [x] transient 5xx retry policy and terminal failure behavior
+  - [x] pre-emptive backoff on an exhausted bucket, per-bucket request serialization, global limits
 - [ ] `src/Tests/CacheOperations.test.ts`
   - Guild cache upsert/fetch/update
   - User cache upsert/fetch/update

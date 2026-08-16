@@ -12,7 +12,6 @@ import {
 } from "../Types/ApplicationCommand.js";
 import { DiscordApplicationIntegrationTypes } from "../Types/DiscordAPITypes.js";
 import { ObjectValues, Prettify } from "../Types/HelperTypes.js";
-import { omitUndefined } from "./BaseSelectBuilder.js";
 
 // ^[-_'\p{L}\p{N}\p{sc=Deva}\p{sc=Thai}]{1,32}$ per Discord's naming rules
 const NAME_PATTERN = /^[-_'\p{L}\p{N}\p{sc=Deva}\p{sc=Thai}]{1,32}$/u;
@@ -211,14 +210,18 @@ abstract class OptionsHolder<TOption extends ApplicationCommandOption> {
 	}
 }
 
-/** Fluent builder for a single subcommand, added via `SlashCommandBuilder#addSubcommand` or `SlashCommandSubcommandGroupBuilder#addSubcommand` */
-export class SlashCommandSubcommandBuilder extends OptionsHolder<LeafOption> {
-	type = ApplicationCommandOptionTypes.SUB_COMMAND;
+/**
+ * Fluent builder for a single subcommand, added via `SlashCommandBuilder#addSubcommand` or
+ * `SlashCommandSubcommandGroupBuilder#addSubcommand`. The builder *is* a {@link SubCommandOption}
+ * payload - its fields carry their wire names - so it can be nested as-is.
+ */
+export class SlashCommandSubcommandBuilder extends OptionsHolder<LeafOption> implements SubCommandOption {
+	readonly type = ApplicationCommandOptionTypes.SUB_COMMAND;
 
 	name: string = 'command';
 	description: string = 'No description';
-	nameLocalizations?: LocalizationDict;
-	descriptionLocalizations?: LocalizationDict;
+	name_localizations?: LocalizationDict;
+	description_localizations?: LocalizationDict;
 
 	/** Sets the subcommand name */
 	setName(name: string): this {
@@ -236,39 +239,28 @@ export class SlashCommandSubcommandBuilder extends OptionsHolder<LeafOption> {
 
 	/** Sets per-locale translations of the subcommand name */
 	setNameLocalizations(localizations: LocalizationDict): this {
-		this.nameLocalizations = localizations;
+		this.name_localizations = localizations;
 		return this;
 	}
 
 	/** Sets per-locale translations of the subcommand description */
 	setDescriptionLocalizations(localizations: LocalizationDict): this {
-		this.descriptionLocalizations = localizations;
+		this.description_localizations = localizations;
 		return this;
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link SubCommandOption} payload Discord expects
-	 */
-	toJSON(): SubCommandOption {
-		return omitUndefined<SubCommandOption>({
-			type: this.type,
-			name: this.name,
-			description: this.description,
-			name_localizations: this.nameLocalizations,
-			description_localizations: this.descriptionLocalizations,
-			options: this.options
-		});
 	}
 }
 
-/** Fluent builder for a subcommand group, added via `SlashCommandBuilder#addSubcommandGroup` */
-export class SlashCommandSubcommandGroupBuilder {
-	type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
+/**
+ * Fluent builder for a subcommand group, added via `SlashCommandBuilder#addSubcommandGroup`. The
+ * builder *is* a {@link SubCommandGroupOption} payload, so it can be nested as-is.
+ */
+export class SlashCommandSubcommandGroupBuilder implements SubCommandGroupOption {
+	readonly type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
 
 	name: string = 'group';
 	description: string = 'No description';
-	nameLocalizations?: LocalizationDict;
-	descriptionLocalizations?: LocalizationDict;
+	name_localizations?: LocalizationDict;
+	description_localizations?: LocalizationDict;
 	options?: SubCommandOption[];
 
 	/** Sets the subcommand group name */
@@ -287,13 +279,13 @@ export class SlashCommandSubcommandGroupBuilder {
 
 	/** Sets per-locale translations of the subcommand group name */
 	setNameLocalizations(localizations: LocalizationDict): this {
-		this.nameLocalizations = localizations;
+		this.name_localizations = localizations;
 		return this;
 	}
 
 	/** Sets per-locale translations of the subcommand group description */
 	setDescriptionLocalizations(localizations: LocalizationDict): this {
-		this.descriptionLocalizations = localizations;
+		this.description_localizations = localizations;
 		return this;
 	}
 
@@ -317,30 +309,20 @@ export class SlashCommandSubcommandGroupBuilder {
 		this.options.push(builder);
 		return this;
 	}
-
-	/**
-	 * Serializes this builder into the raw {@link SubCommandGroupOption} payload Discord expects
-	 */
-	toJSON(): SubCommandGroupOption {
-		return omitUndefined<SubCommandGroupOption>({
-			type: this.type,
-			name: this.name,
-			description: this.description,
-			name_localizations: this.nameLocalizations,
-			description_localizations: this.descriptionLocalizations,
-			options: this.options
-		});
-	}
 }
 
-/** Fluent builder for a `CHAT_INPUT` (slash) application command */
-export class SlashCommandBuilder extends OptionsHolder<ApplicationCommandOption> {
+/**
+ * Fluent builder for a `CHAT_INPUT` (slash) application command. The builder *is* an
+ * {@link ApplicationCommand} payload - its fields carry their wire names - so it can be handed
+ * straight to `Client#registerPublicCommands`/`registerGuildCommands`.
+ */
+export class SlashCommandBuilder extends OptionsHolder<ApplicationCommandOption> implements ApplicationCommand {
 	name: string = 'command';
 	description: string = 'No description';
-	nameLocalizations?: LocalizationDict;
-	descriptionLocalizations?: LocalizationDict;
-	defaultMemberPermissions?: string | null;
-	integrationTypes?: ObjectValues<typeof DiscordApplicationIntegrationTypes>[];
+	name_localizations?: LocalizationDict;
+	description_localizations?: LocalizationDict;
+	default_member_permissions?: string | null;
+	integration_types?: ObjectValues<typeof DiscordApplicationIntegrationTypes>[];
 	contexts?: InteractionContextType[];
 	nsfw?: boolean;
 
@@ -360,25 +342,25 @@ export class SlashCommandBuilder extends OptionsHolder<ApplicationCommandOption>
 
 	/** Sets per-locale translations of the command name */
 	setNameLocalizations(localizations: LocalizationDict): this {
-		this.nameLocalizations = localizations;
+		this.name_localizations = localizations;
 		return this;
 	}
 
 	/** Sets per-locale translations of the command description */
 	setDescriptionLocalizations(localizations: LocalizationDict): this {
-		this.descriptionLocalizations = localizations;
+		this.description_localizations = localizations;
 		return this;
 	}
 
 	/** Sets the default permissions (as a `Permissions` bitfield) a member needs to use this command, or `null` to clear it */
 	setDefaultMemberPermissions(permissions: bigint | number | string | null): this {
-		this.defaultMemberPermissions = permissions === null ? null : permissions.toString();
+		this.default_member_permissions = permissions === null ? null : permissions.toString();
 		return this;
 	}
 
 	/** Sets which installation contexts (guild, user) the command is available in */
 	setIntegrationTypes(...types: ObjectValues<typeof DiscordApplicationIntegrationTypes>[]): this {
-		this.integrationTypes = types;
+		this.integration_types = types;
 		return this;
 	}
 
@@ -433,23 +415,6 @@ export class SlashCommandBuilder extends OptionsHolder<ApplicationCommandOption>
 	 * Validates this builder's current state against Discord's constraints
 	 */
 	validate(): void {
-		SlashCommandBuilder.validate(this.toJSON());
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link ApplicationCommand} payload Discord expects
-	 */
-	toJSON(): ApplicationCommand {
-		return omitUndefined<ApplicationCommand>({
-			name: this.name,
-			description: this.description,
-			name_localizations: this.nameLocalizations,
-			description_localizations: this.descriptionLocalizations,
-			default_member_permissions: this.defaultMemberPermissions,
-			integration_types: this.integrationTypes,
-			contexts: this.contexts,
-			nsfw: this.nsfw,
-			options: this.options
-		});
+		SlashCommandBuilder.validate(this);
 	}
 }

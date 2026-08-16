@@ -132,6 +132,118 @@ describe("Rest request parsing", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
+	it("sends requests sharing a bucket one at a time instead of in a burst", async () => {
+		const rest = new Rest();
+		rest.setToken("token");
+		let inFlight = 0;
+		let peakInFlight = 0;
+
+		const fetchMock = vi.fn(async (): Promise<Response> => {
+			inFlight += 1;
+			peakInFlight = Math.max(peakInFlight, inFlight);
+			await Promise.resolve();
+			inFlight -= 1;
+
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: { "Content-Type": "application/json", "X-RateLimit-Bucket": "shared" }
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		// the exact case that used to stampede: ten calls fired in the same tick, all passing the
+		// rate limit check together because none of them had come back yet
+		await Promise.all(Array.from({ length: 10 }, () => rest.post("/channels/1/messages", { content: "hi" })));
+
+		expect(fetchMock).toHaveBeenCalledTimes(10);
+		expect(peakInFlight).toBe(1);
+	});
+
+	it("waits out an exhausted bucket before sending, without needing a 429 first", async () => {
+		vi.useFakeTimers();
+		const rest = new Rest();
+		rest.setToken("token");
+		const sentAt: number[] = [];
+
+		const fetchMock = vi.fn(async (): Promise<Response> => {
+			sentAt.push(Date.now());
+			await Promise.resolve();
+
+			// Discord says this was the last request left in the window
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: {
+					"Content-Type": "application/json",
+					"X-RateLimit-Bucket": "shared",
+					"X-RateLimit-Remaining": "0",
+					"X-RateLimit-Reset-After": "0.05"
+				}
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		await rest.post("/channels/1/messages", { content: "first" });
+
+		const second = rest.post("/channels/1/messages", { content: "second" });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(50);
+		await second;
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(sentAt[1]! - sentAt[0]!).toBeGreaterThanOrEqual(50);
+	});
+
+	it("pauses every bucket while a global rate limit is active", async () => {
+		vi.useFakeTimers();
+		const rest = new Rest();
+		rest.setToken("token");
+		let limitedAt: number | null = null;
+		let unrelatedSentAt: number | null = null;
+
+		const fetchMock = vi.fn(async (input: URL | RequestInfo): Promise<Response> => {
+			const url = String(input);
+
+			if (url.endsWith("/channels/1/messages")) {
+				if (limitedAt === null) {
+					limitedAt = Date.now();
+					return new Response(JSON.stringify({ message: "Rate limited", retry_after: 0.05, global: true }), {
+						status: 429,
+						headers: { "Content-Type": "application/json", "X-RateLimit-Bucket": "messages" }
+					});
+				}
+
+				return new Response(JSON.stringify({ ok: true }), {
+					status: 200,
+					headers: { "Content-Type": "application/json", "X-RateLimit-Bucket": "messages" }
+				});
+			}
+
+			unrelatedSentAt = Date.now();
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: { "Content-Type": "application/json", "X-RateLimit-Bucket": "users" }
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const limited = rest.post("/channels/1/messages", { content: "hi" });
+		for (let i = 0; i < 10; i += 1) {
+			if (limitedAt !== null && rest.routeRateLimits.size > 0) break;
+			await Promise.resolve();
+		}
+
+		// a different bucket entirely - a global limit still applies to it
+		const unrelated = rest.get("/users/@me");
+
+		await vi.advanceTimersByTimeAsync(60);
+		await Promise.all([limited, unrelated]);
+
+		expect(unrelatedSentAt).not.toBeNull();
+		expect(unrelatedSentAt! - limitedAt!).toBeGreaterThanOrEqual(50);
+	});
+
 	it("shares cooldown across routes that resolve to the same rate-limit bucket", async () => {
 		vi.useFakeTimers();
 		const rest = new Rest();

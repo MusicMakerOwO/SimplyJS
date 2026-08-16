@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { Awaitable } from "./Types/HelperTypes.js";
 import type { Client } from "./Client.js";
-import type { WSClient, WSEvents } from "./WSClient.js";
+import type { WSClient, WSEventMap } from "./WSClient.js";
 import type { ClientEventMap } from "./Types/SimplyJSTypes.js";
 
 /** Predicate deciding whether an emitted event's arguments should be collected */
@@ -202,11 +202,11 @@ export function createCollector<TEvent extends keyof ClientEventMap & string>(
 	event: TEvent,
 	options?: CollectorOptions<ClientEventMap[TEvent]>
 ): Collector<ClientEventMap[TEvent]>;
-export function createCollector<TEvent extends keyof WSEvents & string>(
+export function createCollector<TEvent extends keyof WSEventMap & string>(
 	emitter: WSClient,
 	event: TEvent,
-	options?: CollectorOptions<WSEvents[TEvent]>
-): Collector<WSEvents[TEvent]>;
+	options?: CollectorOptions<WSEventMap[TEvent]>
+): Collector<WSEventMap[TEvent]>;
 export function createCollector<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
 	emitter: EventEmitter<TMap>,
 	event: TEvent,
@@ -239,11 +239,11 @@ export function awaitEvent<TEvent extends keyof ClientEventMap & string>(
 	event: TEvent,
 	options?: Omit<CollectorOptions<ClientEventMap[TEvent]>, "max">
 ): Promise<ClientEventMap[TEvent]>;
-export function awaitEvent<TEvent extends keyof WSEvents & string>(
+export function awaitEvent<TEvent extends keyof WSEventMap & string>(
 	emitter: WSClient,
 	event: TEvent,
-	options?: Omit<CollectorOptions<WSEvents[TEvent]>, "max">
-): Promise<WSEvents[TEvent]>;
+	options?: Omit<CollectorOptions<WSEventMap[TEvent]>, "max">
+): Promise<WSEventMap[TEvent]>;
 export function awaitEvent<TMap extends Record<string, unknown[]>, TEvent extends keyof TMap & string>(
 	emitter: EventEmitter<TMap>,
 	event: TEvent,

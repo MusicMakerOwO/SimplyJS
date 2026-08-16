@@ -6,26 +6,6 @@ import { StringSelectBuilder } from "./StringSelectBuilder.js";
 import { TextInputBuilder } from "./TextInputBuilder.js";
 import { UserSelectBuilder } from "./UserSelectBuilder.js";
 
-/**
- * Anything that can be wrapped by a {@link LabelBuilder}, modal-only - a raw {@link LabelChild}
- * payload, or any of the matching component builders (which serialize to one via `toJSON()`).
- */
-export type LabelChildBuilder =
-	| LabelChild
-	| TextInputBuilder
-	| StringSelectBuilder
-	| UserSelectBuilder
-	| RoleSelectBuilder
-	| MentionableSelectBuilder
-	| ChannelSelectBuilder;
-
-/** Resolves a {@link LabelChildBuilder} (raw payload or builder) down to its raw wire payload */
-function resolveLabelChild(component: LabelChildBuilder): LabelChild {
-	return "toJSON" in component && typeof component.toJSON === "function"
-		? component.toJSON() as LabelChild
-		: component as LabelChild;
-}
-
 /** Runtime checks of the label/description text, shared by both the raw-payload and builder validation paths */
 function validateLabelText(label: { label?: string; description?: string }): void {
 	if (!label.label || label.label.length === 0) throw new Error("Label must have a label");
@@ -37,7 +17,7 @@ function validateLabelText(label: { label?: string; description?: string }): voi
 }
 
 /** Builds the appropriate builder for a raw {@link Label}'s `component`, based on its type */
-function buildLabelChild(component: LabelChild): LabelChildBuilder {
+function buildLabelChild(component: LabelChild): LabelChild {
 	switch (component.type) {
 		case ComponentTypes.TEXT_INPUT: return TextInputBuilder.from(component);
 		case ComponentTypes.STRING_SELECT: return StringSelectBuilder.from(component);
@@ -63,9 +43,10 @@ function validateLabelChild(component: LabelChild): void {
 /**
  * Fluent builder for a modal-only label - associates a label (and optional description) with a
  * single interactive component (text input or select menu). The builder *is* a {@link Label}
- * payload, and `component` is typed as a payload too, so a builder or a plain object both work.
+ * payload, and so is every component builder it can wrap, so `component` takes a builder or a
+ * plain object interchangeably.
  */
-export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
+export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
 	/**
 	 * Creates a builder from an existing label payload, inferring the right builder for `component`
 	 */
@@ -80,10 +61,11 @@ export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
 	}
 
 	/**
-	 * Validates a raw label payload against Discord's constraints
+	 * Validates a label payload against Discord's constraints
 	 */
 	static validate(label: Label): void {
 		validateLabelText(label);
+		if (!label.component) throw new Error("Label must have a component");
 		validateLabelChild(label.component);
 	}
 
@@ -129,21 +111,6 @@ export class LabelBuilder<T extends LabelChildBuilder = LabelChildBuilder> {
 	 * Validates this builder's current state against Discord's constraints
 	 */
 	validate(): void {
-		validateLabelText(this);
-		if (!this.component) throw new Error("Label must have a component");
-		validateLabelChild(resolveLabelChild(this.component));
-	}
-
-	/**
-	 * Serializes this builder to the raw {@link Label} payload sent to Discord
-	 */
-	toJSON(): Label {
-		const payload: Label = {
-			type: this.type,
-			label: this.label,
-			component: resolveLabelChild(this.component),
-		};
-		if (this.description !== undefined) payload.description = this.description;
-		return payload;
+		LabelBuilder.validate(this);
 	}
 }
