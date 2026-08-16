@@ -251,13 +251,19 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.#heartbeatAcked = true;
 		this.emit(WSEvents.Hello, data.heartbeat_interval);
 
-		this.#heartbeatTimer = setInterval(() => {
+		const beat = () => {
 			if (!this.#heartbeatAcked) {
 				// gateway never acked the last heartbeat - connection is dead, reconnect
 				this.#reconnect();
 				return;
 			}
 			this.#sendHeartbeat();
+		};
+
+		// gateway contract: first heartbeat after interval * jitter, then every interval after that
+		this.#heartbeatTimer = setTimeout(() => {
+			beat();
+			this.#heartbeatTimer = setInterval(beat, this.heartbeatInterval).unref();
 		}, this.heartbeatInterval * this.jitter).unref();
 
 		if (this.#sessionId) {

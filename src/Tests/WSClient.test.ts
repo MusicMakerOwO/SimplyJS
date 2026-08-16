@@ -212,6 +212,35 @@ describe("WSClient lifecycle", () => {
 		expect(JSON.parse(mockSocket.sent[1]!) as GatewayPayload).toMatchObject({ op: GatewayOpCodes.Heartbeat });
 	});
 
+	it("applies jitter to the first heartbeat only, not every heartbeat period", async () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 0.1 });
+		socket.setToken("token");
+		const heartbeatSpy = vi.fn();
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
+
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+		mockSocket.emitMessage({
+			op: GatewayOpCodes.Hello,
+			d: { heartbeat_interval: 1000 },
+			s: null,
+			t: null
+		});
+
+		// first beat should fire at interval * jitter (100ms), not at the full interval
+		await vi.advanceTimersByTimeAsync(100);
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+		mockSocket.emitMessage({ op: GatewayOpCodes.HeartbeatACK, d: null, s: null, t: null });
+
+		// subsequent beats should be spaced by the full interval (1000ms), not interval * jitter again
+		await vi.advanceTimersByTimeAsync(900);
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(100);
+		expect(heartbeatSpy).toHaveBeenCalledTimes(2);
+	});
+
 	it("marks client ready after receiving READY dispatch", () => {
 		const client = new Client({
 			token: "token",

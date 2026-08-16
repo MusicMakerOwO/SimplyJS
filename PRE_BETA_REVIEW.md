@@ -29,7 +29,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   Also: op 9 with `d: false` reconnects immediately, but Discord requires a 1–5s randomized wait
   before re-identifying. Hammering IDENTIFY burns the session-start rate limit.
 
-- [ ] **HIGH — Jitter is applied as the heartbeat *period*, not the first-beat offset.**
+- [x] **HIGH — Jitter is applied as the heartbeat *period*, not the first-beat offset.**
   `src/WSClient.ts:218`
   `setInterval(..., heartbeatInterval * this.jitter)` with `jitter = Math.random()` (`:89`). The
   gateway contract is: first heartbeat after `interval * jitter`, then every `interval`.
