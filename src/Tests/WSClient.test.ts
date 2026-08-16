@@ -6,6 +6,7 @@ import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 
 type MessageHandler = (data: { toString(): string }) => void;
 type CloseHandler = () => void;
+type ErrorHandler = (err: Error) => void;
 
 const wsMockState = vi.hoisted(() => {
 	class MockWebSocket {
@@ -13,19 +14,30 @@ const wsMockState = vi.hoisted(() => {
 		url: string;
 		#messageHandlers: MessageHandler[] = [];
 		#closeHandlers: CloseHandler[] = [];
+		#errorHandlers: ErrorHandler[] = [];
 
 		constructor(url: string) {
 			this.url = url;
 			wsMockState.instances.push(this);
 		}
 
-		on(event: "message" | "close", handler: MessageHandler | CloseHandler): void {
+		on(event: "message" | "close" | "error", handler: MessageHandler | CloseHandler | ErrorHandler): void {
 			if (event === "message") {
 				this.#messageHandlers.push(handler as MessageHandler);
 				return;
 			}
+			if (event === "error") {
+				this.#errorHandlers.push(handler as ErrorHandler);
+				return;
+			}
 
 			this.#closeHandlers.push(handler as CloseHandler);
+		}
+
+		emitError(err: Error): void {
+			for (const handler of this.#errorHandlers) {
+				handler(err);
+			}
 		}
 
 		send(payload: string): void {
@@ -141,6 +153,20 @@ describe("WSClient lifecycle", () => {
 		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
 
 		expect(wsMockState.instances[1]!.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
+	});
+
+	it("does not crash the process when the socket emits an error", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		const errorSpy = vi.fn();
+		socket.on(WSEvents.Error, errorSpy);
+
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+		const err = new Error("ECONNRESET");
+
+		expect(() => mockSocket.emitError(err)).not.toThrow();
+		expect(errorSpy).toHaveBeenCalledWith(err);
 	});
 
 	it("drops a malformed frame instead of throwing", () => {

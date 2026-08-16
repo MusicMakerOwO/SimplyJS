@@ -18,7 +18,7 @@ backwards-compatibility tests land.
 This cluster is the difference between a library that survives a night and one that doesn't.
 Worth fixing as a single pass over `WSClient.ts` rather than item by item.
 
-- [ ] **HIGH — No `error` listener on the socket.** `src/WSClient.ts:114`
+- [x] **HIGH — No `error` listener on the socket.** `src/WSClient.ts:114`
   `ws` emits `error` on ECONNRESET / TLS failure / bad handshake. With no listener, Node's
   `EventEmitter` throws it and takes the process down.
   *Trigger:* DNS blip or Discord 5xx during handshake.

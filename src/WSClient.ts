@@ -27,6 +27,8 @@ export const WSEvents = {
 	Ready: "Ready",
 	/** Fired when the gateway sends the `RESUMED` dispatch, indicating a successful session resume */
 	Resumed: "Resumed",
+	/** Fired when the underlying `ws` socket emits an `error` (ECONNRESET, TLS failure, bad handshake, etc) */
+	Error: "Error",
 } as const;
 
 export type WSEventMap = {
@@ -38,6 +40,7 @@ export type WSEventMap = {
 	[WSEvents.HeartbeatAck]: [];
 	[WSEvents.Ready]: [];
 	[WSEvents.Resumed]: [];
+	[WSEvents.Error]: [error: Error];
 };
 
 export type WSOptions = {
@@ -132,6 +135,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.#socket = socket;
 
 		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
+		socket.on("error", (err) => this.emit(WSEvents.Error, err));
 		socket.on("close", () => {
 			this.ready = false;
 			this.heartbeatInterval = -1;
