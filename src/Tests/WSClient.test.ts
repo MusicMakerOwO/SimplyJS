@@ -10,10 +10,12 @@ type CloseHandler = () => void;
 const wsMockState = vi.hoisted(() => {
 	class MockWebSocket {
 		sent: string[] = [];
+		url: string;
 		#messageHandlers: MessageHandler[] = [];
 		#closeHandlers: CloseHandler[] = [];
 
-		constructor() {
+		constructor(url: string) {
+			this.url = url;
 			wsMockState.instances.push(this);
 		}
 
@@ -115,6 +117,30 @@ describe("WSClient lifecycle", () => {
 		socket.setToken("token");
 
 		expect(() => socket.send({ op: GatewayOpCodes.Heartbeat, d: null, s: null, t: null })).toThrow(/websocket client not initialized/i);
+	});
+
+	it("appends gateway version and encoding to the connection URL", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+
+		socket.initialize();
+
+		expect(wsMockState.instances[0]!.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
+	});
+
+	it("appends gateway version and encoding to the resume URL", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		client.socket.initialize();
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+
+		expect(wsMockState.instances[1]!.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
 	});
 
 	it("drops a malformed frame instead of throwing", () => {

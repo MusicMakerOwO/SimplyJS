@@ -43,7 +43,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   hangs forever at ~1000 wakeups/sec instead of throwing. Combined with the two items above, the
   failure is completely silent.
 
-- [ ] **HIGH — Gateway URL has no version or encoding.** `src/WSClient.ts:111`
+- [x] **HIGH — Gateway URL has no version or encoding.** `src/WSClient.ts:111`
   Missing `?v=10&encoding=json` on both the initial connect and the resume URL. Unversioned
   connections get Discord's legacy default.
 

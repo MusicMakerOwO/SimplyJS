@@ -127,7 +127,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 
 		this.#destroyed = false;
 
-		const socket = new WebSocket(this.#resumeGatewayUrl ?? "wss://gateway.discord.gg");
+		const baseUrl = this.#resumeGatewayUrl ?? "wss://gateway.discord.gg";
+		const socket = new WebSocket(`${baseUrl}?v=10&encoding=json`);
 		this.#socket = socket;
 
 		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
