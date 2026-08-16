@@ -46,23 +46,23 @@ describe("SlashCommandBuilder", () => {
 				.setNameLocalizations({ "es-ES": "captura" })
 				.setDescriptionLocalizations({ "es-ES": "Gestionar capturas" });
 
-			expect(builder.nameLocalizations).toEqual({ "es-ES": "captura" });
-			expect(builder.descriptionLocalizations).toEqual({ "es-ES": "Gestionar capturas" });
+			expect(builder.name_localizations).toEqual({ "es-ES": "captura" });
+			expect(builder.description_localizations).toEqual({ "es-ES": "Gestionar capturas" });
 		});
 	});
 
 	describe("top-level command settings", () => {
 		it("stringifies default member permissions and clears them with null", () => {
 			const builder = new SlashCommandBuilder().setDefaultMemberPermissions(8n);
-			expect(builder.defaultMemberPermissions).toBe("8");
+			expect(builder.default_member_permissions).toBe("8");
 
 			builder.setDefaultMemberPermissions(null);
-			expect(builder.defaultMemberPermissions).toBeNull();
+			expect(builder.default_member_permissions).toBeNull();
 		});
 
 		it("accepts number and string permission values", () => {
-			expect(new SlashCommandBuilder().setDefaultMemberPermissions(16).defaultMemberPermissions).toBe("16");
-			expect(new SlashCommandBuilder().setDefaultMemberPermissions("32").defaultMemberPermissions).toBe("32");
+			expect(new SlashCommandBuilder().setDefaultMemberPermissions(16).default_member_permissions).toBe("16");
+			expect(new SlashCommandBuilder().setDefaultMemberPermissions("32").default_member_permissions).toBe("32");
 		});
 
 		it("sets integration types", () => {
@@ -71,7 +71,7 @@ describe("SlashCommandBuilder", () => {
 				DiscordApplicationIntegrationTypes.USER_INSTALL
 			);
 
-			expect(builder.integrationTypes).toEqual([
+			expect(builder.integration_types).toEqual([
 				DiscordApplicationIntegrationTypes.GUILD_INSTALL,
 				DiscordApplicationIntegrationTypes.USER_INSTALL
 			]);
@@ -476,8 +476,8 @@ describe("SlashCommandSubcommandBuilder", () => {
 			.setNameLocalizations({ "es-ES": "crear" })
 			.setDescriptionLocalizations({ "es-ES": "desc" });
 
-		expect(builder.nameLocalizations).toEqual({ "es-ES": "crear" });
-		expect(builder.descriptionLocalizations).toEqual({ "es-ES": "desc" });
+		expect(builder.name_localizations).toEqual({ "es-ES": "crear" });
+		expect(builder.description_localizations).toEqual({ "es-ES": "desc" });
 	});
 });
 
@@ -500,7 +500,7 @@ describe("SlashCommandSubcommandGroupBuilder", () => {
 			.setNameLocalizations({ "es-ES": "gestionar" })
 			.setDescriptionLocalizations({ "es-ES": "desc" });
 
-		expect(builder.nameLocalizations).toEqual({ "es-ES": "gestionar" });
-		expect(builder.descriptionLocalizations).toEqual({ "es-ES": "desc" });
+		expect(builder.name_localizations).toEqual({ "es-ES": "gestionar" });
+		expect(builder.description_localizations).toEqual({ "es-ES": "desc" });
 	});
 });
