@@ -20,7 +20,6 @@
   - `APIClientStructure<T>` — client-bound structures needing `client` access (holds `protected readonly client: Client`)
   - `APIGuildStructure<T>` — guild-owned structures needing both `client` and `guild` access (holds `protected readonly client: Client` and `protected readonly guild: Guild`)
   - `GlobalCache<K,V,API>` / `GuildScopedCache<K,V,API>` — typed Maps with `abstract upsert(data: API): V` and `abstract fetch(key: K): Promise<V>` for top-level and guild-scoped caches respectively
-  - `ComponentBuilder<T>` — builder contract requiring `from(value: T)` and `validate()` methods
 - Domain model types for Discord REST/gateway payloads are in `src/Types/DiscordAPITypes.ts` and `src/Types/MessageComponents.ts`.
 - Gateway packet envelope typing (including Hello/Ready payload shapes) is in `src/Types/DiscordGateway.ts` via `GatewayPayload<T>`.
 - `src/Types/Internal.ts` defines event contracts (`EventHandler`) plus `defineEvent(...)` for strongly typed handler declarations.
@@ -39,7 +38,8 @@
 - New event handlers go in `src/Events/` as named `const` exports created with `defineEvent(...)` from `src/Types/Internal.ts`; export them from `src/Events/index.ts` so `EventDispatcher` can register them.
 - New domain structures extend `APIClientStructure<T>` or `APIGuildStructure<T>` from `src/Contracts/DiscordStructure.ts`, depending on whether the structure is client-bound or guild-owned.
 - New top-level caches extend `GlobalCache<K,V,API>` from `src/Contracts/CacheStructure.ts` and must implement `upsert(data)` and `fetch(key)`.
-- Builders implement `ComponentBuilder<T>` from `src/Contracts/ComponentBuilder.ts` (requires `from` and `validate` methods).
+- Builders in `src/Builders/` **are** their wire payloads: each one `implements` the payload type it builds (`ButtonBuilder implements InteractiveButton`, `ModalBuilder implements InteractionCallbackModal`, ...) and stores fields under their snake_case wire names (`custom_id`, `min_values`, `default_values`). There is deliberately no `toJSON()` — a builder can be sent, inspected, cloned, or logged as-is, and nested builders need no conversion. Every builder also exposes a static `from(value)` and both a static and an instance `validate()`, which read the same wire shape.
+  - Corollary: a builder must have **no** own enumerable property that isn't part of the payload, or it leaks to Discord as an unknown key. Put internal state on the prototype (e.g. the `protected get selectLabel()` accessor in `src/Builders/BaseSelectBuilder.ts`) or in a `#private` field. `src/Tests/Components.test.ts` pins this.
 
 ## Tooling and workflows
 - Type/lint check: `npm run check` (runs ESLint + `tsc --noEmit`).

@@ -16,17 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Client.registerPublicCommands(commands)` / `Client.registerGuildCommands(guildId, commands)` — replace all global or guild-scoped slash commands via REST
 
 #### Message components
+- Every builder **is** its wire payload — `ButtonBuilder implements InteractiveButton`, `ModalBuilder implements InteractionCallbackModal`, and so on — with fields stored under their snake_case wire names (`custom_id`, `min_values`, `default_values`). There is no `toJSON()`: builders can be sent, inspected, cloned, or logged as-is, nested builders need no conversion, and `components` is a plain array you can `push` to or splice
 - `ActionRowBuilder` (`src/Builders/ActionRowBuilder.ts`) — container builder for buttons and select menus, generic over the component payload type so builders and plain objects can be mixed freely
 - `ButtonBuilder`, `LinkButtonBuilder`, `SKUButtonBuilder` (`src/Builders/ButtonBuilder.ts`, `src/Builders/LinkButtonBuilder.ts`, `src/Builders/SKUButtonBuilder.ts`) — one builder per button style family (interactive, link, and SKU/premium), each only exposing the fields valid for its style
 - `ResolveButton()` / `ValidateButton()` (`src/Builders/ResolveButton.ts`) — build or validate the correct button builder for a payload whose style isn't known up front
 - `StringSelectBuilder`, `UserSelectBuilder`, `RoleSelectBuilder`, `ChannelSelectBuilder`, `MentionableSelectBuilder` (`src/Builders/*SelectBuilder.ts`) — all Discord select menu types, sharing common option/constraint logic via `BaseSelectBuilder` / `EntitySelectBuilder`
 - `ModalBuilder`, `LabelBuilder`, `TextInputBuilder` (`src/Builders/ModalBuilder.ts`, `src/Builders/LabelBuilder.ts`, `src/Builders/TextInputBuilder.ts`) — modal construction with labeled text input fields
 - `Components` type definitions (`src/Types/Components.ts`) — full typings for all message component kinds
-- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`, `src/Tests/SlashCommandOptions.test.ts`) for construction, validation, and JSON serialization of every builder
+- Comprehensive builder test coverage (`src/Tests/Components.test.ts`, `src/Tests/SlashCommandBuilder.test.ts`, `src/Tests/SlashCommandOptions.test.ts`) for construction and validation of every builder, plus a wire-format suite pinning that each builder's own properties are exactly the payload Discord expects
 
 #### Interactions
 - `BaseInteraction` (`src/Structures/Interactions/BaseInteraction.ts`) and per-type interaction classes — `PingInteraction`, `SlashCommandInteraction`, `AutocompleteInteraction`, `MessageComponentInteraction`, `SelectMenuInteraction`, `ButtonInteraction`, `ModalInteraction`, `UserContextMenuInteraction`, `MessageContextMenuInteraction`
-- `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types
+- `Repliable`, `Updateable`, and `ModalShowable` mixins (`src/Mixins/Interactions/`) — shared `reply()`/`deferReply()`/`followUp()`, `update()`/`deferUpdate()`, and `showModal()` behavior across the relevant interaction types. `showModal()` accepts a `ModalBuilder` or a raw `InteractionCallbackModal`, since they're the same shape
 - `MessageFlags` constants (`src/Types/DiscordAPITypes.ts`) and an `ephemeral` shorthand on `reply()`/`update()` payloads, for responses only the invoking user can see
 - `CreateInteraction()` factory (`src/Factory/CreateInteraction.ts`) — builds the correct interaction class from a raw gateway payload; returns `AnyInteraction | PingInteraction`
 - `InteractionCreate` gateway event handler (`src/Events/Interactions.ts`) for `INTERACTION_CREATE`, emitting `ClientEvents.InteractionCreate`

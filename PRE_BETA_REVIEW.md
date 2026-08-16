@@ -8,56 +8,15 @@ issues, 8 typos. The 15 highs collapse into roughly 8–10 distinct pieces of wo
 gateway lifecycle items are one broken subsystem and the REST route items are the same mistake
 repeated.
 
-Ordered by suggested triage. Sections 1–3 are the ones that get harder to change once
-backwards-compatibility tests land.
+Ordered by suggested triage. 
 
 ---
-
-## 1. Gateway lifecycle (one coherent piece of work)
-
-This cluster is the difference between a library that survives a night and one that doesn't.
-Worth fixing as a single pass over `WSClient.ts` rather than item by item.
-
-- [x] **HIGH — No `error` listener on the socket.** `src/WSClient.ts:114`
-  `ws` emits `error` on ECONNRESET / TLS failure / bad handshake. With no listener, Node's
-  `EventEmitter` throws it and takes the process down.
-  *Trigger:* DNS blip or Discord 5xx during handshake.
 
 - [ ] **HIGH — `#reconnect()` is an unbounded, un-delayed retry loop.** `src/WSClient.ts:127-139`
   No backoff, no attempt counter, no cap.
   *Trigger:* a bad token (close 4004) or revoked intent (4014) → hello → identify → close → spin.
   Also: op 9 with `d: false` reconnects immediately, but Discord requires a 1–5s randomized wait
   before re-identifying. Hammering IDENTIFY burns the session-start rate limit.
-
-- [x] **HIGH — Jitter is applied as the heartbeat *period*, not the first-beat offset.**
-  `src/WSClient.ts:218`
-  `setInterval(..., heartbeatInterval * this.jitter)` with `jitter = Math.random()` (`:89`). The
-  gateway contract is: first heartbeat after `interval * jitter`, then every `interval`.
-  *Trigger:* every connection. With `jitter ≈ 0.05` and Discord's 41.25s interval the client
-  heartbeats every ~2s forever → gateway rate limit (120 payloads/60s) → forced disconnect.
-  The JSDoc at `:68` already describes the intended behavior; code and doc disagree.
-
-- [x] **HIGH — `login()` can never fail.** `src/Client.ts:88-94`
-  A 1ms busy-poll on `socket.ready` with no timeout and no rejection path.
-  *Trigger:* bad token, missing privileged intent, or unreachable gateway. `await client.login()`
-  hangs forever at ~1000 wakeups/sec instead of throwing. Combined with the two items above, the
-  failure is completely silent.
-  *Note:* already resolved — `Client.ts` uses `awaitEvent` with a 10s timeout that rejects.
-
-- [x] **HIGH — Gateway URL has no version or encoding.** `src/WSClient.ts:111`
-  Missing `?v=10&encoding=json` on both the initial connect and the resume URL. Unversioned
-  connections get Discord's legacy default.
-
-- [x] **MED — Sequence number survives a session it no longer belongs to.**
-  `src/WSClient.ts:155,172-180`
-  On op 9 with `d: false`, `#sessionId`/`#resumeGatewayUrl` are cleared but `#sequence` is not.
-  *Trigger:* invalid-session → fresh IDENTIFY → the first heartbeat (`:255`) sends
-  `d: <old session's sequence>`. Sequence is session-scoped; a stale value on a new session is a
-  protocol violation. Reset `#sequence` to `null` alongside the session id.
-
----
-
-## 5. Correctness and state bugs
 
 - [ ] **MED — Rate limiting is reactive-only, with no request serialization.** `src/Rest.ts:241-276`
   `routeRateLimits` is written *only* on a 429 (`:271`). The `X-RateLimit-Remaining: 0` +
@@ -68,7 +27,14 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
   thundering herd. With `retriesRemaining` starting at 3, a sustained burst throws rather than
   queueing. A per-bucket serialized queue is the missing piece.
 
-- [ ] **MED — Builder serialization depends on an implicit `JSON.stringify` hook.**
+- [x] **MED — Builder serialization depends on an implicit `JSON.stringify` hook.**
+  *Fixed by removing serialization entirely: every builder now `implements` its payload type and
+  stores wire names (`custom_id`, `min_values`, `default_values`, ...), so there is no `toJSON()`
+  and nothing to forget to call. `showModal()` takes an `InteractionCallbackModal`, the `as unknown
+  as` casts are gone, and `src/Tests/Components.test.ts` pins the wire shape of every builder.
+  This also surfaced a latent leak: `selectLabel` was an own enumerable field on the select
+  builders, so it would have been sent to Discord as an unknown key - it's a prototype accessor now.*
+
   `src/Mixins/Interactions/ModalShowable.ts:29` sends `modal as unknown as
   InteractionCallbackModal` — the builder itself, whose fields are `customId`/`title`, not
   `custom_id`. Likewise `src/Builders/SlashCommandBuilder.ts:445` emits `options: this.options`,
