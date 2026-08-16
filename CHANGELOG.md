@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WSClient` now handles `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes the session (via `GatewayOpCodes.Resume`) instead of re-identifying from scratch when possible
 - `WSClient` now tracks heartbeat ACK state and reconnects if the gateway never acknowledges a heartbeat, instead of heartbeating into a dead connection indefinitely
 - `WSEvents` gained `RECONNECT`, `INVALID_SESSION`, and `HELLO`, mirroring the corresponding `GatewayOpCodes` alongside the existing `RAW`/`HEARTBEAT`/`HEARTBEAT_ACK` events
+- `GatewayCloseCodes` (`src/Types/DiscordGateway.ts`) — every gateway close code, documented by whether reconnecting can recover from it
+- `WSEvents.Disconnect` — fired with a reason and close code when the client stops reconnecting for good, either because Discord rejected the connection fatally or because every retry was used up
+- `WSOptions.maxReconnectAttempts` (default `10`) — cap on consecutive reconnect attempts before giving up; the counter resets on every successful `READY`/`RESUMED`
 
 #### Tooling
 - CI workflows for Bun (`.github/workflows/bun.yml`) and Deno (`.github/workflows/deno.yml`) run the build and test suite on every push/PR to `main`, alongside the existing Node workflow
@@ -59,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `WSClient.#reconnect()` no longer retries immediately and forever. Reconnects are scheduled with exponential backoff and full jitter (1s base, 60s cap, first attempt still immediate) and stop after `maxReconnectAttempts`. Fatal close codes (4004 authentication failed, 4010–4014 invalid shard/sharding required/invalid API version/invalid or disallowed intents) now stop reconnecting entirely instead of replaying a rejected `IDENTIFY` in a tight loop, and `4007`/`4009` drop the stale session so the next connection identifies rather than resuming
+- `GatewayOpCodes.InvalidSession` now waits Discord's mandated randomized 1–5 seconds before reconnecting, instead of re-identifying instantly and burning the session start rate limit
+- `Client.login()` now rejects with the gateway's actual failure reason when the connection is rejected outright (bad token, disallowed intents), instead of waiting the full ten seconds to blame a Discord outage
 - `eslint.config.ts` imports `Plugin` from `@eslint/core` as a type-only import, since that package only ships types and no runtime logic
 - All builders now implement their corresponding JSON payload interface directly, for improved type safety
 - Minimum supported Node version raised from 18 to 20, matching what the test suite actually requires

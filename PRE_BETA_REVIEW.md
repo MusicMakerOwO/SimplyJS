@@ -12,7 +12,18 @@ Ordered by suggested triage.
 
 ---
 
-- [ ] **HIGH — `#reconnect()` is an unbounded, un-delayed retry loop.** `src/WSClient.ts:127-139`
+- [x] **HIGH — `#reconnect()` is an unbounded, un-delayed retry loop.** `src/WSClient.ts:127-139`
+  *Fixed: `#reconnect()` now schedules the retry instead of reconnecting inline. The first attempt
+  still fires immediately (a one-off blip costs no downtime), each consecutive failure backs off
+  exponentially with full jitter (1s base, 60s cap), and the client gives up after
+  `maxReconnectAttempts` (new `WSOptions` field, default 10). The counter resets on `READY`/`RESUMED`,
+  so the cap is on consecutive failures, not lifetime reconnects. Op 9 passes a mandated randomized
+  1–5s floor. Close codes are now read off the `ws` `close` event and split via the new
+  `GatewayCloseCodes`: 4004/4010–4014 are terminal (emit the new `WSEvents.Disconnect` and stay down
+  rather than replaying a bad IDENTIFY), 4007/4009 drop the session so the next HELLO identifies
+  instead of resuming. `Client.login()` races Ready against Disconnect so a bad token rejects with
+  Discord's actual reason instead of "Discord may be having an outage" ten seconds later.*
+
   No backoff, no attempt counter, no cap.
   *Trigger:* a bad token (close 4004) or revoked intent (4014) → hello → identify → close → spin.
   Also: op 9 with `d: false` reconnects immediately, but Discord requires a 1–5s randomized wait

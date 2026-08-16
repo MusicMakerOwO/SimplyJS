@@ -340,7 +340,7 @@ npm run linecount   # top 10 largest .ts files by line count
 
 The project is alpha software; gateway resiliency and Discord API coverage are still being built out (tracked in `TODO.md`). Notably:
 
-- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. There's still no close-code-aware backoff or max-retry/terminal-failure detection - a dead connection reconnects immediately and indefinitely.
+- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. Reconnects are close-code aware: fatal codes (bad token, disallowed intents, bad shard/API version) stop retrying and emit `WSEvents.Disconnect`, session-invalidating codes re-identify instead of resuming, and everything else retries with exponential backoff + jitter up to `maxReconnectAttempts` (default 10).
 - Gateway event coverage is partial. Dispatch handlers exist for guilds, channels, members, roles, messages, reactions, emojis, stickers, and invites, but events like `PresenceUpdate`, `TypingStart`, `VoiceStateUpdate`, threads, bans, and interactions are not yet handled.
 - No interaction/slash-command support. Only traditional message-based (prefix) commands are demonstrated, since component/interaction payloads (`src/Types/Internal.ts`) are placeholders for a later update.
 - Large portions of `src/` still lack JSDoc coverage (tracked file-by-file in `docs.md`).

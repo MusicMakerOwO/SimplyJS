@@ -36,8 +36,8 @@
   - Track and reuse `session_id` / `resume_gateway_url` from READY
   - Track and clear heartbeat timers on close/destroy
   - Emit/handle heartbeat ACK state and add ACK timeout detection
-- [ ] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
-  - Include close-code aware backoff, max retries, and clear terminal failure state
+- [x] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
+  - [x] Include close-code aware backoff, max retries, and clear terminal failure state
 - [ ] Add more examples
   - [x] Sending a direct message to a user
   - [x] Sending a message in a guild channel
