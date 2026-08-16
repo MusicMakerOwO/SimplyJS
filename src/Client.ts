@@ -88,14 +88,22 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** Start the WebSocket connection, promise resolves when authorization finishes */
 	async login(): Promise<void> {
 		this.socket.initialize();
-		try {
-			// pause execution until a ready event is recieved
-			await awaitEvent(this.socket, WSEvents.Ready, {
-				time: 10_000
+
+		// pause execution until a ready event is recieved
+		const ready = awaitEvent(this.socket, WSEvents.Ready, { time: 10_000 })
+			.catch(() => {
+				throw new Error("No ready event recieved within 10 seconds - Discord may be having an outage");
 			});
-		} catch {
-			throw new Error("No ready event recieved within 10 seconds - Discord may be having an outage");
-		}
+
+		// a rejected connection (bad token, disallowed intents) will never produce a ready event, so
+		// report what Discord actually said instead of blaming an outage ten seconds later
+		const rejected = awaitEvent(this.socket, WSEvents.Disconnect, { time: 10_000 })
+			.then(
+				([reason]) => { throw new Error(`Failed to connect to the gateway - ${reason}`); },
+				() => new Promise<never>(() => {}) // timed out waiting for a rejection, let `ready` decide
+			);
+
+		await Promise.race([ready, rejected]);
 		if (this.status || this.activity) return this.#updatePresence();
 	}
 
