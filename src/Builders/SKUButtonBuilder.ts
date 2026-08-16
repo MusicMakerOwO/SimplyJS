@@ -1,17 +1,19 @@
 import { ButtonStyles, ComponentTypes, PremiumButton } from "../Types/Components.js";
-import { omitUndefined } from "./BaseSelectBuilder.js";
 
 /** Runtime checks shared by `SKUButtonBuilder#validate` and the static `SKUButtonBuilder.validate` */
-function validateSKUButtonShape(button: { skuId?: string | undefined }): void {
-	if (!button.skuId || button.skuId.length === 0) throw new Error("SKU button must have a skuId");
+function validateSKUButtonShape(button: { sku_id?: string | undefined }): void {
+	if (!button.sku_id || button.sku_id.length === 0) throw new Error("SKU button must have a skuId");
 }
 
 /**
  * Fluent builder for premium (SKU) buttons - purchases a SKU and does not send an
  * interaction when clicked. Discord fills in the label/emoji itself, so unlike
- * `ButtonBuilder` there's no `label`, `emoji`, `customId`, or `url` to set.
+ * `ButtonBuilder` there's no `label`, `emoji`, `custom_id`, or `url` to set.
+ *
+ * The builder *is* a {@link PremiumButton} payload, so it can be used interchangeably with a
+ * plain object anywhere a button is accepted.
  */
-export class SKUButtonBuilder {
+export class SKUButtonBuilder implements PremiumButton {
 	/**
 	 * Creates a builder from an existing SKU button payload
 	 */
@@ -28,13 +30,13 @@ export class SKUButtonBuilder {
 	 * Validates a SKU button payload against Discord's constraints
 	 */
 	static validate(button: PremiumButton): void {
-		validateSKUButtonShape({ skuId: button.sku_id });
+		validateSKUButtonShape(button);
 	}
 
 	readonly type = ComponentTypes.BUTTON;
 	readonly style = ButtonStyles.PREMIUM;
 	/** Id of the SKU the button purchases - only populated once set, see {@link SKUButtonBuilder#validate} */
-	skuId!: string;
+	sku_id!: string;
 	/** Whether the button is disabled, defaults to false */
 	disabled?: boolean;
 
@@ -43,7 +45,7 @@ export class SKUButtonBuilder {
 	 */
 	setSkuId(skuId: string): this {
 		if (skuId.length === 0) throw new Error("SKU button's skuId cannot be empty");
-		this.skuId = skuId;
+		this.sku_id = skuId;
 		return this;
 	}
 
@@ -60,17 +62,5 @@ export class SKUButtonBuilder {
 	 */
 	validate(): void {
 		validateSKUButtonShape(this);
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link PremiumButton} payload Discord expects
-	 */
-	toJSON(): PremiumButton {
-		return omitUndefined<PremiumButton>({
-			type: this.type,
-			style: this.style,
-			sku_id: this.skuId,
-			disabled: this.disabled
-		});
 	}
 }

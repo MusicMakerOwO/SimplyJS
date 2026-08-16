@@ -4,7 +4,7 @@ import { Constructor } from "../../Types/Internal.js";
 import { InteractionCallbackModal, InteractionCallbackTypes } from "../../Types/Interactions.js";
 
 type ModalShowableClass<T> = {
-	showModal(modal: ModalBuilder): Promise<void>;
+	showModal(modal: InteractionCallbackModal): Promise<void>;
 } & T;
 
 /**
@@ -20,13 +20,14 @@ export function ModalShowable<TBase extends Constructor<BaseInteraction>>(
 		/**
 		 * Responds to this interaction by popping up a modal form. Can only be called once, as the
 		 * initial response to the interaction - not after a `reply`/`deferReply`.
-		 * @param modal The modal to display.
+		 * @param modal The modal to display - a {@link ModalBuilder} or a raw payload, which are
+		 * the same shape.
 		 */
-		async showModal(modal: ModalBuilder): Promise<void> {
-			modal.validate();
+		async showModal(modal: InteractionCallbackModal): Promise<void> {
+			ModalBuilder.validate(modal);
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.MODAL,
-				data: modal as unknown as InteractionCallbackModal,
+				data: modal,
 			});
 		}
 	} as unknown as Constructor<ModalShowableClass<InstanceType<TBase>>>;

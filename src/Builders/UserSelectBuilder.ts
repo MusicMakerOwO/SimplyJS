@@ -1,9 +1,11 @@
 import { ComponentTypes, UserSelect } from "../Types/Components.js";
-import { omitUndefined } from "./BaseSelectBuilder.js";
 import { EntitySelectBuilder, validateEntitySelectShape } from "./EntitySelectBuilder.js";
 
-/** Fluent builder for a select menu that picks from a server's users, validating limits as they're set. */
-export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.USER_SELECT> {
+/**
+ * Fluent builder for a select menu that picks from a server's users, validating limits as they're
+ * set. The builder *is* a {@link UserSelect} payload, so it can be sent as-is.
+ */
+export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes.USER_SELECT> implements UserSelect {
 	/**
 	 * Creates a builder from an existing user select payload
 	 */
@@ -25,16 +27,7 @@ export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 	 * Validates a user select payload against Discord's constraints
 	 */
 	static validate(select: UserSelect): void {
-		validateEntitySelectShape(
-			{
-				customId: select.custom_id,
-				placeholder: select.placeholder,
-				minValues: select.min_values,
-				maxValues: select.max_values,
-				defaultValues: select.default_values
-			},
-			"User select"
-		);
+		validateEntitySelectShape(select, "User select");
 	}
 
 	readonly type = ComponentTypes.USER_SELECT;
@@ -49,21 +42,5 @@ export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 
 	validate(): void {
 		validateEntitySelectShape(this, this.selectLabel);
-	}
-
-	/**
-	 * Serializes this builder into the raw {@link UserSelect} payload Discord expects
-	 */
-	toJSON(): UserSelect {
-		return omitUndefined<UserSelect>({
-			type: this.type,
-			custom_id: this.customId,
-			placeholder: this.placeholder,
-			min_values: this.minValues,
-			max_values: this.maxValues,
-			required: this.required,
-			disabled: this.disabled,
-			default_values: this.defaultValues
-		});
 	}
 }
