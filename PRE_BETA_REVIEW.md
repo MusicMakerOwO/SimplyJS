@@ -77,7 +77,7 @@ Worth fixing as a single pass over `WSClient.ts` rather than item by item.
 - [ ] **LOW — Wrong error message.** `src/WSClient.ts:272`
   The websocket client's own guard throws `"Rest client not initialized"`.
 
-- [ ] **LOW — Identify `properties` are joke strings.** `src/WSClient.ts:239-241`
+- [x] **LOW — Identify `properties` are joke strings.** `src/WSClient.ts:239-241`
   `"i use arch btw"` / `"python sucks"` / `"ur mom"` are sent to Discord on every connect. Worth
   a decision before 1.0.
 

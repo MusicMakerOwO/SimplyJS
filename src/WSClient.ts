@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { platform } from "node:os";
 import WebSocket from "ws";
 import { GatewayOpCodes, GatewayPayload } from "./Types/DiscordGateway.js";
 import { Client } from "./Client.js";
@@ -249,9 +250,9 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			d: {
 				token: this.#token,
 				properties: {
-					os: "i use arch btw",
-					browser: "python sucks",
-					device: "ur mom",
+					os: platform(),
+					browser: "Node.js",
+					device: process.env.npm_package_name ?? "SimplyJS",
 				},
 				intents: this.intents
 			},
