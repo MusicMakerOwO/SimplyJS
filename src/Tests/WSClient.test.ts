@@ -171,10 +171,9 @@ describe("WSClient lifecycle", () => {
 
 	it("clears the stale sequence number on a non-resumable InvalidSession", () => {
 		vi.useFakeTimers();
-		const socket = new WSClient({} as Client, { jitterOverride: 1 });
-		socket.setToken("token");
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
 
-		socket.initialize();
+		client.socket.initialize();
 		let mockSocket = wsMockState.instances[0]!;
 		mockSocket.emitMessage({
 			op: GatewayOpCodes.Dispatch,
@@ -390,8 +389,8 @@ describe("WSClient lifecycle", () => {
 
 	it("becomes ready again after a RESUMED dispatch following a resume", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-		const socket = new WSClient({} as Client, {});
-		socket.setToken("token");
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const socket = client.socket;
 		const resumedSpy = vi.fn();
 		socket.on(WSEvents.Resumed, resumedSpy);
 
