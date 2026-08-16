@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
-import { WSClient } from "../WSClient.js";
+import { WSClient, WSEvents } from "../WSClient.js";
 import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
 import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 
@@ -114,7 +114,7 @@ describe("WSClient lifecycle", () => {
 		const socket = new WSClient({} as Client, { jitterOverride: 1 });
 		socket.setToken("token");
 		const heartbeatSpy = vi.fn();
-		socket.on("HEARTBEAT", heartbeatSpy);
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
 
 		socket.initialize();
 		const mockSocket = wsMockState.instances[0]!;

@@ -9,20 +9,32 @@ import { GatewayEventName, JSONObject } from "./Types/Internal.js";
  * Events emitted by {@link WSClient}, separate from the Discord gateway events dispatched via `dispatch()`.
  * These mirror {@link GatewayOpCodes} rather than the higher-level `t` dispatch names.
  */
-export type WSEvents = {
+export const WSEvents = {
 	/** Fired for every raw gateway payload received, before any op-specific handling */
-	"RAW": [data: unknown];
+	Raw: "Raw",
 	/** Mirrors op `Heartbeat` (1) - fired each time a heartbeat is sent to the gateway, whether scheduled or server-requested */
-	"HEARTBEAT": [];
+	Heartbeat: "Heartbeat",
 	/** Mirrors op `Reconnect` (7) - the gateway is asking the client to reconnect and resume */
-	"RECONNECT": [];
+	Reconnect: "Reconnect",
 	/** Mirrors op `InvalidSession` (9) - `resumable` reflects whether the session can be resumed instead of re-identified */
-	"INVALID_SESSION": [resumable: boolean];
+	InvalidSession: "InvalidSession",
 	/** Mirrors op `Hello` (10) - fired once per connection with the heartbeat interval to use */
-	"HELLO": [heartbeatInterval: number];
+	Hello: "Hello",
 	/** Mirrors op `HeartbeatACK` (11) - fired when the gateway acknowledges a heartbeat */
-	"HEARTBEAT_ACK": [];
-}
+	HeartbeatAck: "HeartbeatAck",
+	/** Fired when the gateway sends the `READY` dispatch, indicating successful authentication */
+	Ready: "Ready",
+} as const;
+
+export type WSEventMap = {
+	[WSEvents.Raw]: [data: unknown];
+	[WSEvents.Heartbeat]: [];
+	[WSEvents.Reconnect]: [];
+	[WSEvents.InvalidSession]: [resumable: boolean];
+	[WSEvents.Hello]: [heartbeatInterval: number];
+	[WSEvents.HeartbeatAck]: [];
+	[WSEvents.Ready]: [];
+};
 
 export type WSOptions = {
 	/**
@@ -54,7 +66,7 @@ export type WSOptions = {
  * Manages the raw Discord gateway websocket connection: identifying, heartbeating, and
  * dispatching incoming payloads to event handlers. One `WSClient` backs each {@link Client}.
  */
-export class WSClient extends EventEmitter<WSEvents> {
+export class WSClient extends EventEmitter<WSEventMap> {
 	#token: string | null = null;
 	#socket: WebSocket | null;
 	#sequence: number | null;
@@ -150,7 +162,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 	 */
 	#handleMessage(rawData: string): void {
 		const data = JSON.parse(rawData) as GatewayPayload;
-		this.emit("RAW", data);
+		this.emit(WSEvents.Raw, data);
 
 		if (typeof data.s === "number") this.#sequence = data.s;
 
@@ -163,15 +175,15 @@ export class WSClient extends EventEmitter<WSEvents> {
 				return;
 			case GatewayOpCodes.HeartbeatACK:
 				this.#heartbeatAcked = true;
-				this.emit("HEARTBEAT_ACK");
+				this.emit(WSEvents.HeartbeatAck);
 				return;
 			case GatewayOpCodes.Reconnect:
-				this.emit("RECONNECT");
+				this.emit(WSEvents.Reconnect);
 				this.#reconnect();
 				return;
 			case GatewayOpCodes.InvalidSession:
 				// d indicates whether the session is resumable; if not, drop it and re-identify
-				this.emit("INVALID_SESSION", data.d === true);
+				this.emit(WSEvents.InvalidSession, data.d === true);
 				if (data.d !== true) {
 					this.#sessionId = null;
 					this.#resumeGatewayUrl = null;
@@ -189,6 +201,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 
 		if (data.t === "READY") {
 			this.ready = true;
+			this.emit(WSEvents.Ready);
 			const readyData = data.d as JSONObject;
 			if (typeof readyData.session_id === "string") this.#sessionId = readyData.session_id;
 			if (typeof readyData.resume_gateway_url === "string") this.#resumeGatewayUrl = readyData.resume_gateway_url;
@@ -206,7 +219,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 
 		this.heartbeatInterval = data.heartbeat_interval;
 		this.#heartbeatAcked = true;
-		this.emit("HELLO", data.heartbeat_interval);
+		this.emit(WSEvents.Hello, data.heartbeat_interval);
 
 		this.#heartbeatTimer = setInterval(() => {
 			if (!this.#heartbeatAcked) {
@@ -256,7 +269,7 @@ export class WSClient extends EventEmitter<WSEvents> {
 			t: null,
 			s: null
 		});
-		this.emit("HEARTBEAT");
+		this.emit(WSEvents.Heartbeat);
 	}
 
 	/** Type guard confirming a `HELLO` payload carries a numeric `heartbeat_interval` */
