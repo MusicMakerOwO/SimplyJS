@@ -40,6 +40,10 @@ import {
 } from "../Events/AutoModeration.js";
 import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import { ReactionRemoveAll, ReactionRemoveEmoji } from "../Events/Reactions.js";
+import { WebhooksUpdate } from "../Events/Webhooks.js";
+import { PresenceUpdate } from "../Events/Presence.js";
+import { Presence } from "../Structures/Presence.js";
+import { ActivityType, DiscordActivity, DiscordPresence, Status } from "../Types/DiscordAPITypes.js";
 import {
 	GuildScheduledEventCreate,
 	GuildScheduledEventDelete,
@@ -1246,5 +1250,296 @@ describe("Guild scheduled event gateway event handlers", () => {
 		const events = client.guilds.get("guild-1")!.scheduledEvents;
 		expect(events.size).toBe(2);
 		expect(events.get("scheduled-event-2")).toBeInstanceOf(GuildScheduledEvent);
+	});
+});
+
+describe("WebhooksUpdate gateway event handler", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildWebhooks
+		});
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		return client;
+	}
+
+	it("emits with the cached guild and channel", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await WebhooksUpdate.handler(client, { guild_id: "guild-1", channel_id: "channel-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.WebhooksUpdate, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1")
+		});
+	});
+
+	it("falls back to bare id objects for uncached guilds instead of dropping the event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildWebhooks });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await WebhooksUpdate.handler(client, { guild_id: "guild-missing", channel_id: "channel-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.WebhooksUpdate, {
+			guild: { id: "guild-missing" },
+			channel: { id: "channel-1" }
+		});
+	});
+
+	it("falls back to a bare id object for uncached channels of a cached guild", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await WebhooksUpdate.handler(client, { guild_id: "guild-1", channel_id: "channel-2" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.WebhooksUpdate, {
+			guild: client.guilds.get("guild-1"),
+			channel: { id: "channel-2" }
+		});
+	});
+
+	it("does not touch any cache", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+
+		await WebhooksUpdate.handler(client, { guild_id: "guild-1", channel_id: "channel-2" });
+
+		expect(guild.channels.size).toBe(1);
+		expect(client.guilds.size).toBe(1);
+	});
+});
+
+describe("PresenceUpdate gateway event handler", () => {
+	function createActivity(overrides: Partial<DiscordActivity> = {}): DiscordActivity {
+		return {
+			name: "Factorio",
+			type: ActivityType.PLAYING,
+			created_at: 1704067200000,
+			...overrides
+		};
+	}
+
+	function createPresence(overrides: Partial<DiscordPresence> = {}): DiscordPresence & { guild_id: string } {
+		return {
+			user: { id: "member-1" },
+			guild_id: "guild-1",
+			status: Status.ONLINE,
+			activities: [createActivity()],
+			client_status: { desktop: Status.ONLINE },
+			...overrides
+		} as DiscordPresence & { guild_id: string };
+	}
+
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildPresences
+		});
+		await GuildCreate.handler(client, createGuild());
+		await MemberCreate.handler(client, createMember());
+		return client;
+	}
+
+	it("caches the presence on its guild keyed by user id and emits it", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await PresenceUpdate.handler(client, createPresence());
+
+		const cached = client.guilds.get("guild-1")!.presences.get("member-1");
+		expect(cached).toBeInstanceOf(Presence);
+		expect(cached!.status).toBe(Status.ONLINE);
+		expect(cached!.userId).toBe("member-1");
+		expect(cached!.guildId).toBe("guild-1");
+		expect(cached!.activities[0]!.name).toBe("Factorio");
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.PresenceUpdate, undefined, cached);
+	});
+
+	it("patches the existing instance in place rather than replacing it", async () => {
+		const client = await seededClient();
+		const presences = client.guilds.get("guild-1")!.presences;
+
+		await PresenceUpdate.handler(client, createPresence());
+		const first = presences.get("member-1")!;
+		await PresenceUpdate.handler(client, createPresence({ status: Status.IDLE }));
+
+		expect(presences.get("member-1")).toBe(first);
+		expect(presences.size).toBe(1);
+		expect(first.status).toBe(Status.IDLE);
+	});
+
+	it("emits an oldPresence snapshot that survives the in-place patch", async () => {
+		const client = await seededClient();
+		await PresenceUpdate.handler(client, createPresence());
+
+		const emitSpy = vi.spyOn(client, "emit");
+		await PresenceUpdate.handler(client, createPresence({
+			status: Status.DND,
+			activities: [createActivity({ name: "Terraria" })]
+		}));
+
+		const [, oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Presence, Presence];
+		expect(oldPresence).not.toBe(newPresence);
+		expect(oldPresence.status).toBe(Status.ONLINE);
+		expect(oldPresence.activities[0]!.name).toBe("Factorio");
+		expect(newPresence.status).toBe(Status.DND);
+		expect(newPresence.activities[0]!.name).toBe("Terraria");
+	});
+
+	it("drops the cache entry when the user goes offline, but still emits the old presence", async () => {
+		const client = await seededClient();
+		const presences = client.guilds.get("guild-1")!.presences;
+		await PresenceUpdate.handler(client, createPresence());
+
+		const emitSpy = vi.spyOn(client, "emit");
+		await PresenceUpdate.handler(client, createPresence({ status: Status.OFFLINE, activities: [] }));
+
+		expect(presences.size).toBe(0);
+		const [, oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Presence, Presence];
+		expect(oldPresence.status).toBe(Status.ONLINE);
+		expect(newPresence.status).toBe(Status.OFFLINE);
+	});
+
+	it("does not corrupt the user cache when the payload carries an id-only user", async () => {
+		const client = await seededClient();
+		const cachedUser = client.users.get("member-1")!;
+
+		await PresenceUpdate.handler(client, createPresence());
+
+		expect(client.users.get("member-1")).toBe(cachedUser);
+		expect(cachedUser.username).toBe("tester");
+		expect(cachedUser.globalName).toBe("tester");
+		expect(cachedUser.discriminator).toBe("0001");
+	});
+
+	it("ignores presences for an uncached guild", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await PresenceUpdate.handler(client, createPresence({ guild_id: "guild-missing" }));
+
+		expect(emitSpy).not.toHaveBeenCalled();
+		expect(client.guilds.get("guild-1")!.presences.size).toBe(0);
+	});
+
+	it("exposes a custom status through customStatus", async () => {
+		const client = await seededClient();
+
+		await PresenceUpdate.handler(client, createPresence({
+			activities: [createActivity({ type: ActivityType.CUSTOM, name: "Custom Status", state: "building a bot" })]
+		}));
+
+		const presence = client.guilds.get("guild-1")!.presences.get("member-1")!;
+		expect(presence.customStatus).toBe("building a bot");
+		expect(presence.activityOfType(ActivityType.PLAYING)).toBeUndefined();
+	});
+
+	it("returns null from customStatus when no custom activity is set", async () => {
+		const client = await seededClient();
+		await PresenceUpdate.handler(client, createPresence());
+
+		expect(client.guilds.get("guild-1")!.presences.get("member-1")!.customStatus).toBeNull();
+	});
+
+	it("camelCases nested activity fields", async () => {
+		const client = await seededClient();
+
+		await PresenceUpdate.handler(client, createPresence({
+			activities: [createActivity({
+				application_id: "app-1",
+				timestamps: { start: 1704067200000, end: 1704070800000 },
+				emoji: { name: "wave", id: "emoji-1", animated: true },
+				party: { id: "party-1", size: [2, 4] },
+				assets: { large_image: "large", large_text: "Large", small_url: "https://example.test" },
+				secrets: { join: "join-secret" },
+				buttons: ["Join us"]
+			})]
+		}));
+
+		const activity = client.guilds.get("guild-1")!.presences.get("member-1")!.activities[0]!;
+		expect(activity.createdAt).toBe(1704067200000);
+		expect(activity.applicationId).toBe("app-1");
+		expect(activity.timestamps).toEqual({ start: 1704067200000, end: 1704070800000 });
+		expect(activity.emoji).toEqual({ name: "wave", id: "emoji-1", animated: true });
+		expect(activity.party).toEqual({ id: "party-1", size: [2, 4] });
+		expect(activity.assets).toEqual({ largeImage: "large", largeText: "Large", smallUrl: "https://example.test" });
+		expect(activity.secrets).toEqual({ join: "join-secret" });
+		expect(activity.buttons).toEqual(["Join us"]);
+	});
+
+	it("maps per-device client status and resolves isOn", async () => {
+		const client = await seededClient();
+
+		await PresenceUpdate.handler(client, createPresence({
+			client_status: { mobile: Status.ONLINE, desktop: Status.IDLE }
+		}));
+
+		const presence = client.guilds.get("guild-1")!.presences.get("member-1")!;
+		expect(presence.clientStatus).toEqual({ mobile: Status.ONLINE, desktop: Status.IDLE });
+		expect(presence.isOn("mobile")).toBe(true);
+		expect(presence.isOn("desktop")).toBe(true);
+		expect(presence.isOn("web")).toBe(false);
+	});
+
+	it("resolves the cached user and member from the presence", async () => {
+		const client = await seededClient();
+		await PresenceUpdate.handler(client, createPresence());
+
+		const presence = client.guilds.get("guild-1")!.presences.get("member-1")!;
+		expect(presence.user).toBe(client.users.get("member-1"));
+		expect(presence.member).toBe(client.guilds.get("guild-1")!.members.get("member-1"));
+	});
+
+	it("exposes the presence on the member, and clears it once they go offline", async () => {
+		const client = await seededClient();
+		const member = client.guilds.get("guild-1")!.members.get("member-1")!;
+
+		await PresenceUpdate.handler(client, createPresence());
+		expect(member.presence).toBe(client.guilds.get("guild-1")!.presences.get("member-1"));
+
+		await PresenceUpdate.handler(client, createPresence({ status: Status.OFFLINE, activities: [] }));
+		expect(member.presence).toBeUndefined();
+	});
+
+	it("GUILD_CREATE seeds the presence cache, resolving guildId for entries without guild_id", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildPresences
+		});
+
+		await GuildCreate.handler(client, {
+			...createGuild(),
+			presences: [
+				{ user: { id: "member-1" }, status: Status.ONLINE, activities: [], client_status: {} },
+				{ user: { id: "member-2" }, status: Status.IDLE, activities: [], client_status: {} }
+			]
+		});
+
+		const presences = client.guilds.get("guild-1")!.presences;
+		expect(presences.size).toBe(2);
+		expect(presences.get("member-1")!.guildId).toBe("guild-1");
+		expect(presences.get("member-2")!.status).toBe(Status.IDLE);
+	});
+
+	it("GUILD_CREATE skips offline presences and leaves the cache empty without the intent", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+
+		await GuildCreate.handler(client, {
+			...createGuild(),
+			presences: [{ user: { id: "member-1" }, status: Status.OFFLINE, activities: [], client_status: {} }]
+		});
+		expect(client.guilds.get("guild-1")!.presences.size).toBe(0);
+
+		await GuildCreate.handler(client, createGuild("guild-2"));
+		expect(client.guilds.get("guild-2")!.presences.size).toBe(0);
+	});
+
+	it("rejects fetch, since presences have no REST route", async () => {
+		const client = await seededClient();
+
+		await expect(client.guilds.get("guild-1")!.presences.fetch("member-1"))
+			.rejects.toThrow("Presences are only delivered over the gateway");
 	});
 });
