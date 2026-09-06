@@ -1,3 +1,4 @@
+export * from "./AutoModeration.js";
 export * from "./ChannelPermissionManager.js";
 export * from "./Channels.js";
 export * from "./Emojis.js";

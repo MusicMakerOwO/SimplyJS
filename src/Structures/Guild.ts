@@ -25,6 +25,7 @@ import { ChannelCache } from "../Managers/Channels.js";
 import { MemberCache } from "../Managers/Members.js";
 import { GuildBanManager } from "../Managers/GuildBans.js";
 import { GuildInviteManager } from "../Managers/Invites.js";
+import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
 
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
@@ -105,6 +106,11 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	emojis: EmojiCache;
 	stickers: StickerCache;
 	members: MemberCache;
+	/**
+	 * Manager for this guild's auto moderation rules. Discord never sends rules in `GUILD_CREATE`,
+	 * so this cache starts empty and fills from gateway events or an explicit fetch.
+	 */
+	autoModerationRules: AutoModerationRuleCache;
 	/** Manager for this guild's bans, backed by REST calls rather than a local cache */
 	bans: GuildBanManager;
 	/** Manager for this guild's invites, backed by REST calls rather than a local cache */
@@ -117,6 +123,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.emojis   = new EmojiCache(client, this);
 		this.stickers = new StickerCache(client, this);
 		this.members  = new MemberCache(client, this);
+		this.autoModerationRules = new AutoModerationRuleCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
 		this.invites  = new GuildInviteManager(client, this);
 
