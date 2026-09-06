@@ -1,11 +1,11 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
-import { DiscordGuild } from "../Types/DiscordAPITypes.js";
+import { DiscordGuild, DiscordGuildCreate } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 export const GuildCreate = defineEvent({
 	name: GatewayEvents.GuildCreate,
-	handler: (client, data: DiscordGuild): void => {
+	handler: (client, data: DiscordGuildCreate): void => {
 		const guild = client.guilds.upsert(data);
 		client.emit(ClientEvents.GuildCreate, guild);
 	}
