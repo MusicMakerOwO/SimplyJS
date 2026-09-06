@@ -2,6 +2,7 @@ export * from "./AutoModerationRule.js";
 export * from "./Channels/BaseChannel.js";
 export * from "./Emoji.js";
 export * from "./Guild.js";
+export * from "./GuildScheduledEvent.js";
 export * from "./Channels/GuildAnnouncementChannel.js";
 export * from "./Channels/GuildCategoryChannel.js";
 export * from "./Channels/GuildForumChannel.js";
