@@ -10,6 +10,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { ChannelCreate, ChannelDelete, ChannelUpdate } from "../Events/Channels.js";
+import { ThreadCreate, ThreadDelete, ThreadUpdate } from "../Events/Threads.js";
 import { GuildCreate, GuildDelete } from "../Events/Guilds.js";
 import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
@@ -21,6 +22,7 @@ import { DiscordAuditLogEvent } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
+import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -605,5 +607,117 @@ describe("Gateway event handlers mutate caches", () => {
 			expect.objectContaining({ id: guildPayload.id }),
 			expect.objectContaining({ id: unbannedUser.id })
 		);
+	});
+});
+describe("Thread gateway event handlers", () => {
+	function createThread(id = "thread-1", guildId = "guild-1"): DiscordChannel {
+		return {
+			id,
+			type: DiscordChannelTypes.PUBLIC_THREAD,
+			guild_id: guildId,
+			parent_id: "channel-1",
+			name: "help-thread",
+			owner_id: "user-1",
+			message_count: 1,
+			member_count: 1,
+			thread_metadata: {
+				archived: false,
+				auto_archive_duration: 1440,
+				archive_timestamp: "2024-01-01T00:00:00.000Z",
+				locked: false
+			}
+		};
+	}
+
+	async function seededClient(): Promise<Client> {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		return client;
+	}
+
+	it("ThreadCreate caches the thread as a GuildThreadChannel and emits", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		const threadPayload = createThread();
+
+		await ThreadCreate.handler(client, threadPayload);
+
+		const cached = client.guilds.get("guild-1")?.channels.get(threadPayload.id);
+		expect(cached).toBeInstanceOf(GuildThreadChannel);
+		expect(cached?.isThreadChannel()).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.ThreadCreate,
+			expect.objectContaining({ id: threadPayload.id })
+		);
+	});
+
+	it("ThreadUpdate patches the cached instance in place and emits both states", async () => {
+		const client = await seededClient();
+		const threadPayload = createThread();
+		await ThreadCreate.handler(client, threadPayload);
+
+		const emitSpy = vi.spyOn(client, "emit");
+		const cachedBefore = client.guilds.get("guild-1")!.channels.get(threadPayload.id);
+
+		await ThreadUpdate.handler(client, {
+			...threadPayload,
+			name: "renamed-thread",
+			thread_metadata: { ...threadPayload.thread_metadata!, archived: true, locked: true }
+		});
+
+		const cachedAfter = client.guilds.get("guild-1")!.channels.get(threadPayload.id);
+		// upsert() patches rather than replacing, so the cached reference stays stable
+		expect(cachedAfter).toBe(cachedBefore);
+		expect(cachedAfter?.name).toBe("renamed-thread");
+		expect((cachedAfter as GuildThreadChannel).threadMetadata?.archived).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadUpdate, cachedBefore, cachedAfter);
+	});
+
+	it("ThreadDelete emits the cached thread before evicting it", async () => {
+		const client = await seededClient();
+		const threadPayload = createThread();
+		await ThreadCreate.handler(client, threadPayload);
+
+		const emitSpy = vi.spyOn(client, "emit");
+		// THREAD_DELETE only carries a partial channel
+		await ThreadDelete.handler(client, {
+			id: threadPayload.id,
+			guild_id: "guild-1",
+			parent_id: "channel-1",
+			type: DiscordChannelTypes.PUBLIC_THREAD
+		} as DiscordChannel);
+
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.ThreadDelete,
+			expect.objectContaining({ name: "help-thread" })
+		);
+		expect(client.guilds.get("guild-1")?.channels.has(threadPayload.id)).toBe(false);
+	});
+
+	it("ThreadDelete emits the raw payload when the thread was never cached", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		const partial = {
+			id: "thread-unknown",
+			guild_id: "guild-1",
+			parent_id: "channel-1",
+			type: DiscordChannelTypes.PUBLIC_THREAD
+		} as DiscordChannel;
+
+		await ThreadDelete.handler(client, partial);
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadDelete, partial);
+	});
+
+	it("ignores thread events for uncached guilds", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+		const threadPayload = createThread("thread-1", "guild-missing");
+
+		await ThreadCreate.handler(client, threadPayload);
+		await ThreadUpdate.handler(client, threadPayload);
+		await ThreadDelete.handler(client, threadPayload);
+
+		expect(emitSpy).not.toHaveBeenCalled();
 	});
 });
