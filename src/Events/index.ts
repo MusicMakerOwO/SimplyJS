@@ -19,6 +19,11 @@ export { StickersUpdate } from "./Stickers.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
 export { GuildBanAdd, GuildBanRemove } from "./Bans.js";
 export { AuditLogEntryCreate } from "./AuditLogs.js";
-export { AutoModerationRuleCreate, AutoModerationRuleUpdate, AutoModerationRuleDelete } from "./AutoModeration.js";
+export {
+	AutoModerationRuleCreate,
+	AutoModerationRuleUpdate,
+	AutoModerationRuleDelete,
+	AutoModerationActionExecution
+} from "./AutoModeration.js";
 export { InteractionCreate } from "./Interactions.js";
 export { Ready } from "./Ready.js";
