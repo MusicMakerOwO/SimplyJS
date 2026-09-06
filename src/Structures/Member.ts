@@ -7,6 +7,7 @@ import { ResolvePermissions, type PermissionResolvable } from "../Permissions/Re
 import { BitField } from "../DataStructures/BitField.js";
 import { DiscordPermissions } from "../Constants.js";
 import type { Channel } from "../Types/index.js";
+import type { Presence } from "./Presence.js";
 
 export class Member extends APIGuildStructure<DiscordMember> {
 	/** Backing user for this guild member */
@@ -87,6 +88,23 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	/** The member's user id, proxied from {@link Member.user} for convenience */
 	get id(): string {
 		return this.user.id;
+	}
+
+	/**
+	 * This member's current {@link Presence}, resolved from the guild's presence cache.
+	 *
+	 * `undefined` means the member is offline, has not been seen since connecting, or - most
+	 * commonly - that the privileged `GuildPresences` intent is not enabled. The cache does not
+	 * retain offline users, so this cannot distinguish those cases.
+	 *
+	 * @example
+	 * ```ts
+	 * member.presence?.status;        // "online"
+	 * member.presence?.customStatus;  // "building a bot"
+	 * ```
+	 */
+	get presence(): Presence | undefined {
+		return this.guild.presences.get(this.user.id);
 	}
 
 	/**
