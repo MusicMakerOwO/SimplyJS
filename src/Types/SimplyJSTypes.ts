@@ -299,8 +299,26 @@ export const ClientEvents = {
 	 */
 	MessageDeleteBulk: "MessageDeleteBulk",
 
+	/**
+	 * Fired when a reaction is added to a message.
+	 * Listener arguments: `payload`.
+	 */
 	ReactionAdd: "ReactionAdd",
+	/**
+	 * Fired when a reaction is removed from a message.
+	 * Listener arguments: `payload`.
+	 */
 	ReactionRemove: "ReactionRemove",
+	/**
+	 * Fired when every reaction is cleared from a message.
+	 * Listener arguments: `payload`.
+	 */
+	ReactionRemoveAll: "ReactionRemoveAll",
+	/**
+	 * Fired when every reaction for a single emoji is cleared from a message.
+	 * Listener arguments: `payload`.
+	 */
+	ReactionRemoveEmoji: "ReactionRemoveEmoji",
 
 	/**
 	 * Fired when an invite is created.
@@ -439,6 +457,19 @@ export type ClientEventMap = {
 		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>,
 		messageUserId?: string | null
 		superReaction: boolean
+	}];
+
+	[ClientEvents.ReactionRemoveAll]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		messageId: string
+	}];
+
+	[ClientEvents.ReactionRemoveEmoji]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		messageId: string,
+		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>
 	}];
 
 	[ClientEvents.InviteCreate]: [invite: Invite];
