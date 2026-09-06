@@ -2,19 +2,18 @@ import { Client } from "../Client.js";
 import {
 	DiscordAuditLog,
 	DiscordAuditLogEvent,
-	DiscordChannel,
 	DiscordDefaultMessageNotificationLevels,
 	DiscordExplicitContentFilterLevels,
 	DiscordGuild, DiscordGuildAgeRestrictionLevels,
+	DiscordGuildCreate,
 	DiscordGuildFeatures,
-	DiscordGuildScheduledEvent,
 	DiscordIncidentsData,
 	DiscordLocaleByLanguage,
-	DiscordMember,
 	DiscordMFALevels,
 	DiscordPremiumTiers,
 	DiscordVerificationLevels,
-	DiscordWelcomeScreen
+	DiscordWelcomeScreen,
+	Status
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { JSONObject } from "../Types/Internal.js";
@@ -28,6 +27,7 @@ import { GuildBanManager } from "../Managers/GuildBans.js";
 import { GuildInviteManager } from "../Managers/Invites.js";
 import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
 import { GuildScheduledEventCache } from "../Managers/GuildScheduledEvents.js";
+import { PresenceCache } from "../Managers/Presences.js";
 
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
@@ -118,12 +118,18 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 * current by the `GuildScheduledEvent*` gateway events.
 	 */
 	scheduledEvents: GuildScheduledEventCache;
+	/**
+	 * Manager for this guild's member presences, keyed by user id. Requires the privileged
+	 * `GuildPresences` intent - without it this cache stays empty. Seeded from `GUILD_CREATE` and
+	 * kept current by the `PresenceUpdate` gateway event. Offline users are not stored.
+	 */
+	presences: PresenceCache;
 	/** Manager for this guild's bans, backed by REST calls rather than a local cache */
 	bans: GuildBanManager;
 	/** Manager for this guild's invites, backed by REST calls rather than a local cache */
 	invites: GuildInviteManager;
 
-	constructor(client: Client, data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[], guild_scheduled_events?: DiscordGuildScheduledEvent[] }) {
+	constructor(client: Client, data: DiscordGuildCreate) {
 		super(client);
 		this.channels = new ChannelCache(client, this);
 		this.roles    = new RoleCache(client, this);
@@ -132,13 +138,14 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.members  = new MemberCache(client, this);
 		this.autoModerationRules = new AutoModerationRuleCache(client, this);
 		this.scheduledEvents = new GuildScheduledEventCache(client, this);
+		this.presences = new PresenceCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
 		this.invites  = new GuildInviteManager(client, this);
 
 		this.patch(data);
 	}
 
-	patch(data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[], guild_scheduled_events?: DiscordGuildScheduledEvent[] }): void {
+	patch(data: DiscordGuildCreate): void {
 		this.id = data.id;
 		this.name = data.name;
 		this.ownerId = data.owner_id;
@@ -219,6 +226,15 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		if ("guild_scheduled_events" in data && data.guild_scheduled_events !== undefined) {
 			for (const apiScheduledEvent of data.guild_scheduled_events) {
 				this.scheduledEvents.upsert(apiScheduledEvent);
+			}
+		}
+
+		if ("presences" in data && data.presences !== undefined) {
+			for (const apiPresence of data.presences) {
+				// Discord already omits offline members here; skip any that slip through so the
+				// cache only ever holds online users, matching what PresenceUpdate maintains
+				if (apiPresence.status === Status.OFFLINE) continue;
+				this.presences.upsert(apiPresence);
 			}
 		}
 	}

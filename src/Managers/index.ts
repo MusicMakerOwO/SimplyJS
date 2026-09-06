@@ -7,6 +7,7 @@ export * from "./Guilds.js";
 export * from "./GuildScheduledEvents.js";
 export * from "./Invites.js";
 export * from "./Members.js";
+export * from "./Presences.js";
 export * from "./Roles.js";
 export * from "./SlashCommandOptions.js";
 export * from "./Stickers.js";
