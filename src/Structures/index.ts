@@ -24,6 +24,7 @@ export * from "./Interactions/ModalInteraction.js";
 export * from "./Invite.js";
 export * from "./Member.js";
 export * from "./Message.js";
+export * from "./Presence.js";
 export * from "./Role.js";
 export * from "./Sticker.js";
 export * from "./User.js";
