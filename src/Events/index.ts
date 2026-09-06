@@ -13,7 +13,7 @@ export { ThreadCreate, ThreadUpdate, ThreadDelete } from "./Threads.js";
 export { MemberCreate, MemberUpdate, MemberDelete } from "./Members.js";
 export { RoleCreate, RoleUpdate, RoleDelete } from "./Roles.js";
 export { MessageCreate, MessageUpdate, MessageDelete, MessageDeleteBulk } from "./Messages.js";
-export { ReactionAdd, ReactionRemove } from "./Reactions.js";
+export { ReactionAdd, ReactionRemove, ReactionRemoveAll, ReactionRemoveEmoji } from "./Reactions.js";
 export { EmojisUpdate } from "./Emojis.js";
 export { StickersUpdate } from "./Stickers.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
