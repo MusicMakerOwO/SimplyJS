@@ -9,12 +9,16 @@ import {
 	DiscordChannel,
 	DiscordChannelTypes,
 	DiscordGuild,
+	DiscordGuildScheduledEvent,
+	DiscordGuildScheduledEventEntityTypes,
+	DiscordGuildScheduledEventPrivacyLevel,
+	DiscordGuildScheduledEventStatus,
 	DiscordMember,
 	DiscordRole,
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
-import { ChannelCreate, ChannelDelete, ChannelUpdate } from "../Events/Channels.js";
+import { ChannelCreate, ChannelDelete, ChannelPinsUpdate, ChannelUpdate } from "../Events/Channels.js";
 import { ThreadCreate, ThreadDelete, ThreadUpdate } from "../Events/Threads.js";
 import { GuildCreate, GuildDelete } from "../Events/Guilds.js";
 import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
@@ -36,6 +40,12 @@ import {
 } from "../Events/AutoModeration.js";
 import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import { ReactionRemoveAll, ReactionRemoveEmoji } from "../Events/Reactions.js";
+import {
+	GuildScheduledEventCreate,
+	GuildScheduledEventDelete,
+	GuildScheduledEventUpdate
+} from "../Events/GuildScheduledEvents.js";
+import { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -84,6 +94,25 @@ function createGuild(id = "guild-1"): DiscordGuild {
 		preferred_locale: "en-US",
 		nsfw_level: 0,
 		premium_progress_bar_enabled: false
+	};
+}
+
+function createScheduledEvent(id = "scheduled-event-1", guildId = "guild-1"): DiscordGuildScheduledEvent {
+	return {
+		id,
+		guild_id: guildId,
+		channel_id: "channel-1",
+		creator_id: "user-1",
+		name: "Game night",
+		description: "Bring snacks",
+		scheduled_start_time: "2024-01-01T00:00:00.000Z",
+		scheduled_end_time: null,
+		privacy_level: DiscordGuildScheduledEventPrivacyLevel.GUILD_ONLY,
+		status: DiscordGuildScheduledEventStatus.SCHEDULED,
+		entity_type: DiscordGuildScheduledEventEntityTypes.VOICE,
+		entity_id: null,
+		entity_metadata: null,
+		recurrence_rule: null
 	};
 }
 
@@ -1042,5 +1071,180 @@ describe("Reaction removal gateway event handlers", () => {
 		expect(guild.channels.size).toBe(1);
 		expect(guild.members.size).toBe(0);
 		expect(client.guilds.size).toBe(1);
+	});
+});
+
+describe("ChannelPinsUpdate gateway event handler", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		return client;
+	}
+
+	it("emits with the cached guild and channel", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelPinsUpdate.handler(client, {
+			guild_id: "guild-1",
+			channel_id: "channel-1",
+			last_pin_timestamp: "2024-01-01T00:00:00.000Z"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelPinsUpdate, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			lastPinTimestamp: "2024-01-01T00:00:00.000Z"
+		});
+	});
+
+	it("normalises a missing timestamp to null when the last pin is removed", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelPinsUpdate.handler(client, {
+			guild_id: "guild-1",
+			channel_id: "channel-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelPinsUpdate, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			lastPinTimestamp: null
+		});
+	});
+
+	it("falls back to bare id objects for uncached guilds instead of dropping the event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelPinsUpdate.handler(client, {
+			guild_id: "guild-missing",
+			channel_id: "channel-1",
+			last_pin_timestamp: null
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelPinsUpdate, {
+			guild: { id: "guild-missing" },
+			channel: { id: "channel-1" },
+			lastPinTimestamp: null
+		});
+	});
+
+	it("emits a null guild for DM channels", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelPinsUpdate.handler(client, { channel_id: "dm-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelPinsUpdate, {
+			guild: null,
+			channel: { id: "dm-1" },
+			lastPinTimestamp: null
+		});
+	});
+
+	it("does not touch any cache", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+
+		await ChannelPinsUpdate.handler(client, { guild_id: "guild-1", channel_id: "channel-2" });
+
+		expect(guild.channels.size).toBe(1);
+		expect(client.guilds.size).toBe(1);
+	});
+});
+
+describe("Guild scheduled event gateway event handlers", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildScheduledEvents
+		});
+		await GuildCreate.handler(client, createGuild());
+		return client;
+	}
+
+	it("GuildScheduledEventCreate caches the event on its guild and emits the structure", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+
+		const cached = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1");
+		expect(cached).toBeInstanceOf(GuildScheduledEvent);
+		expect(cached!.name).toBe("Game night");
+		expect(cached!.entityType).toBe(DiscordGuildScheduledEventEntityTypes.VOICE);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventCreate, cached);
+	});
+
+	it("GuildScheduledEventUpdate patches the cached instance in place", async () => {
+		const client = await seededClient();
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+		const cached = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildScheduledEventUpdate.handler(client, {
+			...createScheduledEvent(),
+			name: "Game night II",
+			status: DiscordGuildScheduledEventStatus.ACTIVE
+		});
+
+		const updated = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1")!;
+		expect(updated).toBe(cached);
+		expect(updated.name).toBe("Game night II");
+		expect(updated.status).toBe(DiscordGuildScheduledEventStatus.ACTIVE);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventUpdate, cached, updated);
+	});
+
+	it("GuildScheduledEventDelete emits the cached event and drops it from the cache", async () => {
+		const client = await seededClient();
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+		const cached = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildScheduledEventDelete.handler(client, createScheduledEvent());
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, cached);
+		expect(client.guilds.get("guild-1")!.scheduledEvents.size).toBe(0);
+	});
+
+	it("GuildScheduledEventDelete falls back to the raw payload for an uncached event", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		const payload = createScheduledEvent();
+
+		await GuildScheduledEventDelete.handler(client, payload);
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, payload);
+	});
+
+	it("ignores every event for an uncached guild", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildScheduledEvents });
+		const emitSpy = vi.spyOn(client, "emit");
+		const payload = createScheduledEvent("scheduled-event-1", "guild-missing");
+
+		await GuildScheduledEventCreate.handler(client, payload);
+		await GuildScheduledEventUpdate.handler(client, payload);
+		await GuildScheduledEventDelete.handler(client, payload);
+
+		expect(emitSpy).not.toHaveBeenCalled();
+	});
+
+	it("GUILD_CREATE seeds the scheduled event cache", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildScheduledEvents
+		});
+
+		await GuildCreate.handler(client, {
+			...createGuild(),
+			guild_scheduled_events: [createScheduledEvent(), createScheduledEvent("scheduled-event-2")]
+		} as DiscordGuild);
+
+		const events = client.guilds.get("guild-1")!.scheduledEvents;
+		expect(events.size).toBe(2);
+		expect(events.get("scheduled-event-2")).toBeInstanceOf(GuildScheduledEvent);
 	});
 });
