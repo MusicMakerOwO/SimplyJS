@@ -2,12 +2,12 @@ import {
 	DiscordApplication,
 	DiscordChannel,
 	DiscordGuild,
+	DiscordGuildScheduledEvent,
 	DiscordInvite,
 	DiscordInviteTargetTypes,
 	DiscordInviteTypes,
 	DiscordRole,
 	GatewayInvite,
-	JSONObject,
 	ObjectValues,
 	Channel
 } from "../Types/index.js";
@@ -61,8 +61,7 @@ export class Invite extends APIClientStructure<AnyInviteData> {
 	/** guild invite flags for guild invites */
 	flags?: number;
 	/** guild scheduled event data, only included if guild_scheduled_event_id contains a valid guild scheduled event id */
-	// TODO Guild events
-	guildScheduledEvent?: JSONObject;
+	guildScheduledEvent?: DiscordGuildScheduledEvent;
 
 	/** approximate count of online members, returned from `GET /invites/<code>` when `with_counts` is true */
 	approximatePresenceCount?: number;

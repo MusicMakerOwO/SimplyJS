@@ -903,8 +903,7 @@ export type DiscordInvite = {
 	/** the expiration date of this invite */
 	expires_at: string | null;
 	/** guild scheduled event data, only included if guild_scheduled_event_id contains a valid guild scheduled event id */
-	// TODO Guild events
-	guild_scheduled_event?: JSONObject;
+	guild_scheduled_event?: DiscordGuildScheduledEvent;
 	/** guild invite flags for guild invites */
 	flags?: number;
 	/** the roles assigned to the user upon accepting the invite */
@@ -928,6 +927,143 @@ export const DiscordGuildInviteFlags = {
 } as const;
 
 
+/**
+ * A scheduled event in a guild.
+ *
+ * @see https://docs.discord.com/developers/resources/guild-scheduled-event
+ */
+export type DiscordGuildScheduledEvent = {
+	/** the id of the scheduled event */
+	id: string;
+	/** the guild id which the scheduled event belongs to */
+	guild_id: string;
+	/** the channel id in which the scheduled event will be hosted, or null if entity_type is EXTERNAL */
+	channel_id: string | null;
+	/** the id of the user that created the scheduled event, null for events created before October 25th, 2021 */
+	creator_id?: string | null;
+	/** the name of the scheduled event (1-100 characters) */
+	name: string;
+	/** the description of the scheduled event (1-1000 characters) */
+	description?: string | null;
+	/** the time the scheduled event will start */
+	scheduled_start_time: string;
+	/** the time the scheduled event will end, required if entity_type is EXTERNAL */
+	scheduled_end_time: string | null;
+	/** the privacy level of the scheduled event */
+	privacy_level: ObjectValues<typeof DiscordGuildScheduledEventPrivacyLevel>;
+	/** the status of the scheduled event */
+	status: ObjectValues<typeof DiscordGuildScheduledEventStatus>;
+	/** the type of the scheduled event */
+	entity_type: ObjectValues<typeof DiscordGuildScheduledEventEntityTypes>;
+	/** the id of an entity associated with a guild scheduled event */
+	entity_id: string | null;
+	/** additional metadata for the guild scheduled event */
+	entity_metadata: DiscordGuildScheduledEventEntityMetadata | null;
+	/** the user that created the scheduled event */
+	creator?: DiscordUser;
+	/** the number of users subscribed to the scheduled event, only included when with_user_count is true */
+	user_count?: number;
+	/** the cover image hash of the scheduled event */
+	image?: string | null;
+	/** the definition for how often this event should recur */
+	recurrence_rule: DiscordGuildScheduledEventRecurrenceRule | null;
+}
+
+export const DiscordGuildScheduledEventPrivacyLevel = {
+	/** the scheduled event is only accessible to guild members */
+	GUILD_ONLY: 2
+} as const;
+
+export const DiscordGuildScheduledEventEntityTypes = {
+	STAGE_INSTANCE: 1,
+	VOICE: 2,
+	EXTERNAL: 3
+} as const;
+
+export const DiscordGuildScheduledEventStatus = {
+	SCHEDULED: 1,
+	ACTIVE: 2,
+	COMPLETED: 3,
+	CANCELED: 4
+} as const;
+
+/** Additional metadata for a scheduled event, required when `entity_type` is `EXTERNAL` */
+export type DiscordGuildScheduledEventEntityMetadata = {
+	/** location of the event (1-100 characters), required for events with an entity_type of EXTERNAL */
+	location?: string;
+}
+
+/**
+ * The definition for how often a scheduled event should recur.
+ *
+ * Discord only supports a limited set of combinations of these fields; see the "System limitations"
+ * section of the documentation before building one by hand.
+ * @see https://docs.discord.com/developers/resources/guild-scheduled-event#guild-scheduled-event-recurrence-rule-object
+ */
+export type DiscordGuildScheduledEventRecurrenceRule = {
+	/** starting time of the recurrence interval */
+	start: string;
+	/** ending time of the recurrence interval, cannot be set by clients */
+	end: string | null;
+	/** how often the event occurs */
+	frequency: ObjectValues<typeof DiscordGuildScheduledEventRecurrenceRuleFrequency>;
+	/** the spacing between the events, defined by frequency - e.g. a frequency of WEEKLY and an interval of 2 fires every other week */
+	interval: number;
+	/** set of specific days within a week for the event to recur on */
+	by_weekday: ObjectValues<typeof DiscordGuildScheduledEventRecurrenceRuleWeekday>[] | null;
+	/** list of specific days within a specific week (1-5) to recur on */
+	by_n_weekday: DiscordGuildScheduledEventRecurrenceRuleNWeekday[] | null;
+	/** set of specific months to recur on */
+	by_month: ObjectValues<typeof DiscordGuildScheduledEventRecurrenceRuleMonth>[] | null;
+	/** set of specific dates within a month to recur on */
+	by_month_day: number[] | null;
+	/** set of days within a year to recur on (1-364), cannot be set by clients */
+	by_year_day: number[] | null;
+	/** the total amount of times that the event is allowed to recur before stopping, cannot be set by clients */
+	count: number | null;
+}
+
+export const DiscordGuildScheduledEventRecurrenceRuleFrequency = {
+	YEARLY: 0,
+	MONTHLY: 1,
+	WEEKLY: 2,
+	DAILY: 3
+} as const;
+
+export const DiscordGuildScheduledEventRecurrenceRuleWeekday = {
+	MONDAY: 0,
+	TUESDAY: 1,
+	WEDNESDAY: 2,
+	THURSDAY: 3,
+	FRIDAY: 4,
+	SATURDAY: 5,
+	SUNDAY: 6
+} as const;
+
+export const DiscordGuildScheduledEventRecurrenceRuleMonth = {
+	JANUARY: 1,
+	FEBRUARY: 2,
+	MARCH: 3,
+	APRIL: 4,
+	MAY: 5,
+	JUNE: 6,
+	JULY: 7,
+	AUGUST: 8,
+	SEPTEMBER: 9,
+	OCTOBER: 10,
+	NOVEMBER: 11,
+	DECEMBER: 12
+} as const;
+
+/** A specific day within a specific week to recur on */
+export type DiscordGuildScheduledEventRecurrenceRuleNWeekday = {
+	/** the week to reoccur on (1-5) */
+	n: number;
+	/** the day within the week to reoccur on */
+	day: ObjectValues<typeof DiscordGuildScheduledEventRecurrenceRuleWeekday>;
+}
+
+
 export type DiscordAuditLog = {
 	/** List of application commands referenced in the audit log */
 	application_commands: ApplicationCommand[];
@@ -936,8 +1072,7 @@ export type DiscordAuditLog = {
 	/** List of auto moderation rules referenced in the audit log */
 	auto_moderation_rules: DiscordAutoModerationRule[];
 	/** List of guild scheduled events referenced in the audit log */
-	// TODO Guild events
-	guild_scheduled_events: JSONObject[];
+	guild_scheduled_events: DiscordGuildScheduledEvent[];
 	/** List of partial integration objects */
 	// TODO Integrations
 	integrations: JSONObject[];
