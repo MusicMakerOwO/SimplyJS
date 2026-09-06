@@ -35,6 +35,7 @@ import {
 	AutoModerationRuleUpdate
 } from "../Events/AutoModeration.js";
 import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
+import { ReactionRemoveAll, ReactionRemoveEmoji } from "../Events/Reactions.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -914,5 +915,132 @@ describe("Auto moderation gateway event handlers", () => {
 		await AutoModerationActionExecution.handler(client, createActionExecution());
 
 		expect(rules.size).toBe(0);
+	});
+});
+
+describe("Reaction removal gateway event handlers", () => {
+	const emoji = { id: "emoji-1", name: "smile", animated: false };
+
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMessageReactions
+		});
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		return client;
+	}
+
+	it("ReactionRemoveAll emits with the cached guild and channel", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ReactionRemoveAll.handler(client, {
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveAll, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			messageId: "message-1"
+		});
+	});
+
+	it("ReactionRemoveEmoji passes the emoji through alongside the resolved location", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ReactionRemoveEmoji.handler(client, {
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-1",
+			emoji
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveEmoji, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			messageId: "message-1",
+			emoji
+		});
+	});
+
+	it("falls back to bare id objects for uncached guilds instead of dropping the event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildMessageReactions });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ReactionRemoveAll.handler(client, {
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-missing"
+		});
+		await ReactionRemoveEmoji.handler(client, {
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-missing",
+			emoji
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveAll, {
+			guild: { id: "guild-missing" },
+			channel: { id: "channel-1" },
+			messageId: "message-1"
+		});
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveEmoji, {
+			guild: { id: "guild-missing" },
+			channel: { id: "channel-1" },
+			messageId: "message-1",
+			emoji
+		});
+	});
+
+	it("emits a null guild for DM channels", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ReactionRemoveAll.handler(client, {
+			channel_id: "dm-1",
+			message_id: "message-1"
+		});
+		await ReactionRemoveEmoji.handler(client, {
+			channel_id: "dm-1",
+			message_id: "message-1",
+			emoji
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveAll, {
+			guild: null,
+			channel: { id: "dm-1" },
+			messageId: "message-1"
+		});
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ReactionRemoveEmoji, {
+			guild: null,
+			channel: { id: "dm-1" },
+			messageId: "message-1",
+			emoji
+		});
+	});
+
+	it("does not touch any cache", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+
+		await ReactionRemoveAll.handler(client, {
+			channel_id: "channel-2",
+			message_id: "message-1",
+			guild_id: "guild-1"
+		});
+		await ReactionRemoveEmoji.handler(client, {
+			channel_id: "channel-2",
+			message_id: "message-1",
+			guild_id: "guild-1",
+			emoji
+		});
+
+		expect(guild.channels.size).toBe(1);
+		expect(guild.members.size).toBe(0);
+		expect(client.guilds.size).toBe(1);
 	});
 });
