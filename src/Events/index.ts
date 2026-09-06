@@ -8,7 +8,7 @@
  * relevant cache and re-emitting a friendlier `ClientEvents` event for consumers of the library.
  */
 export { GuildCreate, GuildUpdate, GuildDelete } from "./Guilds.js";
-export { ChannelCreate, ChannelUpdate, ChannelDelete } from "./Channels.js";
+export { ChannelCreate, ChannelUpdate, ChannelDelete, ChannelPinsUpdate } from "./Channels.js";
 export { ThreadCreate, ThreadUpdate, ThreadDelete } from "./Threads.js";
 export { MemberCreate, MemberUpdate, MemberDelete } from "./Members.js";
 export { RoleCreate, RoleUpdate, RoleDelete } from "./Roles.js";
@@ -25,5 +25,10 @@ export {
 	AutoModerationRuleDelete,
 	AutoModerationActionExecution
 } from "./AutoModeration.js";
+export {
+	GuildScheduledEventCreate,
+	GuildScheduledEventUpdate,
+	GuildScheduledEventDelete
+} from "./GuildScheduledEvents.js";
 export { InteractionCreate } from "./Interactions.js";
 export { Ready } from "./Ready.js";
