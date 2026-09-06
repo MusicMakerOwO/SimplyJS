@@ -480,6 +480,20 @@ export type DiscordGuild = {
 	incidents_data?: DiscordIncidentsData;
 };
 
+/**
+ * A guild as it arrives in a `GUILD_CREATE` dispatch, which carries extra collections the REST
+ * guild object never includes. Each is optional because Discord gates them behind intents:
+ * `members` and `presences` need the privileged `GuildMembers` / `GuildPresences` intents, and
+ * `presences` omits offline members entirely.
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-create
+ */
+export type DiscordGuildCreate = DiscordGuild & {
+	channels?: DiscordChannel[];
+	members?: DiscordMember[];
+	guild_scheduled_events?: DiscordGuildScheduledEvent[];
+	presences?: DiscordPresence[];
+};
+
 export type DiscordApplication = {
 	/** ID of the app */
 	id: string;
@@ -856,12 +870,14 @@ export type DiscordChannel = {
 	default_forum_layout?: ObjectValues<typeof DiscordForumLayoutTypes>;
 };
 
-export type ClientActivity = {
-	name: string;
-	type: ObjectValues<typeof ActivityType>;
-	state?: string;
-	url?: string;
-}
+/**
+ * An activity the *client* sets on itself, sent outbound in a gateway Presence Update payload.
+ * Structurally a subset of {@link DiscordActivity} so the two can never drift apart, but kept
+ * separate so callers don't have to supply inbound-only fields like `created_at`.
+ * @see DiscordActivity for the richer shape Discord sends back in `PRESENCE_UPDATE`
+ */
+export type ClientActivity = Pick<DiscordActivity, "name" | "type">
+	& Partial<Pick<DiscordActivity, "state" | "url" | "details">>;
 
 export const ActivityType = {
 	PLAYING: 0,
@@ -872,12 +888,147 @@ export const ActivityType = {
 	COMPETING: 5
 } as const;
 
+/**
+ * Statuses a user can be reported as in an inbound presence. Discord never reports `invisible`
+ * inbound - invisible users arrive as `offline` - so this deliberately excludes it.
+ * @see PresenceStatus for the wider set the client may set on itself
+ */
 export const Status = {
 	ONLINE: 'online',
 	IDLE: 'idle',
 	DND: 'dnd',
 	OFFLINE: 'offline'
 } as const;
+
+/**
+ * Statuses the client may set on itself, adding the outbound-only `invisible`. Discord reports
+ * invisible users to everyone else as `offline`, which is why {@link Status} omits it.
+ */
+export const PresenceStatus = {
+	...Status,
+	INVISIBLE: 'invisible'
+} as const;
+
+/**
+ * A user object that is only guaranteed to carry `id`. Discord sends these in payloads where the
+ * user is an identifier rather than the subject, most notably `PRESENCE_UPDATE`. Never feed one
+ * to `UserCache.upsert()` - `User.patch` assigns the core fields unconditionally and would blank
+ * them on an already-cached user.
+ */
+export type DiscordPartialUser = Pick<DiscordUser, "id"> & Partial<DiscordUser>;
+
+/** Per-device status for a user; a key is absent entirely when the user is offline on that platform */
+export type DiscordClientStatus = {
+	/** Status on an active desktop (Windows, Linux, Mac) application session */
+	desktop?: ObjectValues<typeof Status>;
+	/** Status on an active mobile (iOS, Android) application session */
+	mobile?: ObjectValues<typeof Status>;
+	/** Status on an active web (browser, bot user) application session */
+	web?: ObjectValues<typeof Status>;
+};
+
+/** Unix millisecond bounds of an activity, used to render "elapsed" and "remaining" timers */
+export type DiscordActivityTimestamps = {
+	/** Unix ms of when the activity started */
+	start?: number;
+	/** Unix ms of when the activity ends */
+	end?: number;
+};
+
+/** The emoji shown alongside a custom status */
+export type DiscordActivityEmoji = {
+	name: string;
+	id?: string;
+	animated?: boolean;
+};
+
+/** The party the user is currently in */
+export type DiscordActivityParty = {
+	id?: string;
+	/** Current and maximum party size, in that order */
+	size?: [currentSize: number, maxSize: number];
+};
+
+/** Images and hover texts for the rich presence card */
+export type DiscordActivityAssets = {
+	large_image?: string;
+	large_text?: string;
+	large_url?: string;
+	small_image?: string;
+	small_text?: string;
+	small_url?: string;
+};
+
+/** Rich presence join/spectate secrets */
+export type DiscordActivitySecrets = {
+	join?: string;
+	spectate?: string;
+	match?: string;
+};
+
+/** @see https://docs.discord.com/developers/events/gateway-events#activity-object-activity-flags */
+export const ActivityFlags = {
+	INSTANCE: 1 << 0,
+	JOIN: 1 << 1,
+	SPECTATE: 1 << 2,
+	JOIN_REQUEST: 1 << 3,
+	SYNC: 1 << 4,
+	PLAY: 1 << 5,
+	PARTY_PRIVACY_FRIENDS: 1 << 6,
+	PARTY_PRIVACY_VOICE_CHANNEL: 1 << 7,
+	EMBEDDED: 1 << 8
+} as const;
+
+/**
+ * An activity attached to an inbound presence - what a user is playing, streaming, listening to,
+ * or their custom status.
+ * @see https://docs.discord.com/developers/events/gateway-events#activity-object
+ */
+export type DiscordActivity = {
+	/** The activity's name */
+	name: string;
+	/** What kind of activity this is, which decides how clients render `name` and `state` */
+	type: ObjectValues<typeof ActivityType>;
+	/** Unix ms of when the activity was added to the user's session. Always sent, unlike every other optional field here */
+	created_at: number;
+	/** Stream url, validated only when `type` is `STREAMING` */
+	url?: string | null;
+	timestamps?: DiscordActivityTimestamps;
+	/** Application id for the game */
+	application_id?: string;
+	/** What the player is currently doing */
+	details?: string | null;
+	/** The user's current party status, or the text used for a custom status */
+	state?: string | null;
+	/** Emoji used for a custom status */
+	emoji?: DiscordActivityEmoji | null;
+	party?: DiscordActivityParty;
+	assets?: DiscordActivityAssets;
+	secrets?: DiscordActivitySecrets;
+	/** Whether the activity is an instanced game session */
+	instance?: boolean;
+	/** Describes what the payload includes, as a bitfield of {@link ActivityFlags} */
+	flags?: number;
+	/** Custom button *labels* shown on the profile. Received activities carry labels only; the `{ label, url }` object form is outbound-only */
+	buttons?: string[];
+};
+
+/**
+ * A user's presence - their status and current activities in a guild.
+ * @see https://docs.discord.com/developers/events/gateway-events#presence-update
+ */
+export type DiscordPresence = {
+	/** The user this presence is for. Only `id` is guaranteed to be present */
+	user: DiscordPartialUser;
+	/** Id of the guild. Absent on the entries embedded in a `GUILD_CREATE` payload */
+	guild_id?: string;
+	/** Either `idle`, `dnd`, `online`, or `offline` */
+	status: ObjectValues<typeof Status>;
+	/** The user's current activities */
+	activities: DiscordActivity[];
+	/** The user's platform-dependent status */
+	client_status: DiscordClientStatus;
+};
 
 export type DiscordInvite = {
 	/** the type of invite */
