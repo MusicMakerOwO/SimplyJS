@@ -19,6 +19,7 @@ export { EmojisUpdate } from "./Emojis.js";
 export { StickersUpdate } from "./Stickers.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
 export { WebhooksUpdate } from "./Webhooks.js";
+export { TypingStart } from "./Typing.js";
 export { GuildBanAdd, GuildBanRemove } from "./Bans.js";
 export { AuditLogEntryCreate } from "./AuditLogs.js";
 export {

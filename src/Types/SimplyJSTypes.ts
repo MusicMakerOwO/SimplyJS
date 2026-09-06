@@ -368,6 +368,13 @@ export const ClientEvents = {
 	WebhooksUpdate: "WebhooksUpdate",
 
 	/**
+	 * Fired when a user starts typing in a channel. `guild`, `channel`, and `user` fall back to a
+	 * bare `{ id }` object when not present in the local cache, and `guild` is `null` for DMs.
+	 * Listener arguments: `payload` (`{ guild, channel, user, member, timestamp }`).
+	 */
+	TypingStart: "TypingStart",
+
+	/**
 	 * Fired when an invite is created.
 	 * Listener arguments: `invite` ({@link Invite}).
 	 */
@@ -533,6 +540,14 @@ export type ClientEventMap = {
 	[ClientEvents.WebhooksUpdate]: [payload: {
 		guild: Guild | { id: string },
 		channel: Channel | { id: string }
+	}];
+
+	[ClientEvents.TypingStart]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		user: User | { id: string },
+		member: Member | null,
+		timestamp: Date
 	}];
 
 	[ClientEvents.InviteCreate]: [invite: Invite];
