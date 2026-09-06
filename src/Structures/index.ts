@@ -1,3 +1,4 @@
+export * from "./AutoModerationRule.js";
 export * from "./Channels/BaseChannel.js";
 export * from "./Emoji.js";
 export * from "./Guild.js";
