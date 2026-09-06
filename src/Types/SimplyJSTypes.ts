@@ -17,6 +17,7 @@ import type { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
 import type { Invite } from "../Structures/Invite.js";
 import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
+import type { Presence } from "../Structures/Presence.js";
 import type { Role } from "../Structures/Role.js";
 import type { Sticker } from "../Structures/Sticker.js";
 import type { User } from "../Structures/User.js";
@@ -349,6 +350,24 @@ export const ClientEvents = {
 	ReactionRemoveEmoji: "ReactionRemoveEmoji",
 
 	/**
+	 * Fired when a user's status or activities change. Requires the privileged `GuildPresences`
+	 * intent; without it this never fires and `guild.presences` stays empty.
+	 *
+	 * `oldPresence` is a detached snapshot taken before the update, not a live cache entry, so it
+	 * can be diffed against `newPresence`. It is `undefined` the first time a user is seen. A
+	 * presence that goes offline is emitted and then dropped from the cache.
+	 * Listener arguments: `oldPresence` ({@link Presence} | `undefined`), `newPresence` ({@link Presence}).
+	 */
+	PresenceUpdate: "PresenceUpdate",
+
+	/**
+	 * Fired when a webhook is created, updated, or deleted in a channel. Discord does not send the
+	 * webhook itself, only where the change happened.
+	 * Listener arguments: `payload` (`{ guild, channel }`).
+	 */
+	WebhooksUpdate: "WebhooksUpdate",
+
+	/**
 	 * Fired when an invite is created.
 	 * Listener arguments: `invite` ({@link Invite}).
 	 */
@@ -507,6 +526,13 @@ export type ClientEventMap = {
 		channel: Channel | { id: string },
 		messageId: string,
 		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>
+	}];
+
+	[ClientEvents.PresenceUpdate]: [oldPresence: Presence | undefined, newPresence: Presence];
+
+	[ClientEvents.WebhooksUpdate]: [payload: {
+		guild: Guild | { id: string },
+		channel: Channel | { id: string }
 	}];
 
 	[ClientEvents.InviteCreate]: [invite: Invite];
