@@ -140,6 +140,23 @@ export const ClientEvents = {
 	ChannelDelete: "ChannelDelete",
 
 	/**
+	 * Fired when a thread is created, or when the client is added to a thread it could not previously see.
+	 * Listener arguments: `thread` ({@link Channel}).
+	 */
+	ThreadCreate: "ThreadCreate",
+	/**
+	 * Fired when a thread changes, such as being archived, locked, or renamed.
+	 * Listener arguments: `oldThread` ({@link Channel} | `undefined`), `newThread` ({@link Channel}).
+	 */
+	ThreadUpdate: "ThreadUpdate",
+	/**
+	 * Fired when a thread is deleted. The gateway only sends a partial channel here, so uncached
+	 * threads are emitted as raw data.
+	 * Listener arguments: `thread` ({@link Channel} | {@link DiscordChannel}).
+	 */
+	ThreadDelete: "ThreadDelete",
+
+	/**
 	 * Fired when a member joins a guild.
 	 * Listener arguments: `member` ({@link Member}).
 	 */
@@ -313,6 +330,10 @@ export type ClientEventMap = {
 	[ClientEvents.ChannelCreate]: [channel: Channel];
 	[ClientEvents.ChannelUpdate]: [oldChannel: Channel | undefined, newChannel: Channel];
 	[ClientEvents.ChannelDelete]: [channel: Channel | DiscordChannel];
+
+	[ClientEvents.ThreadCreate]: [thread: Channel];
+	[ClientEvents.ThreadUpdate]: [oldThread: Channel | undefined, newThread: Channel];
+	[ClientEvents.ThreadDelete]: [thread: Channel | DiscordChannel];
 
 	[ClientEvents.MemberCreate]: [member: Member];
 	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];

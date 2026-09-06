@@ -9,6 +9,7 @@
  */
 export { GuildCreate, GuildUpdate, GuildDelete } from "./Guilds.js";
 export { ChannelCreate, ChannelUpdate, ChannelDelete } from "./Channels.js";
+export { ThreadCreate, ThreadUpdate, ThreadDelete } from "./Threads.js";
 export { MemberCreate, MemberUpdate, MemberDelete } from "./Members.js";
 export { RoleCreate, RoleUpdate, RoleDelete } from "./Roles.js";
 export { MessageCreate, MessageUpdate, MessageDelete, MessageDeleteBulk } from "./Messages.js";
