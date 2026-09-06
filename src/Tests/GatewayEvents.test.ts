@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import {
+	DiscordAutoModerationActionType,
+	DiscordAutoModerationRule,
+	DiscordAutoModerationRuleEventType,
+	DiscordAutoModerationRuleTriggerType,
 	DiscordChannel,
 	DiscordChannelTypes,
 	DiscordGuild,
@@ -23,6 +27,8 @@ import { ClientEvents } from "../Types/SimplyJSTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
+import { AutoModerationRuleCreate, AutoModerationRuleDelete, AutoModerationRuleUpdate } from "../Events/AutoModeration.js";
+import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -717,6 +723,109 @@ describe("Thread gateway event handlers", () => {
 		await ThreadCreate.handler(client, threadPayload);
 		await ThreadUpdate.handler(client, threadPayload);
 		await ThreadDelete.handler(client, threadPayload);
+
+		expect(emitSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe("Auto moderation gateway event handlers", () => {
+	function createAutoModerationRule(id = "rule-1", guildId = "guild-1"): DiscordAutoModerationRule {
+		return {
+			id,
+			guild_id: guildId,
+			name: "No links",
+			creator_id: "user-1",
+			event_type: DiscordAutoModerationRuleEventType.MESSAGE_SEND,
+			trigger_type: DiscordAutoModerationRuleTriggerType.KEYWORD,
+			trigger_metadata: { keyword_filter: ["discord.gg"] },
+			actions: [{ type: DiscordAutoModerationActionType.BLOCK_MESSAGE }],
+			enabled: true,
+			exempt_roles: [],
+			exempt_channels: []
+		};
+	}
+
+	async function seededClient(): Promise<Client> {
+		const client = new Client({ token: "token", intents: GatewayIntents.AutoModerationConfiguration });
+		await GuildCreate.handler(client, createGuild());
+		return client;
+	}
+
+	it("AutoModerationRuleCreate caches the rule and emits", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		const rulePayload = createAutoModerationRule();
+
+		await AutoModerationRuleCreate.handler(client, rulePayload);
+
+		const cached = client.guilds.get("guild-1")?.autoModerationRules.get(rulePayload.id);
+		expect(cached).toBeInstanceOf(AutoModerationRule);
+		expect(cached?.name).toBe("No links");
+		expect(cached?.triggerMetadata.keyword_filter).toEqual(["discord.gg"]);
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.AutoModerationRuleCreate,
+			expect.objectContaining({ id: rulePayload.id })
+		);
+	});
+
+	it("AutoModerationRuleUpdate patches the cached instance in place and emits both states", async () => {
+		const client = await seededClient();
+		const rulePayload = createAutoModerationRule();
+		await AutoModerationRuleCreate.handler(client, rulePayload);
+
+		const emitSpy = vi.spyOn(client, "emit");
+		const cachedBefore = client.guilds.get("guild-1")!.autoModerationRules.get(rulePayload.id);
+
+		await AutoModerationRuleUpdate.handler(client, {
+			...rulePayload,
+			name: "No invites",
+			enabled: false,
+			exempt_roles: ["role-1"]
+		});
+
+		const cachedAfter = client.guilds.get("guild-1")!.autoModerationRules.get(rulePayload.id);
+		// upsert() patches rather than replacing, so the cached reference stays stable
+		expect(cachedAfter).toBe(cachedBefore);
+		expect(cachedAfter?.name).toBe("No invites");
+		expect(cachedAfter?.enabled).toBe(false);
+		expect(cachedAfter?.exemptRoles).toEqual(["role-1"]);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationRuleUpdate, cachedBefore, cachedAfter);
+	});
+
+	it("AutoModerationRuleDelete emits the cached rule before evicting it", async () => {
+		const client = await seededClient();
+		const rulePayload = createAutoModerationRule();
+		await AutoModerationRuleCreate.handler(client, rulePayload);
+
+		const emitSpy = vi.spyOn(client, "emit");
+		await AutoModerationRuleDelete.handler(client, rulePayload);
+
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.AutoModerationRuleDelete,
+			expect.any(AutoModerationRule)
+		);
+		expect(client.guilds.get("guild-1")?.autoModerationRules.has(rulePayload.id)).toBe(false);
+	});
+
+	it("AutoModerationRuleDelete emits the raw payload when the rule was never cached", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		// Rules are never sent in GUILD_CREATE, so an uncached delete is the common case
+		const rulePayload = createAutoModerationRule("rule-unknown");
+
+		await AutoModerationRuleDelete.handler(client, rulePayload);
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationRuleDelete, rulePayload);
+	});
+
+	it("ignores auto moderation events for uncached guilds", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.AutoModerationConfiguration });
+		const emitSpy = vi.spyOn(client, "emit");
+		const rulePayload = createAutoModerationRule("rule-1", "guild-missing");
+
+		await AutoModerationRuleCreate.handler(client, rulePayload);
+		await AutoModerationRuleUpdate.handler(client, rulePayload);
+		await AutoModerationRuleDelete.handler(client, rulePayload);
 
 		expect(emitSpy).not.toHaveBeenCalled();
 	});
