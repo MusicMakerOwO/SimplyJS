@@ -991,6 +991,36 @@ export type DiscordAutoModerationRule = {
 	exempt_channels: string[];
 }
 
+/**
+ * Sent when a rule is triggered and an action is executed - e.g. when a message is blocked.
+ *
+ * Requires the `AUTO_MODERATION_EXECUTION` intent.
+ */
+export type DiscordAutoModerationActionExecution = {
+	/** the id of the guild in which action was executed */
+	guild_id: string;
+	/** the action which was executed */
+	action: DiscordAutoModerationAction;
+	/** the id of the rule which action belongs to */
+	rule_id: string;
+	/** the trigger type of rule which was triggered */
+	rule_trigger_type: ObjectValues<typeof DiscordAutoModerationRuleTriggerType>;
+	/** the id of the user which generated the content which triggered the rule */
+	user_id: string;
+	/** the id of the channel in which user content was posted, absent when the content was not posted in a channel */
+	channel_id?: string;
+	/** the id of any user message which content belongs to, absent when the message was blocked or the content is not a message */
+	message_id?: string;
+	/** the id of any system auto moderation messages posted as a result of this action, only present for `SEND_ALERT_MESSAGE` actions */
+	alert_system_message_id?: string;
+	/** the user-generated text content, empty unless the `MESSAGE_CONTENT` intent is enabled */
+	content: string;
+	/** the word or phrase configured in the rule that triggered the rule */
+	matched_keyword: string | null;
+	/** the substring in content that triggered the rule, empty or null unless the `MESSAGE_CONTENT` intent is enabled */
+	matched_content: string | null;
+}
+
 export type DiscordWebhook = {
 	/** the id of the webhook */
 	id: string;

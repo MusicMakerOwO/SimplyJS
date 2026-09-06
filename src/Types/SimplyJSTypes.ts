@@ -1,12 +1,15 @@
 import type {
 	DiscordAuditLogEntry,
+	DiscordAutoModerationAction,
 	DiscordAutoModerationRule,
+	DiscordAutoModerationRuleTriggerType,
 	DiscordChannel,
 	DiscordEmoji,
 	DiscordGuild,
 	DiscordRole,
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
+import type { ObjectValues } from "./HelperTypes.js";
 import type { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import type { Guild } from "../Structures/Guild.js";
 import type { Invite } from "../Structures/Invite.js";
@@ -95,6 +98,35 @@ export type InviteDeletePayload = {
 	guildId?: string;
 	/** The invite code that was deleted */
 	code: string;
+};
+
+/**
+ * Payload for `AutoModerationActionExecution`; describes a single action an auto moderation rule
+ * carried out. Nothing here is cached - the event reports an occurrence, not an entity.
+ */
+export type AutoModerationActionExecutionPayload = {
+	/** Guild the action was executed in */
+	guildId: string;
+	/** The action that was executed */
+	action: DiscordAutoModerationAction;
+	/** ID of the rule the action belongs to; resolve it with `guild.autoModerationRules.fetch(ruleId)` */
+	ruleId: string;
+	/** Trigger type of the rule that fired */
+	ruleTriggerType: ObjectValues<typeof DiscordAutoModerationRuleTriggerType>;
+	/** User who generated the content that triggered the rule */
+	userId: string;
+	/** Channel the content was posted in, omitted when it was not posted in a channel */
+	channelId?: string;
+	/** Message the content belongs to, omitted when the message was blocked */
+	messageId?: string;
+	/** The system alert message posted for this action, only present for `SEND_ALERT_MESSAGE` actions */
+	alertSystemMessageId?: string;
+	/** The user-generated text content, empty without the `MessageContent` intent */
+	content: string;
+	/** The configured word or phrase that triggered the rule */
+	matchedKeyword: string | null;
+	/** The substring of `content` that triggered the rule, empty or `null` without the `MessageContent` intent */
+	matchedContent: string | null;
 };
 
 export const ClientEvents = {
@@ -239,6 +271,12 @@ export const ClientEvents = {
 	 * Listener arguments: `rule` ({@link AutoModerationRule} | {@link DiscordAutoModerationRule}).
 	 */
 	AutoModerationRuleDelete: "AutoModerationRuleDelete",
+	/**
+	 * Fired when an auto moderation rule is triggered and executes an action.
+	 * Requires the `AutoModerationExecution` intent.
+	 * Listener arguments: `payload` ({@link AutoModerationActionExecutionPayload}).
+	 */
+	AutoModerationActionExecution: "AutoModerationActionExecution",
 
 	/**
 	 * Fired when a message is created.
@@ -374,6 +412,7 @@ export type ClientEventMap = {
 	[ClientEvents.AutoModerationRuleCreate]: [rule: AutoModerationRule];
 	[ClientEvents.AutoModerationRuleUpdate]: [oldRule: AutoModerationRule | undefined, newRule: AutoModerationRule];
 	[ClientEvents.AutoModerationRuleDelete]: [rule: AutoModerationRule | DiscordAutoModerationRule];
+	[ClientEvents.AutoModerationActionExecution]: [payload: AutoModerationActionExecutionPayload];
 
 	[ClientEvents.MessageCreate]: [message: Message];
 	[ClientEvents.MessageUpdate]: [message: Message];
