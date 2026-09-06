@@ -1,11 +1,13 @@
 import type {
 	DiscordAuditLogEntry,
+	DiscordAutoModerationRule,
 	DiscordChannel,
 	DiscordEmoji,
 	DiscordGuild,
 	DiscordRole,
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
+import type { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import type { Guild } from "../Structures/Guild.js";
 import type { Invite } from "../Structures/Invite.js";
 import type { Member } from "../Structures/Member.js";
@@ -221,6 +223,24 @@ export const ClientEvents = {
 	RoleDelete: "RoleDelete",
 
 	/**
+	 * Fired when an auto moderation rule is created in a guild.
+	 * Listener arguments: `rule` ({@link AutoModerationRule}).
+	 */
+	AutoModerationRuleCreate: "AutoModerationRuleCreate",
+	/**
+	 * Fired when an auto moderation rule is updated.
+	 * `oldRule` is `undefined` when the rule was not already cached.
+	 * Listener arguments: `oldRule` ({@link AutoModerationRule} | `undefined`), `newRule` ({@link AutoModerationRule}).
+	 */
+	AutoModerationRuleUpdate: "AutoModerationRuleUpdate",
+	/**
+	 * Fired when an auto moderation rule is deleted from a guild.
+	 * Falls back to the raw gateway payload when the rule was not cached.
+	 * Listener arguments: `rule` ({@link AutoModerationRule} | {@link DiscordAutoModerationRule}).
+	 */
+	AutoModerationRuleDelete: "AutoModerationRuleDelete",
+
+	/**
 	 * Fired when a message is created.
 	 * Listener arguments: `message` ({@link Message}).
 	 */
@@ -350,6 +370,10 @@ export type ClientEventMap = {
 	[ClientEvents.RoleCreate]: [role: Role];
 	[ClientEvents.RoleUpdate]: [oldRole: Role | undefined, newRole: Role];
 	[ClientEvents.RoleDelete]: [role: Role | DiscordRole];
+
+	[ClientEvents.AutoModerationRuleCreate]: [rule: AutoModerationRule];
+	[ClientEvents.AutoModerationRuleUpdate]: [oldRule: AutoModerationRule | undefined, newRule: AutoModerationRule];
+	[ClientEvents.AutoModerationRuleDelete]: [rule: AutoModerationRule | DiscordAutoModerationRule];
 
 	[ClientEvents.MessageCreate]: [message: Message];
 	[ClientEvents.MessageUpdate]: [message: Message];
