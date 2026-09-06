@@ -6,12 +6,14 @@ import type {
 	DiscordChannel,
 	DiscordEmoji,
 	DiscordGuild,
+	DiscordGuildScheduledEvent,
 	DiscordRole,
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
 import type { ObjectValues } from "./HelperTypes.js";
 import type { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import type { Guild } from "../Structures/Guild.js";
+import type { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
 import type { Invite } from "../Structures/Invite.js";
 import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
@@ -172,6 +174,11 @@ export const ClientEvents = {
 	 * Listener arguments: `channel` ({@link Channel} | {@link DiscordChannel}).
 	 */
 	ChannelDelete: "ChannelDelete",
+	/**
+	 * Fired when a message is pinned or unpinned in a channel. Not fired when a pinned message is deleted.
+	 * Listener arguments: `payload` (`{ guild, channel, lastPinTimestamp }`).
+	 */
+	ChannelPinsUpdate: "ChannelPinsUpdate",
 
 	/**
 	 * Fired when a thread is created, or when the client is added to a thread it could not previously see.
@@ -277,6 +284,27 @@ export const ClientEvents = {
 	 * Listener arguments: `payload` ({@link AutoModerationActionExecutionPayload}).
 	 */
 	AutoModerationActionExecution: "AutoModerationActionExecution",
+
+	/**
+	 * Fired when a scheduled event is created in a guild.
+	 * Requires the `GuildScheduledEvents` intent.
+	 * Listener arguments: `event` ({@link GuildScheduledEvent}).
+	 */
+	GuildScheduledEventCreate: "GuildScheduledEventCreate",
+	/**
+	 * Fired when a scheduled event is updated, including when it starts, ends, or is cancelled.
+	 * `oldEvent` is `undefined` when the event was not already cached.
+	 * Requires the `GuildScheduledEvents` intent.
+	 * Listener arguments: `oldEvent` ({@link GuildScheduledEvent} | `undefined`), `newEvent` ({@link GuildScheduledEvent}).
+	 */
+	GuildScheduledEventUpdate: "GuildScheduledEventUpdate",
+	/**
+	 * Fired when a scheduled event is deleted from a guild.
+	 * Falls back to the raw gateway payload when the event was not cached.
+	 * Requires the `GuildScheduledEvents` intent.
+	 * Listener arguments: `event` ({@link GuildScheduledEvent} | {@link DiscordGuildScheduledEvent}).
+	 */
+	GuildScheduledEventDelete: "GuildScheduledEventDelete",
 
 	/**
 	 * Fired when a message is created.
@@ -406,6 +434,11 @@ export type ClientEventMap = {
 	[ClientEvents.ChannelCreate]: [channel: Channel];
 	[ClientEvents.ChannelUpdate]: [oldChannel: Channel | undefined, newChannel: Channel];
 	[ClientEvents.ChannelDelete]: [channel: Channel | DiscordChannel];
+	[ClientEvents.ChannelPinsUpdate]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		lastPinTimestamp: string | null
+	}];
 
 	[ClientEvents.ThreadCreate]: [thread: Channel];
 	[ClientEvents.ThreadUpdate]: [oldThread: Channel | undefined, newThread: Channel];
@@ -430,6 +463,10 @@ export type ClientEventMap = {
 	[ClientEvents.AutoModerationRuleCreate]: [rule: AutoModerationRule];
 	[ClientEvents.AutoModerationRuleUpdate]: [oldRule: AutoModerationRule | undefined, newRule: AutoModerationRule];
 	[ClientEvents.AutoModerationRuleDelete]: [rule: AutoModerationRule | DiscordAutoModerationRule];
+
+	[ClientEvents.GuildScheduledEventCreate]: [event: GuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventUpdate]: [oldEvent: GuildScheduledEvent | undefined, newEvent: GuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventDelete]: [event: GuildScheduledEvent | DiscordGuildScheduledEvent];
 	[ClientEvents.AutoModerationActionExecution]: [payload: AutoModerationActionExecutionPayload];
 
 	[ClientEvents.MessageCreate]: [message: Message];
