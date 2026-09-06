@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import {
+	DiscordAutoModerationActionExecution,
 	DiscordAutoModerationActionType,
 	DiscordAutoModerationRule,
 	DiscordAutoModerationRuleEventType,
@@ -23,11 +24,16 @@ import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
 import { GuildBanAdd, GuildBanRemove } from "../Events/Bans.js";
 import { AuditLogEntryCreate } from "../Events/AuditLogs.js";
 import { DiscordAuditLogEvent } from "../Types/DiscordAPITypes.js";
-import { ClientEvents } from "../Types/SimplyJSTypes.js";
+import { AutoModerationActionExecutionPayload, ClientEvents } from "../Types/SimplyJSTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
-import { AutoModerationRuleCreate, AutoModerationRuleDelete, AutoModerationRuleUpdate } from "../Events/AutoModeration.js";
+import {
+	AutoModerationActionExecution,
+	AutoModerationRuleCreate,
+	AutoModerationRuleDelete,
+	AutoModerationRuleUpdate
+} from "../Events/AutoModeration.js";
 import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 
 function createUser(id = "user-1"): DiscordUser {
@@ -745,6 +751,25 @@ describe("Auto moderation gateway event handlers", () => {
 		};
 	}
 
+	function createActionExecution(guildId = "guild-1"): DiscordAutoModerationActionExecution {
+		return {
+			guild_id: guildId,
+			action: {
+				type: DiscordAutoModerationActionType.SEND_ALERT_MESSAGE,
+				metadata: { channel_id: "channel-log" }
+			},
+			rule_id: "rule-1",
+			rule_trigger_type: DiscordAutoModerationRuleTriggerType.KEYWORD,
+			user_id: "user-1",
+			channel_id: "channel-1",
+			message_id: "message-1",
+			alert_system_message_id: "message-alert",
+			content: "join discord.gg/example",
+			matched_keyword: "discord.gg",
+			matched_content: "discord.gg"
+		};
+	}
+
 	async function seededClient(): Promise<Client> {
 		const client = new Client({ token: "token", intents: GatewayIntents.AutoModerationConfiguration });
 		await GuildCreate.handler(client, createGuild());
@@ -826,7 +851,68 @@ describe("Auto moderation gateway event handlers", () => {
 		await AutoModerationRuleCreate.handler(client, rulePayload);
 		await AutoModerationRuleUpdate.handler(client, rulePayload);
 		await AutoModerationRuleDelete.handler(client, rulePayload);
+		await AutoModerationActionExecution.handler(client, createActionExecution("guild-missing"));
 
 		expect(emitSpy).not.toHaveBeenCalled();
+	});
+
+	it("AutoModerationActionExecution emits a camel cased payload", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		const payload = createActionExecution();
+
+		await AutoModerationActionExecution.handler(client, payload);
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationActionExecution, {
+			guildId: "guild-1",
+			action: payload.action,
+			ruleId: "rule-1",
+			ruleTriggerType: DiscordAutoModerationRuleTriggerType.KEYWORD,
+			userId: "user-1",
+			channelId: "channel-1",
+			messageId: "message-1",
+			alertSystemMessageId: "message-alert",
+			content: "join discord.gg/example",
+			matchedKeyword: "discord.gg",
+			matchedContent: "discord.gg"
+		});
+	});
+
+	it("AutoModerationActionExecution omits the optional fields when Discord does", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+		// A blocked message never reaches a channel, so Discord sends no channel/message ids,
+		// and without the MessageContent intent the content fields come back empty
+		const payload: DiscordAutoModerationActionExecution = {
+			guild_id: "guild-1",
+			action: { type: DiscordAutoModerationActionType.BLOCK_MESSAGE },
+			rule_id: "rule-1",
+			rule_trigger_type: DiscordAutoModerationRuleTriggerType.SPAM,
+			user_id: "user-1",
+			content: "",
+			matched_keyword: null,
+			matched_content: null
+		};
+
+		await AutoModerationActionExecution.handler(client, payload);
+
+		const emitted = emitSpy.mock.calls.find(
+			([name]) => name === ClientEvents.AutoModerationActionExecution
+		)?.[1] as AutoModerationActionExecutionPayload;
+		expect(emitted).toBeDefined();
+		expect("channelId" in emitted).toBe(false);
+		expect("messageId" in emitted).toBe(false);
+		expect("alertSystemMessageId" in emitted).toBe(false);
+		expect(emitted.matchedKeyword).toBeNull();
+		expect(emitted.content).toBe("");
+	});
+
+	it("AutoModerationActionExecution does not touch the rule cache", async () => {
+		const client = await seededClient();
+		const rules = client.guilds.get("guild-1")!.autoModerationRules;
+
+		await AutoModerationActionExecution.handler(client, createActionExecution());
+
+		expect(rules.size).toBe(0);
 	});
 });
