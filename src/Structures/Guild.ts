@@ -7,6 +7,7 @@ import {
 	DiscordExplicitContentFilterLevels,
 	DiscordGuild, DiscordGuildAgeRestrictionLevels,
 	DiscordGuildFeatures,
+	DiscordGuildScheduledEvent,
 	DiscordIncidentsData,
 	DiscordLocaleByLanguage,
 	DiscordMember,
@@ -26,6 +27,7 @@ import { MemberCache } from "../Managers/Members.js";
 import { GuildBanManager } from "../Managers/GuildBans.js";
 import { GuildInviteManager } from "../Managers/Invites.js";
 import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
+import { GuildScheduledEventCache } from "../Managers/GuildScheduledEvents.js";
 
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
@@ -111,12 +113,17 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 * so this cache starts empty and fills from gateway events or an explicit fetch.
 	 */
 	autoModerationRules: AutoModerationRuleCache;
+	/**
+	 * Manager for this guild's scheduled events. Seeded from the `GUILD_CREATE` payload and kept
+	 * current by the `GuildScheduledEvent*` gateway events.
+	 */
+	scheduledEvents: GuildScheduledEventCache;
 	/** Manager for this guild's bans, backed by REST calls rather than a local cache */
 	bans: GuildBanManager;
 	/** Manager for this guild's invites, backed by REST calls rather than a local cache */
 	invites: GuildInviteManager;
 
-	constructor(client: Client, data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[] }) {
+	constructor(client: Client, data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[], guild_scheduled_events?: DiscordGuildScheduledEvent[] }) {
 		super(client);
 		this.channels = new ChannelCache(client, this);
 		this.roles    = new RoleCache(client, this);
@@ -124,13 +131,14 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.stickers = new StickerCache(client, this);
 		this.members  = new MemberCache(client, this);
 		this.autoModerationRules = new AutoModerationRuleCache(client, this);
+		this.scheduledEvents = new GuildScheduledEventCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
 		this.invites  = new GuildInviteManager(client, this);
 
 		this.patch(data);
 	}
 
-	patch(data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[] }): void {
+	patch(data: DiscordGuild & { channels?: DiscordChannel[], members?: DiscordMember[], guild_scheduled_events?: DiscordGuildScheduledEvent[] }): void {
 		this.id = data.id;
 		this.name = data.name;
 		this.ownerId = data.owner_id;
@@ -205,6 +213,12 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		if ("emojis" in data && data.emojis !== undefined) {
 			for (const apiEmoji of data.emojis) {
 				this.emojis.upsert(apiEmoji);
+			}
+		}
+
+		if ("guild_scheduled_events" in data && data.guild_scheduled_events !== undefined) {
+			for (const apiScheduledEvent of data.guild_scheduled_events) {
+				this.scheduledEvents.upsert(apiScheduledEvent);
 			}
 		}
 	}

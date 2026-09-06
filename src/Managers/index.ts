@@ -4,6 +4,7 @@ export * from "./Channels.js";
 export * from "./Emojis.js";
 export * from "./GuildBans.js";
 export * from "./Guilds.js";
+export * from "./GuildScheduledEvents.js";
 export * from "./Invites.js";
 export * from "./Members.js";
 export * from "./Roles.js";
