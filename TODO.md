@@ -71,7 +71,13 @@
 ## Further planning
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
-  - Current gaps: VoiceStateUpdate, PresenceUpdate, TypingStart, MessageReactionAdd/Remove, scheduled events, threads, integrations, webhooks, and many others
+  - Current gaps: VoiceStateUpdate, scheduled event subscribers (GUILD_SCHEDULED_EVENT_USER_ADD, GUILD_SCHEDULED_EVENT_USER_REMOVE), thread membership (THREAD_LIST_SYNC, THREAD_MEMBER_UPDATE, THREAD_MEMBERS_UPDATE), integrations, and many others
+- [ ] Give the remaining `*Update` handlers a real "old" value
+  - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
+  - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
+- [ ] Harden `User.patch` against partial user payloads
+  - `src/Structures/User.ts` assigns `id`/`username`/`discriminator`/`global_name`/`avatar` unconditionally, so upserting a partial user (as `PRESENCE_UPDATE` sends) blanks those fields on an already-cached user. `PresenceUpdate` guards at the call site; guarding in `patch` would cover every future partial-user payload
+  - Tradeoff: it weakens the "always set" invariant implied by the `!` definite-assignment markers on those fields
 - [ ] Model application team types in `src/Types/DiscordAPITypes.ts`
   - Replace the current `team?: Record<string, JSONObject>[]` placeholder with typed team and team-member models
   - Thread the new types through any application metadata consumers once they exist
@@ -90,10 +96,10 @@
 | CHANNEL_CREATE                    | ✅          |
 | CHANNEL_UPDATE                    | ✅          |
 | CHANNEL_DELETE                    | ✅          |
-| CHANNEL_PINS_UPDATE               | ❌          |
-| THREAD_CREATE                     | ❌          |
-| THREAD_UPDATE                     | ❌          |
-| THREAD_DELETE                     | ❌          |
+| CHANNEL_PINS_UPDATE               | ✅          |
+| THREAD_CREATE                     | ✅          |
+| THREAD_UPDATE                     | ✅          |
+| THREAD_DELETE                     | ✅          |
 | THREAD_LIST_SYNC                  | ❌          |
 | THREAD_MEMBER_UPDATE              | ❌          |
 | THREAD_MEMBERS_UPDATE             | ❌          |
@@ -118,30 +124,30 @@
 | INTEGRATION_CREATE                | ❌          |
 | INTEGRATION_UPDATE                | ❌          |
 | INTEGRATION_DELETE                | ❌          |
-| WEBHOOKS_UPDATE                   | ❌          |
+| WEBHOOKS_UPDATE                   | ✅          |
 | INVITE_CREATE                     | ✅          |
 | INVITE_DELETE                     | ✅          |
 | VOICE_CHANNEL_EFFECT_SEND         | ❌          |
 | VOICE_STATE_UPDATE                | ❌          |
-| PRESENCE_UPDATE                   | ❌          |
+| PRESENCE_UPDATE                   | ✅          |
 | MESSAGE_CREATE                    | ✅          |
 | MESSAGE_UPDATE                    | ✅          |
 | MESSAGE_DELETE                    | ✅          |
 | MESSAGE_DELETE_BULK               | ✅          |
 | MESSAGE_REACTION_ADD              | ✅          |
 | MESSAGE_REACTION_REMOVE           | ✅          |
-| MESSAGE_REACTION_REMOVE_ALL       | ❌          |
-| MESSAGE_REACTION_REMOVE_EMOJI     | ❌          |
-| TYPING_START                      | ❌          |
-| GUILD_SCHEDULED_EVENT_CREATE      | ❌          |
-| GUILD_SCHEDULED_EVENT_UPDATE      | ❌          |
-| GUILD_SCHEDULED_EVENT_DELETE      | ❌          |
+| MESSAGE_REACTION_REMOVE_ALL       | ✅          |
+| MESSAGE_REACTION_REMOVE_EMOJI     | ✅          |
+| TYPING_START                      | ✅          |
+| GUILD_SCHEDULED_EVENT_CREATE      | ✅          |
+| GUILD_SCHEDULED_EVENT_UPDATE      | ✅          |
+| GUILD_SCHEDULED_EVENT_DELETE      | ✅          |
 | GUILD_SCHEDULED_EVENT_USER_ADD    | ❌          |
 | GUILD_SCHEDULED_EVENT_USER_REMOVE | ❌          |
-| AUTO_MODERATION_RULE_CREATE       | ❌          |
-| AUTO_MODERATION_RULE_UPDATE       | ❌          |
-| AUTO_MODERATION_RULE_DELETE       | ❌          |
-| AUTO_MODERATION_ACTION_EXECUTION  | ❌          |
+| AUTO_MODERATION_RULE_CREATE       | ✅          |
+| AUTO_MODERATION_RULE_UPDATE       | ✅          |
+| AUTO_MODERATION_RULE_DELETE       | ✅          |
+| AUTO_MODERATION_ACTION_EXECUTION  | ✅          |
 | MESSAGE_POLL_VOTE_ADD             | ❌          |
 | MESSAGE_POLL_VOTE_REMOVE          | ❌          |
 | INTERACTION_CREATE                | ✅          |
