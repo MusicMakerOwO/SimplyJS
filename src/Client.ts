@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 import { ClientEventMap } from "./Types/SimplyJSTypes.js";
 import { User } from "./Structures/User.js";
 import { UserCache } from "./Managers/Users.js";
-import { ActivityType, ClientActivity, Status } from "./Types/DiscordAPITypes.js";
+import { ActivityType, ClientActivity, PresenceStatus, Status } from "./Types/DiscordAPITypes.js";
 import { ApplicationCommand, JSONArray } from "./Types/index.js";
 import { awaitEvent } from "./Collector.js";
 
@@ -55,7 +55,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	users: UserCache;
 
 	/** The client's current status, this is only intended for internal use via state tracking */
-	status: ObjectValues<typeof Status>;
+	status: ObjectValues<typeof PresenceStatus>;
 	/** The client's current activity, this is only intended for internal use via state tracking */
 	activity: ClientActivity | null;
 
@@ -118,8 +118,8 @@ export class Client extends EventEmitter<ClientEventMap> {
 		}
 	}
 
-	/** Sets the client's status: online, offline, idle, or dnd */
-	setStatus(status: ObjectValues<typeof Status>): void {
+	/** Sets the client's status: online, idle, dnd, invisible, or offline. Other users see `invisible` as `offline` */
+	setStatus(status: ObjectValues<typeof PresenceStatus>): void {
 		this.status = status;
 		if (this.socket.ready) this.#updatePresence();
 	}
