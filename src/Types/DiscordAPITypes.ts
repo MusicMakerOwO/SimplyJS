@@ -1215,6 +1215,129 @@ export type DiscordGuildScheduledEventRecurrenceRuleNWeekday = {
 }
 
 
+/**
+ * A guild integration, such as a Twitch or YouTube subscriber sync, or an installed bot.
+ *
+ * Everything past `account` is only sent for the streaming integration types. Bot and
+ * `guild_subscription` integrations omit those fields entirely.
+ *
+ * @see https://docs.discord.com/developers/resources/guild#integration-object
+ */
+export type DiscordIntegration = {
+	/** integration id */
+	id: string;
+	/** integration name */
+	name: string;
+	/** integration type (twitch, youtube, discord, or guild_subscription) */
+	type: DiscordIntegrationType;
+	/** is this integration enabled */
+	enabled: boolean;
+	/** integration account information */
+	account: DiscordIntegrationAccount;
+	/** is this integration syncing, not provided for bot integrations */
+	syncing?: boolean;
+	/** id that this integration uses for "subscribers", not provided for bot integrations */
+	role_id?: string;
+	/** whether emoticons should be synced for this integration (twitch only currently), not provided for bot integrations */
+	enable_emoticons?: boolean;
+	/** the behavior of expiring subscribers, not provided for bot integrations */
+	expire_behavior?: ObjectValues<typeof DiscordIntegrationExpireBehaviors>;
+	/** the grace period (days) before expiring subscribers, not provided for bot integrations */
+	expire_grace_period?: number;
+	/** user for this integration, not provided for bot integrations */
+	user?: DiscordUser;
+	/** when this integration was last synced, not provided for bot integrations */
+	synced_at?: string;
+	/** how many subscribers this integration has, not provided for bot integrations */
+	subscriber_count?: number;
+	/** has this integration been revoked, not provided for bot integrations */
+	revoked?: boolean;
+	/** the bot/OAuth2 application for discord integrations */
+	application?: DiscordIntegrationApplication;
+	/** the scopes the application has been authorized for */
+	scopes?: ObjectValues<typeof DiscordOAuth2Scopes>[];
+}
+
+/** The service a guild integration syncs with */
+export type DiscordIntegrationType = "twitch" | "youtube" | "discord" | "guild_subscription";
+
+/**
+ * What happens to a subscriber whose subscription lapses.
+ *
+ * @see https://docs.discord.com/developers/resources/guild#integration-object-integration-expire-behaviors
+ */
+export const DiscordIntegrationExpireBehaviors = {
+	REMOVE_ROLE: 0,
+	KICK: 1
+} as const;
+
+/**
+ * The account on the integrated service that a guild integration is tied to.
+ *
+ * @see https://docs.discord.com/developers/resources/guild#integration-account-object
+ */
+export type DiscordIntegrationAccount = {
+	/** id of the account */
+	id: string;
+	/** name of the account */
+	name: string;
+}
+
+/**
+ * The bot or OAuth2 application backing a `discord` type integration.
+ *
+ * @see https://docs.discord.com/developers/resources/guild#integration-application-object
+ */
+export type DiscordIntegrationApplication = {
+	/** the id of the app */
+	id: string;
+	/** the name of the app */
+	name: string;
+	/** the icon hash of the app */
+	icon: string | null;
+	/** the description of the app */
+	description: string;
+	/** the bot associated with this application */
+	bot?: DiscordUser;
+}
+
+/** The `INTEGRATION_CREATE` payload: an integration object with the guild it was added to */
+export type DiscordIntegrationCreate = DiscordIntegration & {
+	/** id of the guild the integration belongs to */
+	guild_id: string;
+}
+
+/** The `INTEGRATION_UPDATE` payload: an integration object with the guild it belongs to */
+export type DiscordIntegrationUpdate = DiscordIntegration & {
+	/** id of the guild the integration belongs to */
+	guild_id: string;
+}
+
+/**
+ * The `INTEGRATION_DELETE` payload, which carries ids only rather than the deleted integration.
+ *
+ * @see https://docs.discord.com/developers/events/gateway-events#integration-delete
+ */
+export type DiscordIntegrationDelete = {
+	/** integration id */
+	id: string;
+	/** id of the guild the integration belonged to */
+	guild_id: string;
+	/** id of the bot/OAuth2 application for this discord integration */
+	application_id?: string;
+}
+
+/**
+ * The `GUILD_INTEGRATIONS_UPDATE` payload, which only names the guild whose integrations changed.
+ *
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-integrations-update
+ */
+export type DiscordGuildIntegrationsUpdate = {
+	/** id of the guild whose integrations were updated */
+	guild_id: string;
+}
+
+
 export type DiscordAuditLog = {
 	/** List of application commands referenced in the audit log */
 	application_commands: ApplicationCommand[];
@@ -1225,8 +1348,7 @@ export type DiscordAuditLog = {
 	/** List of guild scheduled events referenced in the audit log */
 	guild_scheduled_events: DiscordGuildScheduledEvent[];
 	/** List of partial integration objects */
-	// TODO Integrations
-	integrations: JSONObject[];
+	integrations: Partial<DiscordIntegration>[];
 	/** List of threads referenced in the audit log* */
 	threads: DiscordChannel[];
 	/** List of users referenced in the audit log */
