@@ -27,6 +27,7 @@ export * from "./Member.js";
 export * from "./Message.js";
 export * from "./Presence.js";
 export * from "./Role.js";
+export * from "./SoundboardSound.js";
 export * from "./Sticker.js";
 export * from "./ThreadMember.js";
 export * from "./User.js";
