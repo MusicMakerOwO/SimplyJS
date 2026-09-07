@@ -29,6 +29,7 @@ import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
 import { GuildScheduledEventCache } from "../Managers/GuildScheduledEvents.js";
 import { PresenceCache } from "../Managers/Presences.js";
 import { IntegrationCache } from "../Managers/Integrations.js";
+import { WebhookCache } from "../Managers/Webhooks.js";
 import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
 
 /**
@@ -137,6 +138,12 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 * so this cache starts empty and fills from gateway events or an explicit fetch.
 	 */
 	integrations: IntegrationCache;
+	/**
+	 * Manager for this guild's webhooks. Discord never sends webhooks in `GUILD_CREATE` and the
+	 * `WebhooksUpdate` event says only which channel changed, so this cache starts empty and fills
+	 * from an explicit fetch.
+	 */
+	webhooks: WebhookCache;
 	/** Manager for this guild's bans, backed by REST calls rather than a local cache */
 	bans: GuildBanManager;
 	/** Manager for this guild's invites, backed by REST calls rather than a local cache */
@@ -154,6 +161,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.scheduledEvents = new GuildScheduledEventCache(client, this);
 		this.presences = new PresenceCache(client, this);
 		this.integrations = new IntegrationCache(client, this);
+		this.webhooks = new WebhookCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
 		this.invites  = new GuildInviteManager(client, this);
 
