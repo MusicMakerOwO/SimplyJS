@@ -5,6 +5,7 @@ export * from "./Emojis.js";
 export * from "./GuildBans.js";
 export * from "./Guilds.js";
 export * from "./GuildScheduledEvents.js";
+export * from "./Integrations.js";
 export * from "./Invites.js";
 export * from "./Members.js";
 export * from "./Presences.js";

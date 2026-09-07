@@ -28,6 +28,7 @@ import { GuildInviteManager } from "../Managers/Invites.js";
 import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
 import { GuildScheduledEventCache } from "../Managers/GuildScheduledEvents.js";
 import { PresenceCache } from "../Managers/Presences.js";
+import { IntegrationCache } from "../Managers/Integrations.js";
 
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
@@ -124,6 +125,11 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	 * kept current by the `PresenceUpdate` gateway event. Offline users are not stored.
 	 */
 	presences: PresenceCache;
+	/**
+	 * Manager for this guild's integrations. Discord never sends integrations in `GUILD_CREATE`,
+	 * so this cache starts empty and fills from gateway events or an explicit fetch.
+	 */
+	integrations: IntegrationCache;
 	/** Manager for this guild's bans, backed by REST calls rather than a local cache */
 	bans: GuildBanManager;
 	/** Manager for this guild's invites, backed by REST calls rather than a local cache */
@@ -139,6 +145,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.autoModerationRules = new AutoModerationRuleCache(client, this);
 		this.scheduledEvents = new GuildScheduledEventCache(client, this);
 		this.presences = new PresenceCache(client, this);
+		this.integrations = new IntegrationCache(client, this);
 		this.bans     = new GuildBanManager(client, this);
 		this.invites  = new GuildInviteManager(client, this);
 
