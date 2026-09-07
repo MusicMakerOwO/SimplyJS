@@ -69,6 +69,14 @@ import {
 	IntegrationUpdate
 } from "../Events/Integrations.js";
 import { Integration } from "../Structures/Integration.js";
+import { SoundboardSound } from "../Structures/SoundboardSound.js";
+import {
+	SoundboardSoundCreate,
+	SoundboardSoundDelete,
+	SoundboardSoundUpdate,
+	SoundboardSoundsUpdate
+} from "../Events/SoundboardSounds.js";
+import { DiscordGuildSoundboardSoundCreate } from "../Types/DiscordAPITypes.js";
 import { DiscordIntegrationCreate, DiscordIntegrationExpireBehaviors } from "../Types/DiscordAPITypes.js";
 
 function createUser(id = "user-1"): DiscordUser {
@@ -157,6 +165,18 @@ function createIntegration(id = "integration-1", guildId = "guild-1"): DiscordIn
 		synced_at: "2024-01-01T00:00:00.000Z",
 		subscriber_count: 3,
 		revoked: false
+	};
+}
+
+function createSoundboardSound(id = "sound-1", guildId = "guild-1"): DiscordGuildSoundboardSoundCreate {
+	return {
+		sound_id: id,
+		guild_id: guildId,
+		name: "Airhorn",
+		volume: 0.75,
+		emoji_id: "emoji-1",
+		emoji_name: null,
+		available: true
 	};
 }
 
@@ -2103,5 +2123,186 @@ describe("Integration gateway event handlers", () => {
 
 		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
 		expect(cached.role).toBe(client.guilds.get("guild-1")!.roles.get("role-1"));
+	});
+});
+
+describe("Soundboard sound gateway event handlers", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions
+		});
+		await GuildCreate.handler(client, createGuild());
+		return client;
+	}
+
+	it("SoundboardSoundCreate caches the sound on its guild and emits the structure", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+
+		const cached = guild.soundboardSounds.get("sound-1");
+		expect(cached).toBeInstanceOf(SoundboardSound);
+		expect(cached!.name).toBe("Airhorn");
+		expect(cached!.volume).toBe(0.75);
+		expect(cached!.guildId).toBe("guild-1");
+		expect(cached!.emojiId).toBe("emoji-1");
+		expect(cached!.emojiName).toBeNull();
+		expect(cached!.available).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundCreate, guild, cached);
+	});
+
+	it("SoundboardSoundUpdate patches the cached instance in place", async () => {
+		const client = await seededClient();
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+		const guild = client.guilds.get("guild-1")!;
+		const cached = guild.soundboardSounds.get("sound-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundUpdate.handler(client, {
+			...createSoundboardSound(),
+			name: "Louder Airhorn",
+			volume: 1,
+			available: false
+		});
+
+		const updated = guild.soundboardSounds.get("sound-1")!;
+		expect(updated).toBe(cached);
+		expect(updated.name).toBe("Louder Airhorn");
+		expect(updated.volume).toBe(1);
+		expect(updated.available).toBe(false);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundUpdate, guild, cached, updated);
+	});
+
+	it("SoundboardSoundUpdate emits an undefined old sound when it was not cached", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundUpdate.handler(client, createSoundboardSound());
+
+		const cached = guild.soundboardSounds.get("sound-1")!;
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundUpdate, guild, undefined, cached);
+	});
+
+	it("SoundboardSoundDelete emits the cached sound and drops it from the cache", async () => {
+		const client = await seededClient();
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+		const guild = client.guilds.get("guild-1")!;
+		const cached = guild.soundboardSounds.get("sound-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundDelete.handler(client, { sound_id: "sound-1", guild_id: "guild-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundDelete, guild, cached);
+		expect(guild.soundboardSounds.size).toBe(0);
+	});
+
+	it("SoundboardSoundDelete falls back to a bare sound id for an uncached sound", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundDelete.handler(client, { sound_id: "sound-1", guild_id: "guild-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundDelete, guild, { soundId: "sound-1" });
+	});
+
+	it("SoundboardSoundsUpdate derives per-sound create and update events, then emits the batch", async () => {
+		const client = await seededClient();
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+		const guild = client.guilds.get("guild-1")!;
+		const existing = guild.soundboardSounds.get("sound-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundsUpdate.handler(client, {
+			guild_id: "guild-1",
+			soundboard_sounds: [
+				{ ...createSoundboardSound(), name: "Renamed" },
+				createSoundboardSound("sound-2")
+			]
+		});
+
+		const added = guild.soundboardSounds.get("sound-2")!;
+		expect(existing.name).toBe("Renamed");
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundUpdate, guild, existing, existing);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundCreate, guild, added);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundsUpdate, guild, [existing, added]);
+	});
+
+	it("SoundboardSoundsUpdate does not evict cached sounds missing from the payload", async () => {
+		const client = await seededClient();
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundsUpdate.handler(client, {
+			guild_id: "guild-1",
+			soundboard_sounds: [createSoundboardSound("sound-2")]
+		});
+
+		expect(guild.soundboardSounds.has("sound-1")).toBe(true);
+		expect(guild.soundboardSounds.size).toBe(2);
+		expect(emitSpy).not.toHaveBeenCalledWith(
+			ClientEvents.SoundboardSoundDelete,
+			expect.anything(),
+			expect.anything()
+		);
+	});
+
+	it("seeds the soundboard cache from the GUILD_CREATE payload", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions
+		});
+
+		await GuildCreate.handler(client, {
+			...createGuild("guild-2"),
+			soundboard_sounds: [createSoundboardSound("sound-1", "guild-2")]
+		});
+
+		const cached = client.guilds.get("guild-2")!.soundboardSounds.get("sound-1");
+		expect(cached).toBeInstanceOf(SoundboardSound);
+		expect(cached!.name).toBe("Airhorn");
+	});
+
+	it("ignores every soundboard event for an uncached guild", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await SoundboardSoundCreate.handler(client, createSoundboardSound("sound-1", "guild-missing"));
+		await SoundboardSoundUpdate.handler(client, createSoundboardSound("sound-1", "guild-missing"));
+		await SoundboardSoundDelete.handler(client, { sound_id: "sound-1", guild_id: "guild-missing" });
+		await SoundboardSoundsUpdate.handler(client, { guild_id: "guild-missing", soundboard_sounds: [] });
+
+		expect(emitSpy).not.toHaveBeenCalled();
+	});
+
+	it("resolves emoji from the guild emoji cache, and undefined for a standard emoji", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		guild.emojis.upsert({ id: "emoji-1", name: "airhorn", animated: false, available: true });
+
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+		await SoundboardSoundCreate.handler(client, {
+			...createSoundboardSound("sound-2"),
+			emoji_id: null,
+			emoji_name: "📢"
+		});
+
+		expect(guild.soundboardSounds.get("sound-1")!.emoji).toBe(guild.emojis.get("emoji-1"));
+		const standard = guild.soundboardSounds.get("sound-2")!;
+		expect(standard.emoji).toBeUndefined();
+		expect(standard.emojiName).toBe("📢");
+	});
+
+	it("leaves user undefined when the payload omits it", async () => {
+		const client = await seededClient();
+
+		await SoundboardSoundCreate.handler(client, createSoundboardSound());
+
+		expect(client.guilds.get("guild-1")!.soundboardSounds.get("sound-1")!.user).toBeUndefined();
 	});
 });

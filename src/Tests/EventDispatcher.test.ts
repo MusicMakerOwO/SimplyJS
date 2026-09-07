@@ -174,6 +174,20 @@ describe("EventDispatcher", () => {
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Ready, expect.objectContaining({ id: user.id }));
 	});
 
+	it("registers every soundboard sound event from the Events barrel", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const dispatch = CreateDispatch();
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+		// The guild is uncached, so each handler no-ops; this only asserts the routing exists.
+		dispatch(client, GatewayEvents.GuildSoundboardSoundCreate, { guild_id: "guild-missing" });
+		dispatch(client, GatewayEvents.GuildSoundboardSoundUpdate, { guild_id: "guild-missing" });
+		dispatch(client, GatewayEvents.GuildSoundboardSoundDelete, { guild_id: "guild-missing" });
+		dispatch(client, GatewayEvents.GuildSoundboardSoundsUpdate, { guild_id: "guild-missing" });
+
+		expect(warnSpy).not.toHaveBeenCalled();
+	});
+
 	it("does not warn for handled events", () => {
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		const dispatch = CreateDispatch();

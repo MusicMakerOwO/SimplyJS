@@ -6,6 +6,7 @@ import { Guild } from "../Structures/Guild.js";
 import { Role } from "../Structures/Role.js";
 import { Emoji } from "../Structures/Emoji.js";
 import { Sticker } from "../Structures/Sticker.js";
+import { SoundboardSound } from "../Structures/SoundboardSound.js";
 import { Member } from "../Structures/Member.js";
 import { Message } from "../Structures/Message.js";
 import { User } from "../Structures/User.js";
@@ -21,6 +22,7 @@ import {
 	DiscordMember,
 	DiscordOverwrite,
 	DiscordRole,
+	DiscordSoundboardSound,
 	DiscordSticker,
 	DiscordStickerFormatTypes,
 	DiscordStickerTypes,
@@ -149,6 +151,21 @@ function makeEmoji(client: Client, guild: Guild, id = "emoji-1"): Emoji {
 
 function makeSticker(client: Client, guild: Guild, id = "sticker-1"): Sticker {
 	return new Sticker(client, guild, stickerData(id));
+}
+
+function soundboardSoundData(id = "sound-1"): DiscordSoundboardSound {
+	return {
+		sound_id: id,
+		name: "Airhorn",
+		volume: 0.75,
+		emoji_id: "emoji-1",
+		emoji_name: null,
+		available: true
+	};
+}
+
+function makeSoundboardSound(client: Client, guild: Guild, id = "sound-1"): SoundboardSound {
+	return new SoundboardSound(client, guild, soundboardSoundData(id));
 }
 
 // Moveable/PermissionOverwrites require `position`/`permission_overwrites` to be present on the
@@ -2215,5 +2232,93 @@ describe("User.send() DM flow", () => {
 			expect(gifUrl).toContain(".gif");
 			expect(pngUrl).toContain(".png");
 		});
+	});
+});
+// ---------------------------------------------------------------------------
+// SoundboardSound
+// ---------------------------------------------------------------------------
+
+describe("SoundboardSound action methods", () => {
+	let client: Client;
+	let guild: Guild;
+	let sound: SoundboardSound;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+		sound = makeSoundboardSound(client, guild);
+		vi.restoreAllMocks();
+	});
+
+	it("delete() calls DELETE /guilds/:guildId/soundboard-sounds/:soundId", async () => {
+		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await sound.delete();
+
+		expect(spy).toHaveBeenCalledOnce();
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds/${sound.soundId}`);
+	});
+
+	it("modify() converts camelCase changes to the snake_case API body", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await sound.modify({ name: "Renamed", volume: 0.5, emojiId: "emoji-2", emojiName: null });
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds/${sound.soundId}`, {
+			name: "Renamed",
+			volume: 0.5,
+			emoji_id: "emoji-2",
+			emoji_name: null
+		});
+	});
+
+	it("modify() omits fields that were not passed", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(undefined);
+
+		await sound.modify({ name: "Only the name" });
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds/${sound.soundId}`, {
+			name: "Only the name"
+		});
+	});
+
+	it("cache create() posts the sound and caches the response", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(soundboardSoundData("sound-2"));
+
+		const created = await guild.soundboardSounds.create({
+			name: "Airhorn",
+			sound: "data:audio/mp3;base64,AAAA",
+			volume: 0.75
+		});
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds`, {
+			name: "Airhorn",
+			sound: "data:audio/mp3;base64,AAAA",
+			volume: 0.75
+		});
+		expect(created).toBeInstanceOf(SoundboardSound);
+		expect(guild.soundboardSounds.get("sound-2")).toBe(created);
+	});
+
+	it("cache fetchAll() unwraps the items array and caches every sound", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue({
+			items: [soundboardSoundData("sound-1"), soundboardSoundData("sound-2")]
+		});
+
+		const fetched = await guild.soundboardSounds.fetchAll();
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds`);
+		expect(fetched).toHaveLength(2);
+		expect(guild.soundboardSounds.size).toBe(2);
+		expect(guild.soundboardSounds.get("sound-2")!.name).toBe("Airhorn");
+	});
+
+	it("cache fetch() requests a single sound by id and caches it", async () => {
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue(soundboardSoundData("sound-3"));
+
+		const fetched = await guild.soundboardSounds.fetch("sound-3");
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds/sound-3`);
+		expect(guild.soundboardSounds.get("sound-3")).toBe(fetched);
 	});
 });
