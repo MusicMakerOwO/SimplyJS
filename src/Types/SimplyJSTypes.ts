@@ -20,6 +20,7 @@ import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
 import type { Presence } from "../Structures/Presence.js";
 import type { Role } from "../Structures/Role.js";
+import type { SoundboardSound } from "../Structures/SoundboardSound.js";
 import type { Sticker } from "../Structures/Sticker.js";
 import type { ThreadMember } from "../Structures/ThreadMember.js";
 import type { User } from "../Structures/User.js";
@@ -297,6 +298,38 @@ export const ClientEvents = {
 	 * Listener arguments: `guild` ({@link Guild}), `sticker` ({@link Sticker} | {@link DiscordSticker}).
 	 */
 	StickerDelete: "StickerDelete",
+
+	/**
+	 * Fired when a soundboard sound is added to a guild, either from
+	 * `GUILD_SOUNDBOARD_SOUND_CREATE` or from a bulk sync that carried a sound not yet cached.
+	 * Requires the `GuildExpressions` intent.
+	 * Listener arguments: `guild` ({@link Guild}), `sound` ({@link SoundboardSound}).
+	 */
+	SoundboardSoundCreate: "SoundboardSoundCreate",
+	/**
+	 * Fired when a guild soundboard sound is changed.
+	 * `oldSound` is `undefined` when the sound was not already cached.
+	 * Requires the `GuildExpressions` intent.
+	 * Listener arguments: `guild` ({@link Guild}), `oldSound` ({@link SoundboardSound} | `undefined`), `newSound` ({@link SoundboardSound}).
+	 */
+	SoundboardSoundUpdate: "SoundboardSoundUpdate",
+	/**
+	 * Fired when a soundboard sound is removed from a guild.
+	 * The gateway payload carries ids only, so `sound` falls back to a bare `{ soundId }` object
+	 * when it was not cached.
+	 * Requires the `GuildExpressions` intent.
+	 * Listener arguments: `guild` ({@link Guild}), `sound` ({@link SoundboardSound} | `{ soundId: string }`).
+	 */
+	SoundboardSoundDelete: "SoundboardSoundDelete",
+	/**
+	 * Fired when several of a guild's soundboard sounds change at once, after the individual
+	 * `SoundboardSoundCreate` / `SoundboardSoundUpdate` events derived from the same payload.
+	 * `sounds` is only what the payload carried, which is not necessarily the guild's full
+	 * soundboard - read `guild.soundboardSounds` for that.
+	 * Requires the `GuildExpressions` intent.
+	 * Listener arguments: `guild` ({@link Guild}), `sounds` ({@link SoundboardSound}`[]`).
+	 */
+	SoundboardSoundsUpdate: "SoundboardSoundsUpdate",
 
 	/**
 	 * Fired when a role is created in a guild.
@@ -595,6 +628,11 @@ export type ClientEventMap = {
 	[ClientEvents.StickerCreate]: [guild: Guild, sticker: Sticker];
 	[ClientEvents.StickerUpdate]: [guild: Guild, oldSticker: Sticker | undefined, newSticker: Sticker];
 	[ClientEvents.StickerDelete]: [guild: Guild, sticker: Sticker | DiscordSticker];
+
+	[ClientEvents.SoundboardSoundCreate]: [guild: Guild, sound: SoundboardSound];
+	[ClientEvents.SoundboardSoundUpdate]: [guild: Guild, oldSound: SoundboardSound | undefined, newSound: SoundboardSound];
+	[ClientEvents.SoundboardSoundDelete]: [guild: Guild, sound: SoundboardSound | { soundId: string }];
+	[ClientEvents.SoundboardSoundsUpdate]: [guild: Guild, sounds: SoundboardSound[]];
 
 	[ClientEvents.RoleCreate]: [role: Role];
 	[ClientEvents.RoleUpdate]: [oldRole: Role | undefined, newRole: Role];
