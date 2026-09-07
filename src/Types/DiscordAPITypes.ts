@@ -240,6 +240,73 @@ export const DiscordStickerFormatTypes = {
 	GIF: 4
 } as const;
 
+/**
+ * A sound in a guild's soundboard, playable by members in a voice channel.
+ *
+ * Note that the primary key is `sound_id`, not `id` - soundboard sounds are the one guild
+ * expression that does not follow the usual `id` convention.
+ *
+ * @see https://docs.discord.com/developers/resources/soundboard#soundboard-sound-object
+ */
+export type DiscordSoundboardSound = {
+	/** the name of this sound */
+	name: string;
+	/** the id of this sound */
+	sound_id: string;
+	/** the volume of this sound, from 0 to 1 */
+	volume: number;
+	/** the id of this sound's custom emoji, or null if it uses a standard emoji or none at all */
+	emoji_id: string | null;
+	/** the unicode character of this sound's standard emoji, or null if it uses a custom emoji or none at all */
+	emoji_name: string | null;
+	/** the id of the guild this sound is in, absent for the default sounds Discord ships */
+	guild_id?: string;
+	/** whether this sound can be used, may be false due to loss of Server Boosts */
+	available: boolean;
+	/** the user who created this sound, only sent with the `CREATE_GUILD_EXPRESSIONS` or `MANAGE_GUILD_EXPRESSIONS` permission */
+	user?: DiscordUser;
+}
+
+/**
+ * Payload for `GUILD_SOUNDBOARD_SOUND_CREATE`. Identical to the sound object, but `guild_id` is
+ * always present on the gateway.
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-soundboard-sound-create
+ */
+export type DiscordGuildSoundboardSoundCreate = DiscordSoundboardSound & {
+	guild_id: string;
+}
+
+/**
+ * Payload for `GUILD_SOUNDBOARD_SOUND_UPDATE`. Carries the sound's full new state, not a delta.
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-soundboard-sound-update
+ */
+export type DiscordGuildSoundboardSoundUpdate = DiscordSoundboardSound & {
+	guild_id: string;
+}
+
+/**
+ * Payload for `GUILD_SOUNDBOARD_SOUND_DELETE`. Ids only - the deleted sound's data is never
+ * echoed back, so consumers depend on the cache to know what was removed.
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-soundboard-sound-delete
+ */
+export type DiscordGuildSoundboardSoundDelete = {
+	/** the id of the sound that was deleted */
+	sound_id: string;
+	/** the id of the guild the sound was in */
+	guild_id: string;
+}
+
+/**
+ * Payload for `GUILD_SOUNDBOARD_SOUNDS_UPDATE`, sent when several sounds change at once.
+ * @see https://docs.discord.com/developers/events/gateway-events#guild-soundboard-sounds-update
+ */
+export type DiscordGuildSoundboardSoundsUpdate = {
+	/** the guild's soundboard sounds */
+	soundboard_sounds: DiscordSoundboardSound[];
+	/** the id of the guild the sounds are in */
+	guild_id: string;
+}
+
 export type DiscordIncidentsData = {
 	/** ISO8601 - when invites get enabled again */
 	invites_disabled_until?: string | null;
@@ -492,6 +559,7 @@ export type DiscordGuildCreate = DiscordGuild & {
 	members?: DiscordMember[];
 	guild_scheduled_events?: DiscordGuildScheduledEvent[];
 	presences?: DiscordPresence[];
+	soundboard_sounds?: DiscordSoundboardSound[];
 };
 
 export type DiscordApplication = {
