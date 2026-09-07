@@ -42,6 +42,12 @@ export {
 	GuildScheduledEventUserAdd,
 	GuildScheduledEventUserRemove
 } from "./GuildScheduledEvents.js";
+export {
+	IntegrationCreate,
+	IntegrationUpdate,
+	IntegrationDelete,
+	GuildIntegrationsUpdate
+} from "./Integrations.js";
 export { MessagePollVoteAdd, MessagePollVoteRemove } from "./Polls.js";
 export { InteractionCreate } from "./Interactions.js";
 export { Ready } from "./Ready.js";
