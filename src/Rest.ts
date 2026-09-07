@@ -1,4 +1,4 @@
-import { JSONArray, JSONObject } from "./Types/Internal.js";
+import { FileAttachment, JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
@@ -6,6 +6,7 @@ const USER_AGENT = "DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, 1.2.0
 const DEFAULT_RETRY_COUNT = 3;
 const TRANSIENT_HTTP_STATUS = new Set([500, 502, 503, 504]);
 const EMPTY_RESPONSE_STATUS = new Set([204, 205, 304]);
+const MAX_FILES_PER_REQUEST = 10;
 
 /**
  * Derives a coarse per-route cache key from a method and route, before Discord has told us
@@ -42,7 +43,60 @@ type RestMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 type RestRequestOptions = {
 	headers?: Record<string, string>;
 	retryCount?: number;
+	files?: FileAttachment[];
 };
+
+/**
+ * Rejects file lists Discord would reject anyway, before spending a request on them.
+ *
+ * Names have to be unique because they are how embeds and components address an upload
+ * (`attachment://<name>`) - two files sharing a name makes that reference ambiguous.
+ * @throws {Error} When there are too many files, or a name is empty or duplicated.
+ */
+function ValidateFiles(files: FileAttachment[]): void {
+	if (files.length > MAX_FILES_PER_REQUEST) {
+		throw new Error(`Cannot upload more than ${MAX_FILES_PER_REQUEST} files at once, received ${files.length}`);
+	}
+
+	const seen = new Set<string>();
+	for (const file of files) {
+		if (!file.name || file.name.length === 0) throw new Error("Every attachment must have a name");
+		if (seen.has(file.name)) throw new Error(`Duplicate attachment name "${file.name}"`);
+		seen.add(file.name);
+	}
+}
+
+/**
+ * Collapses the optional `headers`/`files` arguments of the public verb methods into a
+ * {@link RestRequestOptions}, omitting whichever were not supplied rather than setting them to
+ * `undefined` (the project compiles with `exactOptionalPropertyTypes`).
+ */
+function RestRequestOptionsFrom(headers?: Record<string, string>, files?: FileAttachment[]): RestRequestOptions {
+	return {
+		...(headers ? { headers } : {}),
+		...(files ? { files } : {})
+	};
+}
+
+/**
+ * Builds the `multipart/form-data` body Discord expects for uploads: the JSON payload under
+ * `payload_json`, then one `files[n]` part per attachment.
+ *
+ * Rebuilt for every attempt rather than once per request - a body that has already been handed to
+ * `fetch` is consumed and cannot be replayed on a `429` or `5xx` retry.
+ */
+function BuildFormData(data: JSONObject | JSONArray | null, files: FileAttachment[]): FormData {
+	const form = new FormData();
+	form.append("payload_json", JSON.stringify(data ?? {}));
+
+	for (let i = 0; i < files.length; i++) {
+		const file = files[i]!;
+		const bytes = typeof file.data === "string" ? new TextEncoder().encode(file.data) : file.data;
+		form.append(`files[${i}]`, new Blob([bytes as BlobPart]), file.name);
+	}
+
+	return form;
+}
 
 type DiscordErrorResponse = {
 	message?: string;
@@ -322,6 +376,10 @@ export class Rest {
 		let retriesRemaining = options.retryCount ?? DEFAULT_RETRY_COUNT;
 		let transientRetryAttempt = 0;
 
+		const files = options.files ?? [];
+		const isMultipart = files.length > 0;
+		if (isMultipart) ValidateFiles(files);
+
 		while (true) {
 			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(method, normalizedRoute);
 			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey));
@@ -329,12 +387,15 @@ export class Rest {
 			const response = await fetch(`${DISCORD_API_BASE}${normalizedRoute}`, {
 				method,
 				headers: {
-					"Content-Type": "application/json",
+					// `fetch` has to set Content-Type itself on multipart bodies so it can include the boundary
+					...(isMultipart ? {} : { "Content-Type": "application/json" }),
 					"User-Agent": USER_AGENT,
 					Authorization: `Bot ${this.#token}`,
 					...options.headers
 				},
-				body: data ? JSON.stringify(data) : null
+				body: isMultipart
+					? BuildFormData(data, files)
+					: data ? JSON.stringify(data) : null
 			});
 
 			const rawBody = await response.text();
@@ -383,14 +444,22 @@ export class Rest {
 		return this.#request<T>("GET", path, null, headers ? { headers } : {});
 	}
 
-	/** Sends a POST request to the provided path. This can only be used for discord requests */
-	post<T>(path: string, data: JSONObject | JSONArray, headers?: Record<string, string>): Promise<T> {
-		return this.#request<T>("POST", path, data, headers ? { headers } : {});
+	/**
+	 * Sends a POST request to the provided path. This can only be used for discord requests
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
+	 * `data` under `payload_json` instead of as a plain JSON body.
+	 */
+	post<T>(path: string, data: JSONObject | JSONArray, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+		return this.#request<T>("POST", path, data, RestRequestOptionsFrom(headers, files));
 	}
 
-	/** Sends a PATCH request to the provided path. This can only be used for discord requests */
-	patch<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>): Promise<T> {
-		return this.#request<T>("PATCH", path, data, headers ? { headers } : {});
+	/**
+	 * Sends a PATCH request to the provided path. This can only be used for discord requests
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
+	 * `data` under `payload_json` instead of as a plain JSON body.
+	 */
+	patch<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+		return this.#request<T>("PATCH", path, data, RestRequestOptionsFrom(headers, files));
 	}
 
 	/** Sends a DELETE request to the provided path. This can only be used for discord requests */
@@ -398,8 +467,12 @@ export class Rest {
 		return this.#request<T>("DELETE", path, null, headers ? { headers } : {});
 	}
 
-	/** Sends a PUT request to the provided path. This can only be used for discord requests */
-	put<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>): Promise<T> {
-		return this.#request<T>("PUT", path, data, headers ? { headers } : {});
+	/**
+	 * Sends a PUT request to the provided path. This can only be used for discord requests
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
+	 * `data` under `payload_json` instead of as a plain JSON body.
+	 */
+	put<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+		return this.#request<T>("PUT", path, data, RestRequestOptionsFrom(headers, files));
 	}
 }
