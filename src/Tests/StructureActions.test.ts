@@ -428,9 +428,28 @@ describe("GuildTextChannel action methods", () => {
 
 		const result = await channel.send("hello world");
 
-		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "hello world" });
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "hello world" }, undefined, []);
 		expect(result).toBeInstanceOf(Message);
 		expect(result.content).toBe("hello");
+	});
+
+	it("send() strips attachments from the body and passes them as files", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		await channel.send({
+			content: "see attached",
+			attachments: [{ name: "log.txt", data: "contents", description: "a log" }]
+		});
+
+		expect(spy).toHaveBeenCalledWith(
+			`/channels/${channel.id}/messages`,
+			{
+				content: "see attached",
+				attachments: [{ id: "0", filename: "log.txt", description: "a log" }]
+			},
+			undefined,
+			[{ name: "log.txt", data: "contents", description: "a log" }]
+		);
 	});
 
 	it("send() wraps a MessagePayload and sends exact API body", async () => {
@@ -541,7 +560,7 @@ describe("GuildAnnouncementChannel action methods", () => {
 
 		const result = await channel.send("announcement");
 
-		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "announcement" });
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "announcement" }, undefined, []);
 		expect(result).toBeInstanceOf(Message);
 	});
 
@@ -813,7 +832,7 @@ describe("GuildThreadChannel action methods", () => {
 
 		const result = await channel.send("in the thread");
 
-		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "in the thread" });
+		expect(spy).toHaveBeenCalledWith(`/channels/${channel.id}/messages`, { content: "in the thread" }, undefined, []);
 		expect(result).toBeInstanceOf(Message);
 	});
 
@@ -1571,7 +1590,7 @@ describe("Message action methods", () => {
 
 		expect(spy).toHaveBeenCalledWith(`/channels/channel-1/messages/msg-1`, {
 			content: "edited content",
-		});
+		}, undefined, []);
 	});
 
 	it("update() returns a Message instance", async () => {

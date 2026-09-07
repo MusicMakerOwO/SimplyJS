@@ -387,7 +387,7 @@ describe("Repliable mixin", () => {
 		expect(spy).toHaveBeenCalledWith(`/interactions/${interaction.id}/${interaction.token}/callback`, {
 			type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
 			data: { content: "hello world" },
-		});
+		}, undefined, []);
 	});
 
 	it("reply() passes a full payload through unchanged", async () => {
@@ -397,6 +397,56 @@ describe("Repliable mixin", () => {
 
 		const [, body] = spy.mock.calls[0]! as [string, { data: unknown }];
 		expect(body.data).toEqual({ content: "styled", embeds: [{ title: "Embed" }] });
+	});
+
+	it("reply() nests attachment descriptors in data but passes files at the top level", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		await interaction.reply({ content: "see attached", attachments: [{ name: "log.txt", data: "contents" }] });
+
+		expect(spy).toHaveBeenCalledWith(
+			`/interactions/${interaction.id}/${interaction.token}/callback`,
+			{
+				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+				data: { content: "see attached", attachments: [{ id: "0", filename: "log.txt" }] }
+			},
+			undefined,
+			[{ name: "log.txt", data: "contents" }]
+		);
+	});
+
+	it("reply() keeps the ephemeral flag alongside attachments", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		await interaction.reply({
+			content: "private",
+			ephemeral: true,
+			attachments: [{ name: "log.txt", data: "contents" }]
+		});
+
+		const [, body, , files] = spy.mock.calls[0]! as [string, { data: { flags: number } }, undefined, unknown[]];
+		expect(body.data.flags! & 64).toBe(64);
+		expect(files).toHaveLength(1);
+	});
+
+	it("editReply() uploads new files while retaining named existing attachments", async () => {
+		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
+
+		await interaction.editReply({
+			content: "edited",
+			attachments: [{ id: "999888777" }, { name: "new.txt", data: "fresh" }]
+		});
+
+		expect(spy).toHaveBeenCalledWith(
+			`/webhooks/${interaction.applicationId}/${interaction.token}/messages/@original`,
+			{
+				content: "edited",
+				// the retained snowflake passes through; the upload is numbered by its files[] index
+				attachments: [{ id: "999888777" }, { id: "0", filename: "new.txt" }]
+			},
+			undefined,
+			[{ name: "new.txt", data: "fresh" }]
+		);
 	});
 
 	it("deferReply() with no argument posts DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE with no data", async () => {
@@ -427,7 +477,9 @@ describe("Repliable mixin", () => {
 
 		expect(spy).toHaveBeenCalledWith(
 			`/webhooks/${interaction.applicationId}/${interaction.token}/messages/@original`,
-			{ content: "edited" }
+			{ content: "edited" },
+			undefined,
+			[]
 		);
 		expect(result).toBeInstanceOf(Message);
 	});
@@ -439,7 +491,9 @@ describe("Repliable mixin", () => {
 
 		expect(spy).toHaveBeenCalledWith(
 			`/webhooks/${interaction.applicationId}/${interaction.token}`,
-			{ content: "more info" }
+			{ content: "more info" },
+			undefined,
+			[]
 		);
 		expect(result).toBeInstanceOf(Message);
 	});
@@ -475,7 +529,7 @@ describe("Updateable mixin", () => {
 		expect(spy).toHaveBeenCalledWith(`/interactions/${interaction.id}/${interaction.token}/callback`, {
 			type: InteractionCallbackTypes.UPDATE_MESSAGE,
 			data: { content: "edited message" },
-		});
+		}, undefined, []);
 	});
 
 	it("deferUpdate() posts DEFERRED_UPDATE_MESSAGE with no data", async () => {
