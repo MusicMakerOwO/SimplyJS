@@ -14,6 +14,7 @@ import type { ObjectValues } from "./HelperTypes.js";
 import type { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import type { Guild } from "../Structures/Guild.js";
 import type { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
+import type { Integration } from "../Structures/Integration.js";
 import type { Invite } from "../Structures/Invite.js";
 import type { Member } from "../Structures/Member.js";
 import type { Message } from "../Structures/Message.js";
@@ -373,6 +374,37 @@ export const ClientEvents = {
 	GuildScheduledEventUserRemove: "GuildScheduledEventUserRemove",
 
 	/**
+	 * Fired when an integration is added to a guild, such as a Twitch or YouTube subscriber sync
+	 * or a newly installed bot.
+	 * Requires the `GuildIntegrations` intent.
+	 * Listener arguments: `integration` ({@link Integration}).
+	 */
+	IntegrationCreate: "IntegrationCreate",
+	/**
+	 * Fired when a guild integration is updated.
+	 * `oldIntegration` is `undefined` when the integration was not already cached, which is common
+	 * because integrations are never seeded from `GUILD_CREATE`.
+	 * Requires the `GuildIntegrations` intent.
+	 * Listener arguments: `oldIntegration` ({@link Integration} | `undefined`), `newIntegration` ({@link Integration}).
+	 */
+	IntegrationUpdate: "IntegrationUpdate",
+	/**
+	 * Fired when an integration is removed from a guild.
+	 * The gateway payload carries ids only, so `integration` falls back to a bare `{ id }` object
+	 * when it was not cached. `applicationId` is only present for `discord` integrations.
+	 * Requires the `GuildIntegrations` intent.
+	 * Listener arguments: `integration` ({@link Integration} | `{ id: string }`), `guild` ({@link Guild}), `applicationId` (`string` | `undefined`).
+	 */
+	IntegrationDelete: "IntegrationDelete",
+	/**
+	 * Fired when a guild's integrations change in a way Discord does not describe - it names the
+	 * guild and nothing else. Call `guild.integrations.fetchAll()` to resync.
+	 * Requires the `GuildIntegrations` intent.
+	 * Listener arguments: `guild` ({@link Guild}).
+	 */
+	GuildIntegrationsUpdate: "GuildIntegrationsUpdate",
+
+	/**
 	 * Fired when a message is created.
 	 * Listener arguments: `message` ({@link Message}).
 	 */
@@ -578,6 +610,11 @@ export type ClientEventMap = {
 	[ClientEvents.GuildScheduledEventUserAdd]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
 	[ClientEvents.GuildScheduledEventUserRemove]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
 	[ClientEvents.AutoModerationActionExecution]: [payload: AutoModerationActionExecutionPayload];
+
+	[ClientEvents.IntegrationCreate]: [integration: Integration];
+	[ClientEvents.IntegrationUpdate]: [oldIntegration: Integration | undefined, newIntegration: Integration];
+	[ClientEvents.IntegrationDelete]: [integration: Integration | { id: string }, guild: Guild, applicationId?: string];
+	[ClientEvents.GuildIntegrationsUpdate]: [guild: Guild];
 
 	[ClientEvents.MessageCreate]: [message: Message];
 	[ClientEvents.MessageUpdate]: [message: Message];
