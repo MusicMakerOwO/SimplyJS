@@ -1,6 +1,7 @@
 import { DiscordChannel, DiscordThreadMember, DiscordThreadMetadata, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { Messageable } from "../../Mixins/Channels/Messageable.js";
+import { ThreadMemberCache } from "../../Managers/ThreadMembers.js";
 
 /**
  * A thread channel (public, private, or announcement). Threads inherit permission overwrites
@@ -31,17 +32,26 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 	/** Ids of the forum/media tags applied to this thread */
 	declare appliedTags?: string[]
 	declare rateLimitPerUser?: number
+	/**
+	 * Cache of the users who have joined this thread, keyed by user id. Assigned on first
+	 * `patch()` rather than by a field initializer - see the note above on `declare`.
+	 */
+	declare members: ThreadMemberCache
 	// no permissionOverwrites - threads inherit from parent
 
 	patch(data: DiscordChannel): void {
 		super.patch(data);
+		this.members ??= new ThreadMemberCache(this.client, this.guild, this);
 		if (data.owner_id !== undefined) this.ownerId = data.owner_id;
 		if (data.parent_id !== undefined) this.parentId = data.parent_id;
 		if (data.last_message_id !== undefined) this.lastMessageId = data.last_message_id;
 		if (data.message_count !== undefined) this.messageCount = data.message_count;
 		if (data.member_count !== undefined) this.memberCount = data.member_count;
 		if (data.thread_metadata !== undefined) this.threadMetadata = data.thread_metadata;
-		if (data.member !== undefined) this.member = data.member;
+		if (data.member !== undefined) {
+			this.member = data.member;
+			this.members.upsert(data.member);
+		}
 		if (data.total_message_sent !== undefined) this.totalMessageSent = data.total_message_sent;
 		if (data.applied_tags !== undefined) this.appliedTags = data.applied_tags;
 		if (data.rate_limit_per_user !== undefined) this.rateLimitPerUser = data.rate_limit_per_user;
