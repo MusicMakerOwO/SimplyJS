@@ -15,11 +15,19 @@ import {
 	DiscordGuildScheduledEventStatus,
 	DiscordMember,
 	DiscordRole,
+	DiscordThreadMember,
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { ChannelCreate, ChannelDelete, ChannelPinsUpdate, ChannelUpdate } from "../Events/Channels.js";
-import { ThreadCreate, ThreadDelete, ThreadUpdate } from "../Events/Threads.js";
+import {
+	ThreadCreate,
+	ThreadDelete,
+	ThreadListSync,
+	ThreadMemberUpdate,
+	ThreadMembersUpdate,
+	ThreadUpdate
+} from "../Events/Threads.js";
 import { GuildCreate, GuildDelete } from "../Events/Guilds.js";
 import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
@@ -32,6 +40,7 @@ import { AutoModerationActionExecutionPayload, ClientEvents } from "../Types/Sim
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { Message } from "../Structures/Message.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
+import { ThreadMember } from "../Structures/ThreadMember.js";
 import {
 	AutoModerationActionExecution,
 	AutoModerationRuleCreate,
@@ -1541,5 +1550,212 @@ describe("PresenceUpdate gateway event handler", () => {
 
 		await expect(client.guilds.get("guild-1")!.presences.fetch("member-1"))
 			.rejects.toThrow("Presences are only delivered over the gateway");
+	});
+});
+
+describe("Thread membership gateway event handlers", () => {
+	function createThread(id = "thread-1", parentId = "channel-1", guildId = "guild-1"): DiscordChannel {
+		return {
+			id,
+			type: DiscordChannelTypes.PUBLIC_THREAD,
+			guild_id: guildId,
+			parent_id: parentId,
+			name: "help-thread",
+			owner_id: "user-1",
+			member_count: 1
+		};
+	}
+
+	function createThreadMember(userId = "member-1", threadId = "thread-1"): DiscordThreadMember {
+		return {
+			id: threadId,
+			user_id: userId,
+			join_timestamp: "2024-01-01T00:00:00.000Z",
+			flags: 0
+		};
+	}
+
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers
+		});
+		await GuildCreate.handler(client, createGuild());
+		await ThreadCreate.handler(client, createThread());
+		return client;
+	}
+
+	function threadOf(client: Client, id = "thread-1"): GuildThreadChannel {
+		return client.guilds.get("guild-1")!.channels.get(id) as GuildThreadChannel;
+	}
+
+	it("ThreadMemberUpdate caches the membership and emits it", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadMemberUpdate.handler(client, { ...createThreadMember(), guild_id: "guild-1" });
+
+		const cached = threadOf(client).members.get("member-1");
+		expect(cached).toBeInstanceOf(ThreadMember);
+		expect(cached!.id).toBe("thread-1");
+		expect(cached!.userId).toBe("member-1");
+		expect(cached!.joinedAt).toEqual(new Date("2024-01-01T00:00:00.000Z"));
+		expect(cached!.thread).toBe(threadOf(client));
+		expect(threadOf(client).member?.user_id).toBe("member-1");
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadMemberUpdate, cached);
+	});
+
+	it("ThreadMemberUpdate patches the existing instance in place", async () => {
+		const client = await seededClient();
+		await ThreadMemberUpdate.handler(client, { ...createThreadMember(), guild_id: "guild-1" });
+		const first = threadOf(client).members.get("member-1")!;
+
+		await ThreadMemberUpdate.handler(client, { ...createThreadMember(), flags: 4, guild_id: "guild-1" });
+
+		expect(threadOf(client).members.get("member-1")).toBe(first);
+		expect(threadOf(client).members.size).toBe(1);
+		expect(first.flags).toBe(4);
+	});
+
+	it("ThreadMembersUpdate adds members, resolves their guild member, and updates the count", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadMembersUpdate.handler(client, {
+			id: "thread-1",
+			guild_id: "guild-1",
+			member_count: 3,
+			added_members: [
+				{ ...createThreadMember("member-1"), member: createMember("member-1") },
+				createThreadMember("member-2")
+			]
+		});
+
+		const thread = threadOf(client);
+		expect(thread.memberCount).toBe(3);
+		expect([...thread.members.keys()]).toEqual(["member-1", "member-2"]);
+		expect(thread.members.get("member-1")!.member).toBe(client.guilds.get("guild-1")!.members.get("member-1"));
+		expect(thread.members.get("member-2")!.member).toBeUndefined();
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadMembersUpdate, {
+			guild: client.guilds.get("guild-1"),
+			thread: thread,
+			memberCount: 3,
+			added: [thread.members.get("member-1"), thread.members.get("member-2")],
+			removed: []
+		});
+	});
+
+	it("ThreadMembersUpdate evicts removed members and reports their ids", async () => {
+		const client = await seededClient();
+		await ThreadMembersUpdate.handler(client, {
+			id: "thread-1",
+			guild_id: "guild-1",
+			member_count: 2,
+			added_members: [createThreadMember("member-1"), createThreadMember("member-2")]
+		});
+
+		const emitSpy = vi.spyOn(client, "emit");
+		await ThreadMembersUpdate.handler(client, {
+			id: "thread-1",
+			guild_id: "guild-1",
+			member_count: 1,
+			removed_member_ids: ["member-2"]
+		});
+
+		const thread = threadOf(client);
+		expect(thread.members.has("member-2")).toBe(false);
+		expect(thread.members.has("member-1")).toBe(true);
+		expect(thread.memberCount).toBe(1);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadMembersUpdate, expect.objectContaining({
+			added: [],
+			removed: ["member-2"]
+		}));
+	});
+
+	it("ThreadListSync caches the synced threads and their members", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadListSync.handler(client, {
+			guild_id: "guild-1",
+			channel_ids: ["channel-1"],
+			threads: [createThread("thread-1"), createThread("thread-2")],
+			members: [createThreadMember("member-1", "thread-2")]
+		});
+
+		const channels = client.guilds.get("guild-1")!.channels;
+		expect(channels.has("thread-2")).toBe(true);
+		expect(threadOf(client, "thread-2").members.get("member-1")!.userId).toBe("member-1");
+		expect(threadOf(client, "thread-1").members.size).toBe(0);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadListSync, {
+			guild: client.guilds.get("guild-1"),
+			threads: [threadOf(client, "thread-1"), threadOf(client, "thread-2")],
+			evicted: []
+		});
+	});
+
+	it("ThreadListSync evicts stale threads under the synced channels only", async () => {
+		const client = await seededClient();
+		await ThreadCreate.handler(client, createThread("thread-stale", "channel-1"));
+		await ThreadCreate.handler(client, createThread("thread-elsewhere", "channel-2"));
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadListSync.handler(client, {
+			guild_id: "guild-1",
+			channel_ids: ["channel-1"],
+			threads: [createThread("thread-1")],
+			members: []
+		});
+
+		const channels = client.guilds.get("guild-1")!.channels;
+		expect(channels.has("thread-stale")).toBe(false);
+		expect(channels.has("thread-elsewhere")).toBe(true);
+		expect(channels.has("thread-1")).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadListSync, expect.objectContaining({
+			evicted: ["thread-stale"]
+		}));
+	});
+
+	it("ThreadListSync without channel_ids syncs the whole guild", async () => {
+		const client = await seededClient();
+		await ThreadCreate.handler(client, createThread("thread-elsewhere", "channel-2"));
+
+		await ThreadListSync.handler(client, {
+			guild_id: "guild-1",
+			threads: [createThread("thread-1")],
+			members: []
+		});
+
+		const channels = client.guilds.get("guild-1")!.channels;
+		expect(channels.has("thread-elsewhere")).toBe(false);
+		expect(channels.has("thread-1")).toBe(true);
+	});
+
+	it("ThreadListSync leaves non-thread channels alone", async () => {
+		const client = await seededClient();
+		await ChannelCreate.handler(client, createChannel("channel-1"));
+
+		await ThreadListSync.handler(client, {
+			guild_id: "guild-1",
+			threads: [],
+			members: []
+		});
+
+		expect(client.guilds.get("guild-1")!.channels.has("channel-1")).toBe(true);
+	});
+
+	it("all three handlers no-op on an uncached guild or thread", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadMemberUpdate.handler(client, { ...createThreadMember(), guild_id: "guild-missing" });
+		await ThreadMembersUpdate.handler(client, { id: "thread-1", guild_id: "guild-missing", member_count: 1 });
+		await ThreadListSync.handler(client, { guild_id: "guild-missing", threads: [], members: [] });
+
+		await ThreadMemberUpdate.handler(client, { ...createThreadMember("member-1", "thread-missing"), guild_id: "guild-1" });
+		await ThreadMembersUpdate.handler(client, { id: "thread-missing", guild_id: "guild-1", member_count: 1 });
+
+		expect(emitSpy).not.toHaveBeenCalled();
+		expect(threadOf(client).members.size).toBe(0);
 	});
 });
