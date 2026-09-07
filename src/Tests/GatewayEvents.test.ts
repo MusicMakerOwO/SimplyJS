@@ -50,6 +50,7 @@ import {
 import { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import { ReactionRemoveAll, ReactionRemoveEmoji } from "../Events/Reactions.js";
 import { WebhooksUpdate } from "../Events/Webhooks.js";
+import { MessagePollVoteAdd, MessagePollVoteRemove } from "../Events/Polls.js";
 import { PresenceUpdate } from "../Events/Presence.js";
 import { Presence } from "../Structures/Presence.js";
 import { ActivityType, DiscordActivity, DiscordPresence, Status } from "../Types/DiscordAPITypes.js";
@@ -1840,3 +1841,99 @@ describe("Thread membership gateway event handlers", () => {
 	});
 });
 
+describe("Poll vote gateway event handlers", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMessagePolls
+		});
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		return client;
+	}
+
+	it("MessagePollVoteAdd emits with the cached guild, channel, and user", async () => {
+		const client = await seededClient();
+		const user = client.users.upsert(createUser());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessagePollVoteAdd.handler(client, {
+			user_id: "user-1",
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-1",
+			answer_id: 2
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessagePollVoteAdd, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			user: user,
+			messageId: "message-1",
+			answerId: 2
+		});
+	});
+
+	it("MessagePollVoteRemove emits with the cached guild, channel, and user", async () => {
+		const client = await seededClient();
+		const user = client.users.upsert(createUser());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessagePollVoteRemove.handler(client, {
+			user_id: "user-1",
+			channel_id: "channel-1",
+			message_id: "message-1",
+			guild_id: "guild-1",
+			answer_id: 2
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessagePollVoteRemove, {
+			guild: client.guilds.get("guild-1"),
+			channel: client.guilds.get("guild-1")!.channels.get("channel-1"),
+			user: user,
+			messageId: "message-1",
+			answerId: 2
+		});
+	});
+
+	it("falls back to bare ids for an uncached guild, channel, and user", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildMessagePolls });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessagePollVoteAdd.handler(client, {
+			user_id: "user-missing",
+			channel_id: "channel-missing",
+			message_id: "message-1",
+			guild_id: "guild-missing",
+			answer_id: 1
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessagePollVoteAdd, {
+			guild: { id: "guild-missing" },
+			channel: { id: "channel-missing" },
+			user: { id: "user-missing" },
+			messageId: "message-1",
+			answerId: 1
+		});
+	});
+
+	it("emits a null guild for a poll vote in a DM", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessagePollVoteRemove.handler(client, {
+			user_id: "user-1",
+			channel_id: "dm-channel-1",
+			message_id: "message-1",
+			answer_id: 1
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessagePollVoteRemove, {
+			guild: null,
+			channel: { id: "dm-channel-1" },
+			user: { id: "user-1" },
+			messageId: "message-1",
+			answerId: 1
+		});
+	});
+});
