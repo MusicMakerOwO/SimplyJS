@@ -62,6 +62,14 @@ import {
 	GuildScheduledEventUserRemove
 } from "../Events/GuildScheduledEvents.js";
 import { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
+import {
+	GuildIntegrationsUpdate,
+	IntegrationCreate,
+	IntegrationDelete,
+	IntegrationUpdate
+} from "../Events/Integrations.js";
+import { Integration } from "../Structures/Integration.js";
+import { DiscordIntegrationCreate, DiscordIntegrationExpireBehaviors } from "../Types/DiscordAPITypes.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -129,6 +137,26 @@ function createScheduledEvent(id = "scheduled-event-1", guildId = "guild-1"): Di
 		entity_id: null,
 		entity_metadata: null,
 		recurrence_rule: null
+	};
+}
+
+function createIntegration(id = "integration-1", guildId = "guild-1"): DiscordIntegrationCreate {
+	return {
+		id,
+		guild_id: guildId,
+		name: "Cool Streamer",
+		type: "twitch",
+		enabled: true,
+		account: { id: "twitch-1", name: "coolstreamer" },
+		syncing: false,
+		role_id: "role-1",
+		enable_emoticons: true,
+		expire_behavior: DiscordIntegrationExpireBehaviors.REMOVE_ROLE,
+		expire_grace_period: 7,
+		user: createUser(),
+		synced_at: "2024-01-01T00:00:00.000Z",
+		subscriber_count: 3,
+		revoked: false
 	};
 }
 
@@ -1935,5 +1963,145 @@ describe("Poll vote gateway event handlers", () => {
 			messageId: "message-1",
 			answerId: 1
 		});
+	});
+});
+
+describe("Integration gateway event handlers", () => {
+	async function seededClient(): Promise<Client> {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildIntegrations
+		});
+		await GuildCreate.handler(client, createGuild());
+		return client;
+	}
+
+	it("IntegrationCreate caches the integration on its guild and emits the structure", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationCreate.handler(client, createIntegration());
+
+		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1");
+		expect(cached).toBeInstanceOf(Integration);
+		expect(cached!.name).toBe("Cool Streamer");
+		expect(cached!.type).toBe("twitch");
+		expect(cached!.guildId).toBe("guild-1");
+		expect(cached!.expireBehavior).toBe(DiscordIntegrationExpireBehaviors.REMOVE_ROLE);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationCreate, cached);
+	});
+
+	it("IntegrationUpdate patches the cached instance in place", async () => {
+		const client = await seededClient();
+		await IntegrationCreate.handler(client, createIntegration());
+		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationUpdate.handler(client, {
+			...createIntegration(),
+			enabled: false,
+			subscriber_count: 42
+		});
+
+		const updated = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
+		expect(updated).toBe(cached);
+		expect(updated.enabled).toBe(false);
+		expect(updated.subscriberCount).toBe(42);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationUpdate, cached, updated);
+	});
+
+	it("IntegrationUpdate emits an undefined old integration when it was not cached", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationUpdate.handler(client, createIntegration());
+
+		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationUpdate, undefined, cached);
+	});
+
+	it("IntegrationDelete emits the cached integration with its guild and drops it from the cache", async () => {
+		const client = await seededClient();
+		await IntegrationCreate.handler(client, createIntegration());
+		const guild = client.guilds.get("guild-1")!;
+		const cached = guild.integrations.get("integration-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationDelete.handler(client, {
+			id: "integration-1",
+			guild_id: "guild-1",
+			application_id: "application-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, cached, guild, "application-1");
+		expect(guild.integrations.size).toBe(0);
+	});
+
+	it("IntegrationDelete falls back to a bare id for an uncached integration", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationDelete.handler(client, { id: "integration-1", guild_id: "guild-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, { id: "integration-1" }, guild, undefined);
+	});
+
+	it("GuildIntegrationsUpdate emits the guild the change happened in", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildIntegrationsUpdate.handler(client, { guild_id: "guild-1" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildIntegrationsUpdate, guild);
+	});
+
+	it("ignores every integration event for an uncached guild", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await IntegrationCreate.handler(client, createIntegration("integration-1", "guild-missing"));
+		await IntegrationUpdate.handler(client, createIntegration("integration-1", "guild-missing"));
+		await IntegrationDelete.handler(client, { id: "integration-1", guild_id: "guild-missing" });
+		await GuildIntegrationsUpdate.handler(client, { guild_id: "guild-missing" });
+
+		expect(emitSpy).not.toHaveBeenCalled();
+	});
+
+	it("leaves the subscriber fields undefined for a bot integration", async () => {
+		const client = await seededClient();
+
+		await IntegrationCreate.handler(client, {
+			id: "integration-2",
+			guild_id: "guild-1",
+			name: "Helper Bot",
+			type: "discord",
+			enabled: true,
+			account: { id: "application-1", name: "Helper Bot" },
+			application: {
+				id: "application-1",
+				name: "Helper Bot",
+				icon: null,
+				description: "Helps"
+			}
+		});
+
+		const cached = client.guilds.get("guild-1")!.integrations.get("integration-2")!;
+		expect(cached.syncing).toBeUndefined();
+		expect(cached.roleId).toBeUndefined();
+		expect(cached.expireBehavior).toBeUndefined();
+		expect(cached.application!.id).toBe("application-1");
+		expect(cached.role).toBeUndefined();
+	});
+
+	it("resolves role from the guild role cache once the role is known", async () => {
+		const client = await seededClient();
+		await RoleCreate.handler(client, { guild_id: "guild-1", role: createRole() });
+
+		await IntegrationCreate.handler(client, createIntegration());
+
+		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
+		expect(cached.role).toBe(client.guilds.get("guild-1")!.roles.get("role-1"));
 	});
 });
