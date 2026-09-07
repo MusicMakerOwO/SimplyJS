@@ -1,52 +1,104 @@
 # TODO
 
+## Pre-beta blockers
+
+Everything here adds *new public surface*. Landing it after the beta tag means either a semver
+break or living with the gap for a full major cycle, so it goes in first.
+
+- [ ] Multipart / file upload support in `src/Rest.ts`
+  - `#execute` hardcodes `Content-Type: application/json` and `body: JSON.stringify(data)`, so there is no code path that can send a file
+  - Blocks: message attachments, emoji/sticker/soundboard uploads from a file (`modify()` currently only accepts a pre-encoded data URI), guild icon/banner uploads, and the `attachment://` references that `FileComponent` and `MediaGallery` require
+  - Needs a `files` field on `MessagePayload` and a `payload_json` + `FormData` branch when files are present
+- [ ] Message fetching
+  - There is no `GET /channels/{id}/messages` or `GET /channels/{id}/messages/{id}` anywhere; no `channel.messages` manager exists
+  - Send, edit, delete, pin, and react all work, but a message cannot be read back by ID and history cannot be paged
+  - Wants a message manager mirroring the other caches, with `fetch(id)` and a list form taking `before`/`after`/`around`/`limit`
+- [ ] Member list fetching + `REQUEST_GUILD_MEMBERS`
+  - `Members.fetch()` only does single-member GETs; there is no `GET /guilds/{id}/members` list and no member search
+  - `GatewayOpCodes.RequestGuildMembers` (op 8) is defined but never sent, and `GUILD_MEMBERS_CHUNK` is not modeled in `GatewayEvents` or handled
+  - Without both, a guild's member cache can never be populated
+- [ ] Sharding
+  - `#handleHello` sends `Identify` with no `shard` array and there is no shard manager, so the library hard-stops at the ~2500 guild boundary
+  - `GatewayCloseCodes.ShardingRequired` is correctly treated as fatal, which makes the ceiling a clean failure rather than a silent one - but it is still a ceiling
+  - Likely reshapes `Client` / `WSClient` construction, which is exactly why it belongs before the API freezes
+
 ## Active backlog
 
-- [x] Interaction collectors (buttons, select menus, modals)
-- [x] Slash command builder and all the options
-- [x] `client.registerCommands(...)`
-- [x] Create a mixin system for channel class inheritance
-- [x] Start planning mixins for interactions
-- [x] Add component and interaction payload support
-	- Define interaction structures in `src/Structures/` (InteractionMessage, InteractionCommandOption, etc.)
-	- Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
-	- Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
-- [x] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
-- [x] Add collectors, name pending
-  - Temporary filtered event listeners that await matching events over a time period and auto-cleanup
-  - Useful for interactions like "wait for the next message from this user"
-  - `createCollector()` / `awaitEvent()` in `src/Collector.ts`, with `Client`/`WSClient` overloads for argument inference
-- [x] Add examples showcasing interactions
-  - [x] Creating/Registering commands
-  - [x] Responding to commands
-  - [x] Responding to other components (buttons, select menus, modals)
-  - [x] Using an interaction handler
-  - [x] Introduce the idea of button args
-    - split `interaction.customId` on `_`
-    - Allows for state management on buttons themselves, without collectors
-  - [x] Introduce collectors
-     - BE SURE TO WARN THAT COLLECTORS DO NOT PERSIST AFTER RESTART. This is the #1 trouble point for beginners, they assume the button will always exist. This is the point of handlers and button args, they are permanant due to attached to the button directly
-     - Pagination is a great example
-     - `examples/14-collectors` covers this
+### Components v2
 
+All component types are already modeled in `src/Types/Components.ts` and the message flag exists as
+`MessageFlags.IS_COMPONENTS_V2`. What is missing is the builder + send plumbing. `LabelBuilder`
+(type 18, modal-only) is already written and exported, so it is not listed below.
+
+Each builder follows the existing house pattern - a class implementing its own payload type, with
+`from()`, chainable setters, and a `validate()` that throws on Discord's constraints.
+
+#### Builders
+
+- [ ] `TextDisplayBuilder` - `TEXT_DISPLAY` (10)
+  - Single `content` field, supports markdown/mentions/emoji
+  - `content` counts toward the message's 4000-character v2 budget
+  - Worth doing first: `Section` and `Container` both take these as children, so the others can be tested against it
+- [ ] `ThumbnailBuilder` - `THUMBNAIL` (11)
+  - `media` (`UnfurledMediaItem`), optional `description` (max 1024) and `spoiler`
+  - Only valid as a `Section` accessory - `validate()` cannot catch misuse on its own, so the check belongs in `SectionBuilder`
+  - Image, gif, and animated webp media only
+- [ ] `SectionBuilder` - `SECTION` (9)
+  - `components` must be 1-3 `TextDisplay`s, and `accessory` is required (a `Button` or `Thumbnail`)
+  - Both bounds and the required accessory are `validate()` cases
+- [ ] `MediaGalleryBuilder` - `MEDIA_GALLERY` (12)
+  - `items` must be 1-10 `MediaGalleryItem`s, each with `media` plus optional `description` (max 1024) and `spoiler`
+  - Wants an `addItem()` / `addItems()` pair rather than only a bulk setter
+- [ ] `FileBuilder` - `FILE` (13)
+  - `file` (`UnfurledMediaItem`) plus optional `spoiler`
+  - `name` and `size` are response-only - Discord populates them, so they should not be settable
+  - Blocked in practice by multipart upload; only accepts `attachment://<filename>` references
+- [ ] `SeparatorBuilder` - `SEPARATOR` (14)
+  - Optional `divider` (defaults true) and `spacing` (`SeparatorSpacingSizes`, defaults `SMALL`)
+  - No required fields, so this is the cheapest one to land
+- [ ] `ContainerBuilder` - `CONTAINER` (17)
+  - `components` accepts `ActionRow`, `TextDisplay`, `Section`, `MediaGallery`, `FileComponent`, `Separator` - but not another `Container`
+  - Optional `accent_color` (nullable) and `spoiler`
+  - Do this last; it is the only nesting component and is easiest to test once the children exist
+
+#### Plumbing
+
+- [ ] Export the new builders from `src/Builders/index.ts`
+- [ ] Set `IS_COMPONENTS_V2` on the send path when a payload contains v2 components
+- [ ] Reject the v1/v2 mixing cases Discord rejects (`content`/`embeds` alongside v2 components)
+- [ ] Enforce the message-wide v2 limits (40 components total, 4000 characters across all `TextDisplay`s)
+- Note: `FileComponent` and `MediaGallery` only accept `attachment://` references, so both stay
+  half-usable until multipart upload lands
+
+### Voice Chat
+
+Deferred to a later update - `VOICE_STATE_UPDATE`, `VOICE_CHANNEL_EFFECT_SEND`,
+`VOICE_CHANNEL_STATUS_UPDATE`, `VOICE_CHANNEL_START_TIME_UPDATE`, the stage instance events, and
+the `/stage-instances` REST resource all ride along with this.
+
+### Missing REST resources
+
+Whole resource categories with no coverage, roughly in order of how often a bot author would reach
+for them.
+
+- [ ] Webhooks
+  - `WEBHOOKS_UPDATE` is handled and `src/Rest.ts` already buckets webhook routes, but there is no `Webhook` structure or manager - no create, edit, delete, or execute
+  - The only `/webhooks/` routes in use are interaction followups
+- [ ] Thread creation
+  - Every thread *event* is handled and cached, but `POST /channels/{id}/threads`, `POST /channels/{id}/messages/{id}/threads`, and the archived-thread listing endpoints are all absent
+- [ ] Application resource
+  - `/applications/@me`, application-owned emojis, role connection metadata
+- [ ] Monetization
+  - Entitlements, SKUs, and subscriptions - no REST and no events
+  - `BaseInteraction.entitlements` is still typed `JSONObject[]`, and `SKUButtonBuilder` can produce a purchase button whose result the library cannot observe
+- [ ] Poll endpoints
+  - `Message.poll` is read-only; no answer-voters fetch and no expire endpoint
+- [ ] Guild extras
+  - Onboarding, welcome screen, templates, widget, prune, vanity URL, MFA level, guild preview, `/sticker-packs`
+- [ ] Announcement channel follow (`POST /channels/{id}/followers`)
+- [ ] Application command permission endpoints
 
 ### Quality of Life
-- [x] Harden gateway reconnect/session handling in `src/WSClient.ts`
-  - Handle `GatewayOpCodes.Reconnect` and `GatewayOpCodes.InvalidSession` with resume/identify flow
-  - Track and reuse `session_id` / `resume_gateway_url` from READY
-  - Track and clear heartbeat timers on close/destroy
-  - Emit/handle heartbeat ACK state and add ACK timeout detection
-- [x] Add reconnect policy controls in `src/Client.ts` + `src/WSClient.ts`
-  - [x] Include close-code aware backoff, max retries, and clear terminal failure state
-- [ ] Add more examples
-  - [x] Sending a direct message to a user
-  - [x] Sending a message in a guild channel
-  - [x] Replying to a message, with and without pinging the author
-  - [x] Building and sending an embed with `EmbedBuilder`
-  - [ ] Reacting to a message and demonstrating emoji handling
-  - [x] Fetching guilds, users, channels, and members from caches
-  - [x] Basic moderation example using member actions (`timeout`, `kick`, `ban`)
-  - [ ] Event logging example that prints a few common gateway events
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
 
@@ -57,21 +109,16 @@
   - invalid session resume-vs-identify branching
   - heartbeat ACK timeout + timer cleanup on close/destroy
   - session_id and resume_gateway_url tracking
-- [x] `src/Tests/Rest.test.ts`
-  - [x] 429 retry using JSON body `retry_after`
-  - [x] 429 retry using rate-limit headers
-  - [x] transient 5xx retry policy and terminal failure behavior
-  - [x] pre-emptive backoff on an exhausted bucket, per-bucket request serialization, global limits
 - [ ] `src/Tests/CacheOperations.test.ts`
   - Guild cache upsert/fetch/update
   - User cache upsert/fetch/update
   - Guild-scoped cache interactions (Channels, Roles, Members, Stickers, Emojis)
-- [x] Test ReactionAdd and ReactionRemove event handlers
 
 ## Further planning
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
-  - Current gaps: VoiceStateUpdate, stage instances, voice channel effects, and many others
+  - Voice, stage instance, and voice channel effect events are deliberately deferred with the Voice Chat work
+  - The non-voice gaps are the `❌ not modeled` rows in the status table below - `USER_UPDATE` and `GUILD_MEMBERS_CHUNK` are the two that affect ordinary bots
 - [ ] Give the remaining `*Update` handlers a real "old" value
   - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
   - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
@@ -87,73 +134,98 @@
 
 ## Discord gateway event implementation status
 
-| Discord event                     | Implemented |
-|-----------------------------------|-------------|
-| READY                             | ✅          |
-| GUILD_CREATE                      | ✅          |
-| GUILD_UPDATE                      | ✅          |
-| GUILD_DELETE                      | ✅          |
-| GUILD_ROLE_CREATE                 | ✅          |
-| GUILD_ROLE_UPDATE                 | ✅          |
-| GUILD_ROLE_DELETE                 | ✅          |
-| CHANNEL_CREATE                    | ✅          |
-| CHANNEL_UPDATE                    | ✅          |
-| CHANNEL_DELETE                    | ✅          |
-| CHANNEL_PINS_UPDATE               | ✅          |
-| THREAD_CREATE                     | ✅          |
-| THREAD_UPDATE                     | ✅          |
-| THREAD_DELETE                     | ✅          |
-| THREAD_LIST_SYNC                  | ✅          |
-| THREAD_MEMBER_UPDATE              | ✅          |
-| THREAD_MEMBERS_UPDATE             | ✅          |
-| STAGE_INSTANCE_CREATE             | ❌          |
-| STAGE_INSTANCE_UPDATE             | ❌          |
-| STAGE_INSTANCE_DELETE             | ❌          |
-| VOICE_CHANNEL_STATUS_UPDATE       | ❌          |
-| VOICE_CHANNEL_START_TIME_UPDATE   | ❌          |
-| GUILD_MEMBER_ADD                  | ✅          |
-| GUILD_MEMBER_UPDATE               | ✅          |
-| GUILD_MEMBER_REMOVE               | ✅          |
-| GUILD_AUDIT_LOG_ENTRY_CREATE      | ✅          |
-| GUILD_BAN_ADD                     | ✅          |
-| GUILD_BAN_REMOVE                  | ✅          |
-| GUILD_EMOJIS_UPDATE               | ✅          |
-| GUILD_STICKERS_UPDATE             | ✅          |
-| GUILD_SOUNDBOARD_SOUND_CREATE     | ✅          |
-| GUILD_SOUNDBOARD_SOUND_UPDATE     | ✅          |
-| GUILD_SOUNDBOARD_SOUND_DELETE     | ✅          |
-| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ✅          |
-| GUILD_INTEGRATIONS_UPDATE         | ✅          |
-| INTEGRATION_CREATE                | ✅          |
-| INTEGRATION_UPDATE                | ✅          |
-| INTEGRATION_DELETE                | ✅          |
-| WEBHOOKS_UPDATE                   | ✅          |
-| INVITE_CREATE                     | ✅          |
-| INVITE_DELETE                     | ✅          |
-| VOICE_CHANNEL_EFFECT_SEND         | ❌          |
-| VOICE_STATE_UPDATE                | ❌          |
-| PRESENCE_UPDATE                   | ✅          |
-| MESSAGE_CREATE                    | ✅          |
-| MESSAGE_UPDATE                    | ✅          |
-| MESSAGE_DELETE                    | ✅          |
-| MESSAGE_DELETE_BULK               | ✅          |
-| MESSAGE_REACTION_ADD              | ✅          |
-| MESSAGE_REACTION_REMOVE           | ✅          |
-| MESSAGE_REACTION_REMOVE_ALL       | ✅          |
-| MESSAGE_REACTION_REMOVE_EMOJI     | ✅          |
-| TYPING_START                      | ✅          |
-| GUILD_SCHEDULED_EVENT_CREATE      | ✅          |
-| GUILD_SCHEDULED_EVENT_UPDATE      | ✅          |
-| GUILD_SCHEDULED_EVENT_DELETE      | ✅          |
-| GUILD_SCHEDULED_EVENT_USER_ADD    | ✅          |
-| GUILD_SCHEDULED_EVENT_USER_REMOVE | ✅          |
-| AUTO_MODERATION_RULE_CREATE       | ✅          |
-| AUTO_MODERATION_RULE_UPDATE       | ✅          |
-| AUTO_MODERATION_RULE_DELETE       | ✅          |
-| AUTO_MODERATION_ACTION_EXECUTION  | ✅          |
-| MESSAGE_POLL_VOTE_ADD             | ✅          |
-| MESSAGE_POLL_VOTE_REMOVE          | ✅          |
-| INTERACTION_CREATE                | ✅          |
+This table previously listed only events already present in `GatewayEvents`, which made anything
+*not* modeled invisible. The rows below now include events missing from `src/Types/DiscordGateway.ts`
+entirely, so the gaps are visible rather than implied.
+
+Legend:
+- ✅ handler implemented and exported from `src/Events/index.ts`
+- ❌ modeled in `GatewayEvents`, no handler yet
+- ⬜ not modeled at all - the type does not exist in `src/Types/DiscordGateway.ts`
+
+| Discord event                          | Implemented |
+|----------------------------------------|-------------|
+| READY                                  | ✅           |
+| RESUMED                                | ❌ [^3]      |
+| USER_UPDATE                            | ⬜ [^1]      |
+| GUILD_MEMBERS_CHUNK                    | ⬜ [^2]      |
+| ENTITLEMENT_CREATE                     | ⬜           |
+| ENTITLEMENT_UPDATE                     | ⬜           |
+| ENTITLEMENT_DELETE                     | ⬜           |
+| SUBSCRIPTION_CREATE                    | ⬜           |
+| SUBSCRIPTION_UPDATE                    | ⬜           |
+| SUBSCRIPTION_DELETE                    | ⬜           |
+| APPLICATION_COMMAND_PERMISSIONS_UPDATE | ⬜           |
+| GUILD_CREATE                           | ✅           |
+| GUILD_UPDATE                           | ✅           |
+| GUILD_DELETE                           | ✅           |
+| GUILD_ROLE_CREATE                      | ✅           |
+| GUILD_ROLE_UPDATE                      | ✅           |
+| GUILD_ROLE_DELETE                      | ✅           |
+| CHANNEL_CREATE                         | ✅           |
+| CHANNEL_UPDATE                         | ✅           |
+| CHANNEL_DELETE                         | ✅           |
+| CHANNEL_PINS_UPDATE                    | ✅           |
+| THREAD_CREATE                          | ✅           |
+| THREAD_UPDATE                          | ✅           |
+| THREAD_DELETE                          | ✅           |
+| THREAD_LIST_SYNC                       | ✅           |
+| THREAD_MEMBER_UPDATE                   | ✅           |
+| THREAD_MEMBERS_UPDATE                  | ✅           |
+| STAGE_INSTANCE_CREATE                  | ❌           |
+| STAGE_INSTANCE_UPDATE                  | ❌           |
+| STAGE_INSTANCE_DELETE                  | ❌           |
+| VOICE_CHANNEL_STATUS_UPDATE            | ❌           |
+| VOICE_CHANNEL_START_TIME_UPDATE        | ❌           |
+| GUILD_MEMBER_ADD                       | ✅           |
+| GUILD_MEMBER_UPDATE                    | ✅           |
+| GUILD_MEMBER_REMOVE                    | ✅           |
+| GUILD_AUDIT_LOG_ENTRY_CREATE           | ✅           |
+| GUILD_BAN_ADD                          | ✅           |
+| GUILD_BAN_REMOVE                       | ✅           |
+| GUILD_EMOJIS_UPDATE                    | ✅           |
+| GUILD_STICKERS_UPDATE                  | ✅           |
+| GUILD_SOUNDBOARD_SOUND_CREATE          | ✅           |
+| GUILD_SOUNDBOARD_SOUND_UPDATE          | ✅           |
+| GUILD_SOUNDBOARD_SOUND_DELETE          | ✅           |
+| GUILD_SOUNDBOARD_SOUNDS_UPDATE         | ✅           |
+| GUILD_INTEGRATIONS_UPDATE              | ✅           |
+| INTEGRATION_CREATE                     | ✅           |
+| INTEGRATION_UPDATE                     | ✅           |
+| INTEGRATION_DELETE                     | ✅           |
+| WEBHOOKS_UPDATE                        | ✅           |
+| INVITE_CREATE                          | ✅           |
+| INVITE_DELETE                          | ✅           |
+| VOICE_CHANNEL_EFFECT_SEND              | ❌           |
+| VOICE_STATE_UPDATE                     | ❌           |
+| PRESENCE_UPDATE                        | ✅           |
+| MESSAGE_CREATE                         | ✅           |
+| MESSAGE_UPDATE                         | ✅           |
+| MESSAGE_DELETE                         | ✅           |
+| MESSAGE_DELETE_BULK                    | ✅           |
+| MESSAGE_REACTION_ADD                   | ✅           |
+| MESSAGE_REACTION_REMOVE                | ✅           |
+| MESSAGE_REACTION_REMOVE_ALL            | ✅           |
+| MESSAGE_REACTION_REMOVE_EMOJI          | ✅           |
+| TYPING_START                           | ✅           |
+| GUILD_SCHEDULED_EVENT_CREATE           | ✅           |
+| GUILD_SCHEDULED_EVENT_UPDATE           | ✅           |
+| GUILD_SCHEDULED_EVENT_DELETE           | ✅           |
+| GUILD_SCHEDULED_EVENT_USER_ADD         | ✅           |
+| GUILD_SCHEDULED_EVENT_USER_REMOVE      | ✅           |
+| AUTO_MODERATION_RULE_CREATE            | ✅           |
+| AUTO_MODERATION_RULE_UPDATE            | ✅           |
+| AUTO_MODERATION_RULE_DELETE            | ✅           |
+| AUTO_MODERATION_ACTION_EXECUTION       | ✅           |
+| MESSAGE_POLL_VOTE_ADD                  | ✅           |
+| MESSAGE_POLL_VOTE_REMOVE               | ✅           |
+| INTERACTION_CREATE                     | ✅           |
+
+[^1]: The client's own user goes stale after an app edit, since nothing refreshes `client.user`.
+
+[^2]: See the member fetching entry under "Pre-beta blockers" - the chunk event and the op 8 request that triggers it have to land together.
+
+[^3]: Present in `GatewayEvents` but no handler is exported from `src/Events/index.ts`.
 
 ## Completed (verified in current codebase)
 
@@ -264,3 +336,31 @@
 			- Return all invites if no code provided
 			- Additional data is returned if bot has `MANAGE_GUILD` permission
 			- https://docs.discord.com/developers/resources/invite#invite-metadata-object
+
+## Interactions
+- [x] Interaction collectors (buttons, select menus, modals)
+- [x] Slash command builder and all the options
+- [x] `client.registerCommands(...)`
+- [x] Create a mixin system for channel class inheritance
+- [x] Start planning mixins for interactions
+- [x] Add component and interaction payload support
+	- Define interaction structures in `src/Structures/` (InteractionMessage, InteractionCommandOption, etc.)
+	- Add `ButtonBuilder`, `SelectMenuBuilder`, `ModalBuilder` in `src/Builders/`
+	- Update `src/Types/MessageComponents.ts` to structured types for interactions instead of JSONObject
+- [x] Add interadtion options for slash commands (ie `Interaction.options.getUser(name)`)
+- [x] Add collectors, name pending
+  - Temporary filtered event listeners that await matching events over a time period and auto-cleanup
+  - Useful for interactions like "wait for the next message from this user"
+  - `createCollector()` / `awaitEvent()` in `src/Collector.ts`, with `Client`/`WSClient` overloads for argument inference
+- [x] Add examples showcasing interactions
+  - [x] Creating/Registering commands
+  - [x] Responding to commands
+  - [x] Responding to other components (buttons, select menus, modals)
+  - [x] Using an interaction handler
+  - [x] Introduce the idea of button args
+    - split `interaction.customId` on `_`
+    - Allows for state management on buttons themselves, without collectors
+  - [x] Introduce collectors
+     - BE SURE TO WARN THAT COLLECTORS DO NOT PERSIST AFTER RESTART. This is the #1 trouble point for beginners, they assume the button will always exist. This is the point of handlers and button args, they are permanant due to attached to the button directly
+     - Pagination is a great example
+     - `examples/14-collectors` covers this
