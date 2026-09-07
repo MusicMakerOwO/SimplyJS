@@ -414,6 +414,19 @@ export const ClientEvents = {
 	 */
 	ReactionRemoveEmoji: "ReactionRemoveEmoji",
 
+	/**
+	 * Fired when a user votes on a poll.
+	 * Requires the `GuildMessagePolls` intent in guilds, or `DirectMessagePolls` in DMs.
+	 * Listener arguments: `payload`.
+	 */
+	MessagePollVoteAdd: "MessagePollVoteAdd",
+	/**
+	 * Fired when a user retracts a poll vote. Changing a vote in a single-select poll arrives as a
+	 * remove for the old answer followed by an add for the new one.
+	 * Requires the `GuildMessagePolls` intent in guilds, or `DirectMessagePolls` in DMs.
+	 * Listener arguments: `payload`.
+	 */
+	MessagePollVoteRemove: "MessagePollVoteRemove",
 
 	/**
 	 * Fired when a user's status or activities change. Requires the privileged `GuildPresences`
@@ -604,6 +617,24 @@ export type ClientEventMap = {
 		channel: Channel | { id: string },
 		messageId: string,
 		emoji: Pick<DiscordEmoji, 'id' | 'name' | 'animated'>
+	}];
+
+	[ClientEvents.MessagePollVoteAdd]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		user: User | { id: string },
+		messageId: string,
+		/** Id of the chosen answer, matching that answer's `answer_id` in the poll's `answers` array */
+		answerId: number
+	}];
+
+	[ClientEvents.MessagePollVoteRemove]: [payload: {
+		guild: Guild | { id: string } | null,
+		channel: Channel | { id: string },
+		user: User | { id: string },
+		messageId: string,
+		/** Id of the retracted answer, matching that answer's `answer_id` in the poll's `answers` array */
+		answerId: number
 	}];
 
 	[ClientEvents.PresenceUpdate]: [oldPresence: Presence | undefined, newPresence: Presence];
