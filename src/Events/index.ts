@@ -9,7 +9,14 @@
  */
 export { GuildCreate, GuildUpdate, GuildDelete } from "./Guilds.js";
 export { ChannelCreate, ChannelUpdate, ChannelDelete, ChannelPinsUpdate } from "./Channels.js";
-export { ThreadCreate, ThreadUpdate, ThreadDelete } from "./Threads.js";
+export {
+	ThreadCreate,
+	ThreadUpdate,
+	ThreadDelete,
+	ThreadMemberUpdate,
+	ThreadMembersUpdate,
+	ThreadListSync
+} from "./Threads.js";
 export { MemberCreate, MemberUpdate, MemberDelete } from "./Members.js";
 export { PresenceUpdate } from "./Presence.js";
 export { RoleCreate, RoleUpdate, RoleDelete } from "./Roles.js";

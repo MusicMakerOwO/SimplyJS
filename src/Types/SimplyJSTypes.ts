@@ -20,6 +20,7 @@ import type { Message } from "../Structures/Message.js";
 import type { Presence } from "../Structures/Presence.js";
 import type { Role } from "../Structures/Role.js";
 import type { Sticker } from "../Structures/Sticker.js";
+import type { ThreadMember } from "../Structures/ThreadMember.js";
 import type { User } from "../Structures/User.js";
 import { Emoji } from "../Structures/Emoji.js";
 import { BaseChannel } from "../Structures/Channels/BaseChannel.js";
@@ -132,6 +133,37 @@ export type AutoModerationActionExecutionPayload = {
 	matchedContent: string | null;
 };
 
+/**
+ * Payload for `ThreadMembersUpdate`; Discord sends a delta rather than the full member list, and
+ * caps `added` at 50 entries. Removals are ids only - the removed {@link ThreadMember} is already
+ * gone from `thread.members` by the time listeners run.
+ */
+export type ThreadMembersUpdatePayload = {
+	/** Guild the thread belongs to */
+	guild: Guild;
+	/** The thread whose membership changed */
+	thread: GuildThreadChannel;
+	/** Approximate number of members in the thread, capped at `50` by Discord */
+	memberCount: number;
+	/** Members that joined the thread; only populated with the privileged `GuildMembers` intent */
+	added: ThreadMember[];
+	/** Ids of the users that left the thread */
+	removed: string[];
+};
+
+/** Payload for `ThreadListSync`; the full set of active threads the client can see in a guild */
+export type ThreadListSyncPayload = {
+	/** Guild the threads belong to */
+	guild: Guild;
+	/** The synced threads, now cached in `guild.channels` */
+	threads: GuildThreadChannel[];
+	/**
+	 * Ids of the threads dropped from the cache because the sync did not list them - they were
+	 * archived or deleted while the client could not see them.
+	 */
+	evicted: string[];
+};
+
 export const ClientEvents = {
 	/**
 	 * Fired once the client is ready for normal use.
@@ -197,6 +229,25 @@ export const ClientEvents = {
 	 * Listener arguments: `thread` ({@link Channel} | {@link DiscordChannel}).
 	 */
 	ThreadDelete: "ThreadDelete",
+	/**
+	 * Fired when the current user's own thread membership changes, such as after joining a thread
+	 * or changing its notification settings. Only ever fires for the current user.
+	 * Listener arguments: `member` ({@link ThreadMember}).
+	 */
+	ThreadMemberUpdate: "ThreadMemberUpdate",
+	/**
+	 * Fired when users are added to or removed from a thread. Requires the privileged
+	 * `GuildMembers` intent to see anyone other than the current user.
+	 * Listener arguments: `payload` ({@link ThreadMembersUpdatePayload}).
+	 */
+	ThreadMembersUpdate: "ThreadMembersUpdate",
+	/**
+	 * Fired when the client gains access to threads it could not previously see, typically right
+	 * after joining a guild or a channel. Carries the full active thread list for the channels it
+	 * covers, so threads missing from it are dropped from the cache.
+	 * Listener arguments: `payload` ({@link ThreadListSyncPayload}).
+	 */
+	ThreadListSync: "ThreadListSync",
 
 	/**
 	 * Fired when a member joins a guild.
@@ -469,6 +520,9 @@ export type ClientEventMap = {
 	[ClientEvents.ThreadCreate]: [thread: Channel];
 	[ClientEvents.ThreadUpdate]: [oldThread: Channel | undefined, newThread: Channel];
 	[ClientEvents.ThreadDelete]: [thread: Channel | DiscordChannel];
+	[ClientEvents.ThreadMemberUpdate]: [member: ThreadMember];
+	[ClientEvents.ThreadMembersUpdate]: [payload: ThreadMembersUpdatePayload];
+	[ClientEvents.ThreadListSync]: [payload: ThreadListSyncPayload];
 
 	[ClientEvents.MemberCreate]: [member: Member];
 	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];
