@@ -1,12 +1,14 @@
 import { BaseChannel } from "../../Structures/Channels/BaseChannel.js";
-import { CreateMessagePayload, Message } from "../../Structures/Message.js";
+import { CreateMessagePayload, Message, SplitAttachments } from "../../Structures/Message.js";
 import { Constructor, MessagePayload } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
+import { MessageManager } from "../../Managers/Messages.js";
 
 /** A message, or the ID of one. */
 export type MessageResolvable = Message | Message['id'];
 
 type MessageableClass<T> = {
+	readonly messages: MessageManager;
 	send(content: string | MessagePayload): Promise<Message>;
 	deleteMessage(message: MessageResolvable, reason?: string): Promise<void>;
 	bulkDeleteMessages(messages: MessageResolvable[], reason?: string): Promise<string[]>;
@@ -29,14 +31,24 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 	Base: TBase,
 ): Constructor<MessageableClass<InstanceType<TBase>>> {
 	return class extends Base {
+		#messages?: MessageManager;
+
+		/**
+		 * This manager reads this channel's messages straight from the API; nothing is cached, since
+		 * a channel's message history is unbounded.
+		 */
+		get messages(): MessageManager {
+			return this.#messages ??= new MessageManager(this.client, this);
+		}
+
 		/**
 		 * Sends a message to this channel.
 		 * @param content Either plain text content or a full message payload.
 		 * @returns The created message.
 		 */
 		async send(content: string | MessagePayload): Promise<Message> {
-			const payload = CreateMessagePayload(content);
-			const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.id}/messages`, payload);
+			const { body, files } = SplitAttachments(CreateMessagePayload(content));
+			const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.id}/messages`, body, undefined, files);
 			return new Message(this.client, response);
 		}
 
