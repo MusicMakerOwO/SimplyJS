@@ -71,10 +71,13 @@
 ## Further planning
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
-  - Current gaps: VoiceStateUpdate, scheduled event subscribers (GUILD_SCHEDULED_EVENT_USER_ADD, GUILD_SCHEDULED_EVENT_USER_REMOVE), thread membership (THREAD_LIST_SYNC, THREAD_MEMBER_UPDATE, THREAD_MEMBERS_UPDATE), integrations, and many others
+  - Current gaps: VoiceStateUpdate, stage instances, voice channel effects, and many others
 - [ ] Give the remaining `*Update` handlers a real "old" value
   - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
   - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
+- [ ] Seed the active thread list from `GUILD_CREATE`
+  - Discord sends a `threads` array (every active thread the bot can see) in `GUILD_CREATE`, but `DiscordGuildCreate` (`src/Types/DiscordAPITypes.ts`) doesn't model it and `Guild.patch` doesn't read it, so `guild.channels` has no threads until a `THREAD_CREATE` or `THREAD_LIST_SYNC` arrives
+  - The same payload's thread `member` blobs would seed `thread.members` for the current user at the same time
 - [ ] Harden `User.patch` against partial user payloads
   - `src/Structures/User.ts` assigns `id`/`username`/`discriminator`/`global_name`/`avatar` unconditionally, so upserting a partial user (as `PRESENCE_UPDATE` sends) blanks those fields on an already-cached user. `PresenceUpdate` guards at the call site; guarding in `patch` would cover every future partial-user payload
   - Tradeoff: it weakens the "always set" invariant implied by the `!` definite-assignment markers on those fields
@@ -100,9 +103,9 @@
 | THREAD_CREATE                     | ✅          |
 | THREAD_UPDATE                     | ✅          |
 | THREAD_DELETE                     | ✅          |
-| THREAD_LIST_SYNC                  | ❌          |
-| THREAD_MEMBER_UPDATE              | ❌          |
-| THREAD_MEMBERS_UPDATE             | ❌          |
+| THREAD_LIST_SYNC                  | ✅          |
+| THREAD_MEMBER_UPDATE              | ✅          |
+| THREAD_MEMBERS_UPDATE             | ✅          |
 | STAGE_INSTANCE_CREATE             | ❌          |
 | STAGE_INSTANCE_UPDATE             | ❌          |
 | STAGE_INSTANCE_DELETE             | ❌          |
@@ -116,14 +119,14 @@
 | GUILD_BAN_REMOVE                  | ✅          |
 | GUILD_EMOJIS_UPDATE               | ✅          |
 | GUILD_STICKERS_UPDATE             | ✅          |
-| GUILD_SOUNDBOARD_SOUND_CREATE     | ❌          |
-| GUILD_SOUNDBOARD_SOUND_UPDATE     | ❌          |
-| GUILD_SOUNDBOARD_SOUND_DELETE     | ❌          |
-| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ❌          |
-| GUILD_INTEGRATIONS_UPDATE         | ❌          |
-| INTEGRATION_CREATE                | ❌          |
-| INTEGRATION_UPDATE                | ❌          |
-| INTEGRATION_DELETE                | ❌          |
+| GUILD_SOUNDBOARD_SOUND_CREATE     | ✅          |
+| GUILD_SOUNDBOARD_SOUND_UPDATE     | ✅          |
+| GUILD_SOUNDBOARD_SOUND_DELETE     | ✅          |
+| GUILD_SOUNDBOARD_SOUNDS_UPDATE    | ✅          |
+| GUILD_INTEGRATIONS_UPDATE         | ✅          |
+| INTEGRATION_CREATE                | ✅          |
+| INTEGRATION_UPDATE                | ✅          |
+| INTEGRATION_DELETE                | ✅          |
 | WEBHOOKS_UPDATE                   | ✅          |
 | INVITE_CREATE                     | ✅          |
 | INVITE_DELETE                     | ✅          |
@@ -142,14 +145,14 @@
 | GUILD_SCHEDULED_EVENT_CREATE      | ✅          |
 | GUILD_SCHEDULED_EVENT_UPDATE      | ✅          |
 | GUILD_SCHEDULED_EVENT_DELETE      | ✅          |
-| GUILD_SCHEDULED_EVENT_USER_ADD    | ❌          |
-| GUILD_SCHEDULED_EVENT_USER_REMOVE | ❌          |
+| GUILD_SCHEDULED_EVENT_USER_ADD    | ✅          |
+| GUILD_SCHEDULED_EVENT_USER_REMOVE | ✅          |
 | AUTO_MODERATION_RULE_CREATE       | ✅          |
 | AUTO_MODERATION_RULE_UPDATE       | ✅          |
 | AUTO_MODERATION_RULE_DELETE       | ✅          |
 | AUTO_MODERATION_ACTION_EXECUTION  | ✅          |
-| MESSAGE_POLL_VOTE_ADD             | ❌          |
-| MESSAGE_POLL_VOTE_REMOVE          | ❌          |
+| MESSAGE_POLL_VOTE_ADD             | ✅          |
+| MESSAGE_POLL_VOTE_REMOVE          | ✅          |
 | INTERACTION_CREATE                | ✅          |
 
 ## Completed (verified in current codebase)
