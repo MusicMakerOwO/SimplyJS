@@ -24,6 +24,12 @@ export { MessageCreate, MessageUpdate, MessageDelete, MessageDeleteBulk } from "
 export { ReactionAdd, ReactionRemove, ReactionRemoveAll, ReactionRemoveEmoji } from "./Reactions.js";
 export { EmojisUpdate } from "./Emojis.js";
 export { StickersUpdate } from "./Stickers.js";
+export {
+	SoundboardSoundCreate,
+	SoundboardSoundUpdate,
+	SoundboardSoundDelete,
+	SoundboardSoundsUpdate
+} from "./SoundboardSounds.js";
 export { InviteCreate, InviteDelete } from "./Invites.js";
 export { WebhooksUpdate } from "./Webhooks.js";
 export { TypingStart } from "./Typing.js";
