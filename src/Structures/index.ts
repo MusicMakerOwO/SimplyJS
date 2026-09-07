@@ -21,6 +21,7 @@ export * from "./Interactions/ButtonInteraction.js";
 export * from "./Interactions/SelectMenuInteraction.js";
 export * from "./Interactions/AutocompleteInteraction.js";
 export * from "./Interactions/ModalInteraction.js";
+export * from "./Integration.js";
 export * from "./Invite.js";
 export * from "./Member.js";
 export * from "./Message.js";
