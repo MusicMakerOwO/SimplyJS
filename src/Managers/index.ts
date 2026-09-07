@@ -11,6 +11,7 @@ export * from "./Members.js";
 export * from "./Presences.js";
 export * from "./Roles.js";
 export * from "./SlashCommandOptions.js";
+export * from "./SoundboardSounds.js";
 export * from "./Stickers.js";
 export * from "./ThreadMembers.js";
 export * from "./Users.js";

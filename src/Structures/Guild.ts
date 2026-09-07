@@ -29,6 +29,7 @@ import { AutoModerationRuleCache } from "../Managers/AutoModeration.js";
 import { GuildScheduledEventCache } from "../Managers/GuildScheduledEvents.js";
 import { PresenceCache } from "../Managers/Presences.js";
 import { IntegrationCache } from "../Managers/Integrations.js";
+import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
 
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
@@ -108,6 +109,12 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	roles: RoleCache;
 	emojis: EmojiCache;
 	stickers: StickerCache;
+	/**
+	 * Manager for this guild's soundboard sounds, keyed by sound id. Seeded from the `GUILD_CREATE`
+	 * payload and kept current by the `SoundboardSound*` gateway events, which need the
+	 * `GuildExpressions` intent.
+	 */
+	soundboardSounds: SoundboardSoundCache;
 	members: MemberCache;
 	/**
 	 * Manager for this guild's auto moderation rules. Discord never sends rules in `GUILD_CREATE`,
@@ -141,6 +148,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		this.roles    = new RoleCache(client, this);
 		this.emojis   = new EmojiCache(client, this);
 		this.stickers = new StickerCache(client, this);
+		this.soundboardSounds = new SoundboardSoundCache(client, this);
 		this.members  = new MemberCache(client, this);
 		this.autoModerationRules = new AutoModerationRuleCache(client, this);
 		this.scheduledEvents = new GuildScheduledEventCache(client, this);
@@ -227,6 +235,12 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		if ("emojis" in data && data.emojis !== undefined) {
 			for (const apiEmoji of data.emojis) {
 				this.emojis.upsert(apiEmoji);
+			}
+		}
+
+		if ("soundboard_sounds" in data && data.soundboard_sounds !== undefined) {
+			for (const apiSound of data.soundboard_sounds) {
+				this.soundboardSounds.upsert(apiSound);
 			}
 		}
 
