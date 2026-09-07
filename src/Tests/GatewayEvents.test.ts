@@ -56,7 +56,9 @@ import { ActivityType, DiscordActivity, DiscordPresence, Status } from "../Types
 import {
 	GuildScheduledEventCreate,
 	GuildScheduledEventDelete,
-	GuildScheduledEventUpdate
+	GuildScheduledEventUpdate,
+	GuildScheduledEventUserAdd,
+	GuildScheduledEventUserRemove
 } from "../Events/GuildScheduledEvents.js";
 import { GuildScheduledEvent } from "../Structures/GuildScheduledEvent.js";
 
@@ -1233,6 +1235,74 @@ describe("Guild scheduled event gateway event handlers", () => {
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, payload);
 	});
 
+	it("GuildScheduledEventUserAdd emits the cached event, user, and guild", async () => {
+		const client = await seededClient();
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+		const guild = client.guilds.get("guild-1")!;
+		const cached = guild.scheduledEvents.get("scheduled-event-1")!;
+		const user = client.users.upsert(createUser());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildScheduledEventUserAdd.handler(client, {
+			guild_scheduled_event_id: "scheduled-event-1",
+			user_id: "user-1",
+			guild_id: "guild-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventUserAdd, cached, user, guild);
+	});
+
+	it("GuildScheduledEventUserAdd falls back to bare ids for an uncached event and user", async () => {
+		const client = await seededClient();
+		const guild = client.guilds.get("guild-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildScheduledEventUserAdd.handler(client, {
+			guild_scheduled_event_id: "scheduled-event-missing",
+			user_id: "user-missing",
+			guild_id: "guild-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.GuildScheduledEventUserAdd,
+			{ id: "scheduled-event-missing" },
+			{ id: "user-missing" },
+			guild
+		);
+	});
+
+	it("keeps userCount in step only when it is already known", async () => {
+		const client = await seededClient();
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+		const cached = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1")!;
+		const payload = { guild_scheduled_event_id: "scheduled-event-1", user_id: "user-1", guild_id: "guild-1" };
+
+		await GuildScheduledEventUserAdd.handler(client, payload);
+		expect(cached.userCount).toBeUndefined();
+
+		cached.userCount = 3;
+		await GuildScheduledEventUserAdd.handler(client, payload);
+		expect(cached.userCount).toBe(4);
+
+		await GuildScheduledEventUserRemove.handler(client, payload);
+		expect(cached.userCount).toBe(3);
+	});
+
+	it("GuildScheduledEventUserRemove never drives userCount below zero", async () => {
+		const client = await seededClient();
+		await GuildScheduledEventCreate.handler(client, createScheduledEvent());
+		const cached = client.guilds.get("guild-1")!.scheduledEvents.get("scheduled-event-1")!;
+		cached.userCount = 0;
+
+		await GuildScheduledEventUserRemove.handler(client, {
+			guild_scheduled_event_id: "scheduled-event-1",
+			user_id: "user-1",
+			guild_id: "guild-1"
+		});
+
+		expect(cached.userCount).toBe(0);
+	});
+
 	it("ignores every event for an uncached guild", async () => {
 		const client = new Client({ token: "token", intents: GatewayIntents.GuildScheduledEvents });
 		const emitSpy = vi.spyOn(client, "emit");
@@ -1241,6 +1311,16 @@ describe("Guild scheduled event gateway event handlers", () => {
 		await GuildScheduledEventCreate.handler(client, payload);
 		await GuildScheduledEventUpdate.handler(client, payload);
 		await GuildScheduledEventDelete.handler(client, payload);
+		await GuildScheduledEventUserAdd.handler(client, {
+			guild_scheduled_event_id: "scheduled-event-1",
+			user_id: "user-1",
+			guild_id: "guild-missing"
+		});
+		await GuildScheduledEventUserRemove.handler(client, {
+			guild_scheduled_event_id: "scheduled-event-1",
+			user_id: "user-1",
+			guild_id: "guild-missing"
+		});
 
 		expect(emitSpy).not.toHaveBeenCalled();
 	});
@@ -1759,3 +1839,4 @@ describe("Thread membership gateway event handlers", () => {
 		expect(threadOf(client).members.size).toBe(0);
 	});
 });
+
