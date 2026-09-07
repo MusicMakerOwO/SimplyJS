@@ -5,14 +5,18 @@
 Everything here adds *new public surface*. Landing it after the beta tag means either a semver
 break or living with the gap for a full major cycle, so it goes in first.
 
-- [ ] Multipart / file upload support in `src/Rest.ts`
-  - `#execute` hardcodes `Content-Type: application/json` and `body: JSON.stringify(data)`, so there is no code path that can send a file
-  - Blocks: message attachments, emoji/sticker/soundboard uploads from a file (`modify()` currently only accepts a pre-encoded data URI), guild icon/banner uploads, and the `attachment://` references that `FileComponent` and `MediaGallery` require
-  - Needs a `files` field on `MessagePayload` and a `payload_json` + `FormData` branch when files are present
-- [ ] Message fetching
-  - There is no `GET /channels/{id}/messages` or `GET /channels/{id}/messages/{id}` anywhere; no `channel.messages` manager exists
-  - Send, edit, delete, pin, and react all work, but a message cannot be read back by ID and history cannot be paged
-  - Wants a message manager mirroring the other caches, with `fetch(id)` and a list form taking `before`/`after`/`around`/`limit`
+- [x] Multipart / file upload support in `src/Rest.ts`
+  - `post()`/`patch()`/`put()` take an optional 4th `files: FileAttachment[]`; a non-empty list switches `#execute` to a `payload_json` + `FormData` body and drops the hardcoded `Content-Type` so `fetch` can set the boundary. The form is rebuilt per attempt so 429/5xx retries can replay it
+  - `MessagePayload.attachments` accepts `{ name, data: Buffer | Uint8Array | string, description? }`; `SplitAttachments()` in `src/Structures/Message.ts` splits it into the wire `attachments` descriptors (which is what makes `attachment://<name>` resolve) and the files to upload
+  - Wired into `channel.send()`, `message.reply()`, `message.update()`, `user.send()`, `webhook.send()`, and the interaction responses (`reply()`, `editReply()`, `followUp()`, `update()`)
+  - Still to do:
+    - [ ] Emoji / sticker / soundboard uploads from a file, and guild icon/banner uploads - all still require a pre-encoded data URI
+- [x] Message fetching
+  - `MessageManager` (`src/Managers/Messages.ts`) on `channel.messages`, with `fetch(id)` for a single message and `fetch({ limit, before, after, around })` for a page of history. Created lazily by the `Messageable` mixin, so it is on `GuildTextChannel`, `GuildVoiceChannel`, and `GuildThreadChannel`
+  - Deliberately **not** a cache, unlike the other managers: message history is unbounded, so caching it would mean owning an eviction policy. Every call hits REST. Authors/mentions still populate the global user cache via `Message.patch()`
+  - `before`/`after`/`around` are mutually exclusive and the manager throws rather than letting Discord reject the request
+  - Still to do:
+    - [ ] `channel.messages` on `GuildAnnouncementChannel` and `GuildStageChannel` — both are in the `MessageableChannel` union (`src/Types/SimplyJSTypes.ts`) but neither applies the `Messageable` mixin, and `GuildAnnouncementChannel` carries its own duplicate `send()`. Refitting them onto the mixin would remove that duplication and make the union honest
 - [ ] Member list fetching + `REQUEST_GUILD_MEMBERS`
   - `Members.fetch()` only does single-member GETs; there is no `GET /guilds/{id}/members` list and no member search
   - `GatewayOpCodes.RequestGuildMembers` (op 8) is defined but never sent, and `GUILD_MEMBERS_CHUNK` is not modeled in `GatewayEvents` or handled
@@ -31,14 +35,15 @@ All component types are already modeled in `src/Types/Components.ts` and the mes
 (type 18, modal-only) is already written and exported, so it is not listed below.
 
 Each builder follows the existing house pattern - a class implementing its own payload type, with
-`from()`, chainable setters, and a `validate()` that throws on Discord's constraints.
+`from()`, chainable setters, and a `validate()` that throws on Discord's constraints. The v2 builders
+additionally extend `ComponentBuilder` (`src/Builders/ComponentBuilder.ts`), which carries the
+optional `id` every component shares and validates it as a 32-bit integer.
 
 #### Builders
 
-- [ ] `TextDisplayBuilder` - `TEXT_DISPLAY` (10)
+- [x] `TextDisplayBuilder` - `TEXT_DISPLAY` (10)
   - Single `content` field, supports markdown/mentions/emoji
-  - `content` counts toward the message's 4000-character v2 budget
-  - Worth doing first: `Section` and `Container` both take these as children, so the others can be tested against it
+  - `content` counts toward the message's 4000-character v2 budget, which is message-wide rather than per-component, so the builder only rejects empty content
 - [ ] `ThumbnailBuilder` - `THUMBNAIL` (11)
   - `media` (`UnfurledMediaItem`), optional `description` (max 1024) and `spoiler`
   - Only valid as a `Section` accessory - `validate()` cannot catch misuse on its own, so the check belongs in `SectionBuilder`
@@ -52,10 +57,10 @@ Each builder follows the existing house pattern - a class implementing its own p
 - [ ] `FileBuilder` - `FILE` (13)
   - `file` (`UnfurledMediaItem`) plus optional `spoiler`
   - `name` and `size` are response-only - Discord populates them, so they should not be settable
-  - Blocked in practice by multipart upload; only accepts `attachment://<filename>` references
-- [ ] `SeparatorBuilder` - `SEPARATOR` (14)
+  - Only accepts `attachment://<filename>` references, which now resolve against `MessagePayload.attachments`
+- [x] `SeparatorBuilder` - `SEPARATOR` (14)
   - Optional `divider` (defaults true) and `spacing` (`SeparatorSpacingSizes`, defaults `SMALL`)
-  - No required fields, so this is the cheapest one to land
+  - Both fields are left unset unless explicitly set, so Discord applies its own defaults
 - [ ] `ContainerBuilder` - `CONTAINER` (17)
   - `components` accepts `ActionRow`, `TextDisplay`, `Section`, `MediaGallery`, `FileComponent`, `Separator` - but not another `Container`
   - Optional `accent_color` (nullable) and `spoiler`
@@ -63,12 +68,13 @@ Each builder follows the existing house pattern - a class implementing its own p
 
 #### Plumbing
 
-- [ ] Export the new builders from `src/Builders/index.ts`
+- [ ] Export the new builders from `src/Builders/index.ts` (done for `ComponentBuilder`, `TextDisplayBuilder`, and `SeparatorBuilder`)
+- [ ] Backfill `ComponentBuilder` onto the v1 builders, which still have no `id` support at all
 - [ ] Set `IS_COMPONENTS_V2` on the send path when a payload contains v2 components
 - [ ] Reject the v1/v2 mixing cases Discord rejects (`content`/`embeds` alongside v2 components)
 - [ ] Enforce the message-wide v2 limits (40 components total, 4000 characters across all `TextDisplay`s)
-- Note: `FileComponent` and `MediaGallery` only accept `attachment://` references, so both stay
-  half-usable until multipart upload lands
+- Note: `FileComponent` and `MediaGallery` only accept `attachment://` references; those now resolve,
+  since `MessagePayload.attachments` uploads the files they point at
 
 ### Voice Chat
 
@@ -81,9 +87,11 @@ the `/stage-instances` REST resource all ride along with this.
 Whole resource categories with no coverage, roughly in order of how often a bot author would reach
 for them.
 
-- [ ] Webhooks
-  - `WEBHOOKS_UPDATE` is handled and `src/Rest.ts` already buckets webhook routes, but there is no `Webhook` structure or manager - no create, edit, delete, or execute
-  - The only `/webhooks/` routes in use are interaction followups
+- [x] Webhooks
+  - `Webhook` (`src/Structures/Webhook.ts`) and `WebhookCache` on `guild.webhooks` cover create, fetch, edit, delete, and execute
+  - Not covered: the webhook *message* routes (`GET`/`PATCH`/`DELETE /webhooks/{id}/{token}/messages/{id}`), so a message sent by `webhook.send()` cannot be edited or deleted through the webhook afterwards
+  - Not covered: `POST /channels/{id}/followers` (channel follower webhooks) and the `/webhooks/{id}/{token}/slack` and `/github` compatibility routes
+  - `send()` can attach files via `attachments`
 - [ ] Thread creation
   - Every thread *event* is handled and cached, but `POST /channels/{id}/threads`, `POST /channels/{id}/messages/{id}/threads`, and the archived-thread listing endpoints are all absent
 - [ ] Application resource
