@@ -1,4 +1,5 @@
 import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.js";
+import { SplitAttachments } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { InteractionCallbackTypes } from "../../Types/Interactions.js";
 import { InteractionReplyPayload } from "./Repliable.js";
@@ -29,10 +30,12 @@ export function Updateable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async update(content: InteractionReplyPayload): Promise<void> {
+			const { body, files } = SplitAttachments(resolveReplyPayload(content));
+			// the callback route nests the message in `data`, but uploads stay top-level form parts
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.UPDATE_MESSAGE,
-				data: resolveReplyPayload(content),
-			});
+				data: body,
+			}, undefined, files);
 		}
 
 		/**

@@ -6,9 +6,9 @@ import {
 	InteractionContextType
 } from "./ApplicationCommand.js";
 import { DiscordChannel, DiscordGuild, DiscordMember, DiscordUser } from "./DiscordAPITypes.js";
-import { AllowedMentions, Attachment, DiscordMessage, Embed, PollLayoutTypes, PollMedia, ResolvedData } from "./MessageComponents.js";
+import { AllowedMentions, DiscordMessage, Embed, PollLayoutTypes, PollMedia, ResolvedData } from "./MessageComponents.js";
 import { ComponentType, MessageComponent, ModalComponent } from "./Components.js";
-import { JSONObject } from "./Internal.js";
+import { JSONObject, MessageAttachmentInput } from "./Internal.js";
 
 /**
  * The kind of interaction being received, determining the shape of its `data` payload.
@@ -269,8 +269,11 @@ export type InteractionCallbackMessages = {
 	flags?: number;
 	/** message components */
 	components?: MessageComponent[];
-	/** attachment objects with filename and description, only `id` is required */
-	attachments?: (Pick<Attachment, "id"> & Partial<Omit<Attachment, "id">>)[];
+	/**
+	 * Files to upload with the response (sent as `multipart/form-data`), and, when editing, the
+	 * {@link RetainedAttachment} entries naming the existing attachments to keep
+	 */
+	attachments?: MessageAttachmentInput[];
 	/** details about the poll to include with the message */
 	poll?: PollCreateRequest;
 	/**

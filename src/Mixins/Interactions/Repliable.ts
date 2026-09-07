@@ -1,5 +1,5 @@
 import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.js";
-import { Message } from "../../Structures/Message.js";
+import { Message, SplitAttachments } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { InteractionCallbackMessages, InteractionCallbackTypes } from "../../Types/Interactions.js";
@@ -36,15 +36,16 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async reply(content: InteractionReplyPayload): Promise<void> {
-			const payload = resolveReplyPayload(content);
+			const { body, files } = SplitAttachments(resolveReplyPayload(content));
 			if (typeof content === 'object' && content.ephemeral) {
-				payload.flags ??= 0;
-				payload.flags |= MessageFlags.EPHEMERAL;
+				body.flags ??= 0;
+				body.flags |= MessageFlags.EPHEMERAL;
 			}
+			// the callback route nests the message in `data`, but uploads stay top-level form parts
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-				data: payload,
-			});
+				data: body,
+			}, undefined, files);
 		}
 
 		/**
@@ -64,9 +65,12 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async editReply(content: InteractionReplyPayload): Promise<Message> {
+			const { body, files } = SplitAttachments(resolveReplyPayload(content));
 			const response = await this.client.rest.patch<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}/messages/@original`,
-				resolveReplyPayload(content),
+				body,
+				undefined,
+				files
 			);
 			return new Message(this.client, response);
 		}
@@ -77,9 +81,12 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async followUp(content: InteractionReplyPayload): Promise<Message> {
+			const { body, files } = SplitAttachments(resolveReplyPayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}`,
-				resolveReplyPayload(content),
+				body,
+				undefined,
+				files
 			);
 			return new Message(this.client, response);
 		}
