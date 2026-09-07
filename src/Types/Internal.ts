@@ -37,6 +37,50 @@ export type JSONObject = Record<string, JSONValue>;
 /** A JSON array */
 export type JSONArray = JSONValue[];
 
+/**
+ * A file to upload alongside a message.
+ *
+ * Sending one of these switches the request from a JSON body to `multipart/form-data`; see
+ * {@link Rest.post}. Reference an attachment from an embed or component with `attachment://<name>`.
+ */
+export type FileAttachment = {
+	/** Filename as it will appear in Discord, including the extension */
+	name: string;
+	/** File contents. A `string` is uploaded as its UTF-8 bytes, not read from disk */
+	data: Buffer | Uint8Array | string;
+	/** Alt text, shown to screen readers and on hover */
+	description?: string;
+}
+
+/**
+ * An attachment already on a message, named so an edit keeps it.
+ *
+ * Editing a message replaces its whole attachment list, so any existing attachment left out of the
+ * list is removed. Include one of these to hold onto it.
+ */
+export type RetainedAttachment = {
+	/** The existing attachment's id, as it appears on the message */
+	id: string;
+	/** Renames the attachment when set, otherwise the current name is kept */
+	filename?: string;
+	/** Replaces the alt text when set, otherwise the current description is kept */
+	description?: string;
+}
+
+/**
+ * An entry in a payload's `attachments` list: either a {@link FileAttachment} to upload, or a
+ * {@link RetainedAttachment} naming one already on the message. Entries carrying `data` are uploads.
+ */
+export type MessageAttachmentInput = FileAttachment | RetainedAttachment;
+
+/** Wire-format attachment descriptor, as it appears in the JSON body Discord receives */
+export type AttachmentDescriptor = {
+	/** For uploads, the index of the matching `files[n]` form part; for retained ones, the real id */
+	id: string;
+	filename?: string;
+	description?: string;
+}
+
 /** Full message payload accepted by `send()` and `reply()`; a plain string is shorthand for `{ content }` */
 export type MessagePayload = {
 	/** Plain text message content */
@@ -53,6 +97,18 @@ export type MessagePayload = {
 	components?: MessageComponent[];
 	/** IDs of stickers to attach to the message */
 	sticker_ids?: string[];
+	/**
+	 * Files to upload with the message (sent as `multipart/form-data`), and, when editing,
+	 * {@link RetainedAttachment} entries naming the existing attachments to keep
+	 */
+	attachments?: MessageAttachmentInput[];
+	/** Message flags bitfield, such as `SUPPRESS_EMBEDS` or `IS_COMPONENTS_V2` */
+	flags?: number;
+}
+
+/** A {@link MessagePayload} with the user-facing `attachments` replaced by their wire descriptors */
+export type MessagePayloadBody = Omit<MessagePayload, 'attachments'> & {
+	attachments?: AttachmentDescriptor[];
 }
 
 /** A class constructor accepting any arguments and producing `T`, used to type mixin base classes */
