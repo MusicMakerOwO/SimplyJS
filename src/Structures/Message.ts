@@ -11,7 +11,7 @@ import { DiscordApplication, DiscordChannel, DiscordSticker } from "../Types/Dis
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { Client } from "../Client.js";
 import { User } from "./User.js";
-import { MessagePayload } from "../Types/Internal.js";
+import { AttachmentDescriptor, FileAttachment, MessageAttachmentInput, MessagePayload } from "../Types/Internal.js";
 import { Emoji } from "./Emoji.js";
 import { Guild } from "./Guild.js";
 import { MessageableChannel } from "../Types/index.js";
@@ -20,7 +20,7 @@ import { MessageableChannel } from "../Types/index.js";
  * Normalizes user input into a valid message payload.
  * @param input Either plain text content or a full message payload.
  * @returns A payload that can be sent to the Discord messages endpoint.
- * @throws {Error} When no message content, embeds, components, or stickers are provided.
+ * @throws {Error} When no message content, embeds, components, attachments, or stickers are provided.
  */
 export function CreateMessagePayload(input: string | MessagePayload): MessagePayload {
 	if (typeof input === "string") input = { content: input };
@@ -29,11 +29,54 @@ export function CreateMessagePayload(input: string | MessagePayload): MessagePay
 		(input.content?.length ?? 0) > 0 ||
 		(input.embeds?.length ?? 0) > 0 ||
 		(input.components?.length ?? 0) > 0 ||
-		(input.sticker_ids?.length ?? 0) > 0
+		(input.sticker_ids?.length ?? 0) > 0 ||
+		(input.attachments?.length ?? 0) > 0
 
 	if (!hasContent) throw new Error("Cannot send an empty message");
 
 	return input;
+}
+
+/** Narrows an attachment entry to one carrying file contents, as opposed to one naming an existing attachment */
+function isUpload(attachment: MessageAttachmentInput): attachment is FileAttachment {
+	return "data" in attachment;
+}
+
+/**
+ * Separates a payload's user-supplied files from the JSON that describes them.
+ *
+ * Discord pairs each `files[n]` form part with an entry in the JSON `attachments` array by that
+ * entry's `id`, which is what `attachment://<filename>` in an embed or component resolves against -
+ * so the two halves have to be built together. Uploads are numbered by their position among the
+ * *files*, not among the attachments, so interleaving them with retained attachments still lines up.
+ * {@link RetainedAttachment} entries pass through with their real ids, which are snowflakes and so
+ * never collide with the small indices given to uploads.
+ *
+ * Returns a shallow copy; callers such as {@link Message.reply} mutate the body afterwards and the
+ * original payload belongs to the caller.
+ * @param payload The normalized payload from {@link CreateMessagePayload}.
+ * @returns The JSON body to send, and the files to upload alongside it.
+ */
+export function SplitAttachments<T extends MessagePayload>(
+	payload: T
+): { body: Omit<T, 'attachments'> & { attachments?: AttachmentDescriptor[] }; files: FileAttachment[] } {
+	const { attachments, ...rest } = payload;
+
+	if (!attachments || attachments.length === 0) return { body: rest, files: [] };
+
+	const files: FileAttachment[] = [];
+	const descriptors = attachments.map((attachment): AttachmentDescriptor => {
+		if (!isUpload(attachment)) return attachment;
+
+		files.push(attachment);
+		return {
+			id: String(files.length - 1),
+			filename: attachment.name,
+			...(attachment.description ? { description: attachment.description } : {})
+		};
+	});
+
+	return { body: { ...rest, attachments: descriptors }, files };
 }
 
 /**
@@ -198,15 +241,15 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * @returns The created reply message.
 	 */
 	async reply(content: string | MessagePayload, options: { ping?: boolean } = {}): Promise<Message> {
-		const payload = CreateMessagePayload(content);
-		payload.message_reference = {
+		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		body.message_reference = {
 			message_id: this.id
 		}
 		if (!options.ping) {
-			payload.allowed_mentions ??= {};
-			payload.allowed_mentions.replied_user ??= false
+			body.allowed_mentions ??= {};
+			body.allowed_mentions.replied_user ??= false
 		}
-		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.channelId}/messages`, payload);
+		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.channelId}/messages`, body, undefined, files);
 		return new Message(this.client, response);
 	}
 
@@ -227,8 +270,8 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 */
 	async update(content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>): Promise<Message> {
 		if (this.user.id !== this.client.user!.id) throw new Error("Can only edit messages sent by the bot");
-		const payload = CreateMessagePayload(content);
-		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channelId}/messages/${this.id}`, payload);
+		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channelId}/messages/${this.id}`, body, undefined, files);
 		return new Message(this.client, response);
 	}
 
