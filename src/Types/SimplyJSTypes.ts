@@ -357,6 +357,20 @@ export const ClientEvents = {
 	 * Listener arguments: `event` ({@link GuildScheduledEvent} | {@link DiscordGuildScheduledEvent}).
 	 */
 	GuildScheduledEventDelete: "GuildScheduledEventDelete",
+	/**
+	 * Fired when a user subscribes to a scheduled event.
+	 * `event` and `user` fall back to a bare `{ id }` object when not present in the local cache.
+	 * Requires the `GuildScheduledEvents` intent.
+	 * Listener arguments: `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`), `guild` ({@link Guild}).
+	 */
+	GuildScheduledEventUserAdd: "GuildScheduledEventUserAdd",
+	/**
+	 * Fired when a user unsubscribes from a scheduled event.
+	 * `event` and `user` fall back to a bare `{ id }` object when not present in the local cache.
+	 * Requires the `GuildScheduledEvents` intent.
+	 * Listener arguments: `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`), `guild` ({@link Guild}).
+	 */
+	GuildScheduledEventUserRemove: "GuildScheduledEventUserRemove",
 
 	/**
 	 * Fired when a message is created.
@@ -399,6 +413,7 @@ export const ClientEvents = {
 	 * Listener arguments: `payload`.
 	 */
 	ReactionRemoveEmoji: "ReactionRemoveEmoji",
+
 
 	/**
 	 * Fired when a user's status or activities change. Requires the privileged `GuildPresences`
@@ -547,6 +562,8 @@ export type ClientEventMap = {
 	[ClientEvents.GuildScheduledEventCreate]: [event: GuildScheduledEvent];
 	[ClientEvents.GuildScheduledEventUpdate]: [oldEvent: GuildScheduledEvent | undefined, newEvent: GuildScheduledEvent];
 	[ClientEvents.GuildScheduledEventDelete]: [event: GuildScheduledEvent | DiscordGuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventUserAdd]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
+	[ClientEvents.GuildScheduledEventUserRemove]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
 	[ClientEvents.AutoModerationActionExecution]: [payload: AutoModerationActionExecutionPayload];
 
 	[ClientEvents.MessageCreate]: [message: Message];

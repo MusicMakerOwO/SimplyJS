@@ -38,7 +38,9 @@ export {
 export {
 	GuildScheduledEventCreate,
 	GuildScheduledEventUpdate,
-	GuildScheduledEventDelete
+	GuildScheduledEventDelete,
+	GuildScheduledEventUserAdd,
+	GuildScheduledEventUserRemove
 } from "./GuildScheduledEvents.js";
 export { InteractionCreate } from "./Interactions.js";
 export { Ready } from "./Ready.js";
