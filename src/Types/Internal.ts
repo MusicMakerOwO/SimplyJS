@@ -38,6 +38,16 @@ export type JSONObject = Record<string, JSONValue>;
 export type JSONArray = JSONValue[];
 
 /**
+ * The raw bytes of a file to upload.
+ *
+ * Emoji and sticker uploads take this instead of a {@link FileAttachment}: those endpoints already
+ * take the name of the thing being created and Discord ignores the filename, so there is nothing
+ * left worth naming. The file type is read from the contents rather than an extension
+ * (`DetectMimeType()`), and `ResolveUpload()` supplies the filename the form needs.
+ */
+export type UploadInput = Buffer | Uint8Array;
+
+/**
  * A file to upload alongside a message.
  *
  * Sending one of these switches the request from a JSON body to `multipart/form-data`; see
