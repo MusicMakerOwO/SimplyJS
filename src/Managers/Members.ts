@@ -1,8 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { Member } from "../Structures/Member.js";
 import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordMember } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
+import { GatewayIntents } from "../Types/DiscordGateway.js";
+import { HasIntent } from "../Intents.js";
+import { createCollector } from "../Collector.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 /** Pagination options for a bulk {@link MemberCache.fetch} call. */
 export type MemberFetchOptions = {
@@ -11,6 +16,26 @@ export type MemberFetchOptions = {
 	/** Consider only members after the given user id - useful in batching */
 	after?: string;
 };
+
+/** Options for a {@link MemberCache.fetchGateway} request. */
+export type GatewayMemberFetchOptions = {
+	/**
+	 * Username/nickname prefix to match. Defaults to `""` (every member) when `userIds` is omitted.
+	 * Mutually exclusive with `userIds`, and requires the privileged `GuildMembers` intent.
+	 */
+	query?: string;
+	/** Maximum number of members to return; `0` means no limit, and is the only valid value for a `""` query. */
+	limit?: number;
+	/** Specific user ids to fetch, up to 100. Mutually exclusive with `query`. */
+	userIds?: string[];
+	/** Whether to also fetch each member's presence. Requires the privileged `GuildPresences` intent. */
+	presences?: boolean;
+	/** How long to wait for the response to complete before rejecting, in ms (default 30000) */
+	time?: number;
+};
+
+/** Discord rejects a `RequestGuildMembers` payload carrying more ids than this */
+const MAX_REQUESTED_USER_IDS = 100;
 
 /** Cache of a single guild's {@link Member}s, keyed by user id. */
 export class MemberCache extends GuildScopedCache<string, Member, DiscordMember> {
@@ -75,6 +100,85 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 			if (page.length < 1000) return all;
 			after = page[page.length - 1].id;
 		}
+	}
+
+	/**
+	 * Fetches members over the gateway with a `RequestGuildMembers` (op 8) request, resolving once
+	 * the last chunk of the response arrives. Every member is cached along the way.
+	 *
+	 * Unlike the REST {@link fetch}, this is not rate limited per 1000 members and is the only way
+	 * to pull members together with their presences or to look up a batch of user ids in one call.
+	 * Each chunk is also emitted as `ClientEvents.GuildMembersChunk` as it lands, so a very large
+	 * fetch can be streamed instead of awaited.
+	 *
+	 * @param options Which members to request, and how long to wait for them.
+	 * @throws {Error} If `query` and `userIds` are both given, more than 100 ids are requested, the
+	 * intents required by the request are missing, or the response does not complete in time.
+	 *
+	 * @example
+	 * ```ts
+	 * const members = await guild.members.fetchGateway({ userIds: ["123", "456"], presences: true });
+	 * ```
+	 */
+	async fetchGateway(options: GatewayMemberFetchOptions = {}): Promise<Member[]> {
+		if (options.query !== undefined && options.userIds !== undefined) {
+			throw new Error("`query` and `userIds` are mutually exclusive - request members by one or the other");
+		}
+		if (options.userIds && options.userIds.length > MAX_REQUESTED_USER_IDS) {
+			throw new Error(
+				`Cannot request more than ${MAX_REQUESTED_USER_IDS} user ids at once (got ${options.userIds.length})`
+			);
+		}
+
+		const intents = this.client.socket.intents;
+		// Discord silently drops a request whose intents are missing, so it would otherwise hang
+		// until the timeout with no indication of why.
+		if (!options.userIds && !HasIntent(intents, GatewayIntents.GuildMembers)) {
+			throw new Error("Fetching members by query over the gateway requires the privileged `GuildMembers` intent");
+		}
+		if (options.presences && !HasIntent(intents, GatewayIntents.GuildPresences)) {
+			throw new Error("Fetching presences over the gateway requires the privileged `GuildPresences` intent");
+		}
+
+		// A nonce is what tells one in-flight request's chunks from another's; Discord caps it at 32
+		// characters, which a UUID fits once its dashes are stripped.
+		const nonce = randomUUID().replaceAll("-", "");
+
+		const collector = createCollector(this.client, ClientEvents.GuildMembersChunk, {
+			filter: (payload) => payload.nonce === nonce && payload.guild.id === this.guild.id,
+			time: options.time ?? 30_000
+		});
+
+		const members: Member[] = [];
+		const completed = new Promise<Member[]>((resolve, reject) => {
+			collector.on("collect", (payload) => {
+				members.push(...payload.members);
+				if (payload.chunkIndex >= payload.chunkCount - 1) collector.stop();
+			});
+			collector.on("end", (_collected, reason) => {
+				if (reason === "time") {
+					reject(new Error(`Timed out waiting for guild member chunks for guild ${this.guild.id}`));
+					return;
+				}
+				resolve(members);
+			});
+		});
+
+		// Sent only once the collector is listening, so a chunk that comes back immediately is caught.
+		try {
+			this.client.socket.requestGuildMembers({
+				guild_id: this.guild.id,
+				limit: options.limit ?? 0,
+				...(options.presences === undefined ? {} : { presences: options.presences }),
+				...(options.userIds ? { user_ids: options.userIds } : { query: options.query ?? "" }),
+				nonce
+			});
+		} catch (error) {
+			collector.stop();
+			throw error;
+		}
+
+		return completed;
 	}
 
 	/**
