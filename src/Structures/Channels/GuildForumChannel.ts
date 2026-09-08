@@ -5,11 +5,12 @@ import { ObjectValues } from "../../Types/HelperTypes.js";
 import { BaseChannel } from "./BaseChannel.js";
 import { Moveable } from "../../Mixins/Channels/Moveable.js";
 import { PermissionOverwrites } from "../../Mixins/Channels/PermissionOverwrites.js";
+import { Threadable } from "../../Mixins/Channels/Threadable.js";
 
 /**
  * A forum (or media) channel, whose posts are represented as threads.
  */
-export class GuildForumChannel extends PermissionOverwrites(Moveable(BaseChannel)) {
+export class GuildForumChannel extends Threadable(PermissionOverwrites(Moveable(BaseChannel))) {
 	declare type: typeof DiscordChannelTypes.GUILD_FORUM | typeof DiscordChannelTypes.GUILD_MEDIA
 
 	// `declare` avoids emitting a field initializer — with useDefineForClassFields (target

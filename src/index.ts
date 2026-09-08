@@ -29,6 +29,7 @@ export * from "./Factory/CreateInteraction.js";
 
 export * from "./Mixins/Channels/Messageable.js";
 export * from "./Mixins/Channels/Moveable.js";
+export * from "./Mixins/Channels/Threadable.js";
 export * from "./Mixins/Channels/PermissionOverwrites.js";
 export * from "./Mixins/Interactions/ModalShowable.js";
 export * from "./Mixins/Interactions/Repliable.js";

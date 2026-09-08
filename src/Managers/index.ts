@@ -15,5 +15,6 @@ export * from "./SlashCommandOptions.js";
 export * from "./SoundboardSounds.js";
 export * from "./Stickers.js";
 export * from "./ThreadMembers.js";
+export * from "./Threads.js";
 export * from "./Users.js";
 export * from "./Webhooks.js";

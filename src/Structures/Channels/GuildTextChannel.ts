@@ -3,11 +3,12 @@ import { BaseChannel } from "./BaseChannel.js";
 import { Messageable } from "../../Mixins/Channels/Messageable.js";
 import { Moveable } from "../../Mixins/Channels/Moveable.js";
 import { PermissionOverwrites } from "../../Mixins/Channels/PermissionOverwrites.js";
+import { Threadable } from "../../Mixins/Channels/Threadable.js";
 
 /**
  * A standard guild text channel.
  */
-export class GuildTextChannel extends PermissionOverwrites(Moveable(Messageable(BaseChannel))) {
+export class GuildTextChannel extends Threadable(PermissionOverwrites(Moveable(Messageable(BaseChannel)))) {
 	declare type: typeof DiscordChannelTypes.GUILD_TEXT | typeof DiscordChannelTypes.GUILD_ANNOUNCEMENT
 
 	// `declare` avoids emitting a field initializer — with useDefineForClassFields (target
