@@ -39,11 +39,30 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 	}
 
 	patch(data: DiscordSticker): void {
-		this.id = data.id;
-		this.name = data.name;
-		this.tags = data.tags;
-		this.type = data.type;
-		this.formatType = data.format_type;
+		// Discord types these as always present, but the sticker items nested in message payloads are
+		// partial - they carry only `id`, `name`, and `format_type`. Assigning them unconditionally
+		// would blank an already-cached sticker, so they are guarded like every optional field below.
+		// The `!` markers still hold: a sticker is only ever constructed from a full payload, and a
+		// partial one can then only leave those fields untouched.
+		if ('id' in data && data.id !== undefined) {
+			this.id = data.id;
+		}
+
+		if ('name' in data && data.name !== undefined) {
+			this.name = data.name;
+		}
+
+		if ('tags' in data && data.tags !== undefined) {
+			this.tags = data.tags;
+		}
+
+		if ('type' in data && data.type !== undefined) {
+			this.type = data.type;
+		}
+
+		if ('format_type' in data && data.format_type !== undefined) {
+			this.formatType = data.format_type;
+		}
 
 		if ('pack_id' in data && data.pack_id !== undefined) {
 			this.packId = data.pack_id;

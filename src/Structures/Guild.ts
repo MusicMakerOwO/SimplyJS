@@ -173,19 +173,24 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	}
 
 	patch(data: DiscordGuildCreate): void {
-		this.id = data.id;
-		this.name = data.name;
-		this.ownerId = data.owner_id;
-		this.afkTimeout = data.afk_timeout;
-		this.verificationLevel = data.verification_level;
-		this.defaultMessageNotifications = data.default_message_notifications;
-		this.explicitContentFilter = data.explicit_content_filter;
-		this.features = data.features;
-		this.mfaLevel = data.mfa_level;
-		this.premiumTier = data.premium_tier;
-		this.preferredLocale = data.preferred_locale;
-		this.nsfwLevel = data.nsfw_level;
-		this.premiumProgressBarEnabled = data.premium_progress_bar_enabled;
+		// Discord types these as always present, but partial guild objects exist (an invite's
+		// `guild`, an unavailable guild). Assigning them unconditionally would blank an
+		// already-cached guild, so they are guarded like every optional field below. The `!` markers
+		// still hold: a guild is only ever constructed from a full payload, and a partial one can
+		// then only leave those fields untouched.
+		if ("id" in data && data.id !== undefined) this.id = data.id;
+		if ("name" in data && data.name !== undefined) this.name = data.name;
+		if ("owner_id" in data && data.owner_id !== undefined) this.ownerId = data.owner_id;
+		if ("afk_timeout" in data && data.afk_timeout !== undefined) this.afkTimeout = data.afk_timeout;
+		if ("verification_level" in data && data.verification_level !== undefined) this.verificationLevel = data.verification_level;
+		if ("default_message_notifications" in data && data.default_message_notifications !== undefined) this.defaultMessageNotifications = data.default_message_notifications;
+		if ("explicit_content_filter" in data && data.explicit_content_filter !== undefined) this.explicitContentFilter = data.explicit_content_filter;
+		if ("features" in data && data.features !== undefined) this.features = data.features;
+		if ("mfa_level" in data && data.mfa_level !== undefined) this.mfaLevel = data.mfa_level;
+		if ("premium_tier" in data && data.premium_tier !== undefined) this.premiumTier = data.premium_tier;
+		if ("preferred_locale" in data && data.preferred_locale !== undefined) this.preferredLocale = data.preferred_locale;
+		if ("nsfw_level" in data && data.nsfw_level !== undefined) this.nsfwLevel = data.nsfw_level;
+		if ("premium_progress_bar_enabled" in data && data.premium_progress_bar_enabled !== undefined) this.premiumProgressBarEnabled = data.premium_progress_bar_enabled;
 
 		if ("icon" in data && data.icon !== undefined) this.icon = data.icon;
 		if ("icon_hash" in data && data.icon_hash !== undefined) this.iconHash = data.icon_hash;
@@ -234,8 +239,10 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 			}
 		}
 
-		for (const apiRole of data.roles) {
-			this.roles.upsert(apiRole);
+		if ("roles" in data && data.roles !== undefined) {
+			for (const apiRole of data.roles) {
+				this.roles.upsert(apiRole);
+			}
 		}
 
 		if ("stickers" in data && data.stickers !== undefined) {

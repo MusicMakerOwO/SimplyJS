@@ -31,8 +31,12 @@ export class BaseChannel extends APIGuildStructure<DiscordChannel> {
 	}
 
 	patch(data: DiscordChannel): void {
-		this.id = data.id;
-		this.type = data.type;
+		// Partial channel objects (an interaction's `resolved.channels`, an invite's `channel`, a
+		// message's `mention_channels`) always carry `id` and `type`, but they are guarded anyway so
+		// a future partial that drops one cannot blank it on an already-cached channel. Every
+		// subclass already guards its own fields the same way.
+		if ('id' in data && data.id !== undefined) this.id = data.id;
+		if ('type' in data && data.type !== undefined) this.type = data.type;
 		if (data.name !== undefined) this.name = data.name;
 		if (data.flags !== undefined) this.flags = data.flags;
 		if (data.guild_id !== undefined) this.guildId = data.guild_id;

@@ -45,12 +45,35 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	}
 
 	patch(data: DiscordMember): void {
-		this.deaf = data.deaf;
-		this.mute = data.mute;
-		this.flags = data.flags;
-		this.roles = data.roles;
-		this.joinedAt = data.joined_at;
-		this.user = this.client.users.upsert(data.user);
+		// Discord types these as always present, but the member objects nested in other payloads are
+		// partial - an interaction's `resolved.members` omit `user`, `deaf`, and `mute`. Assigning
+		// them unconditionally would blank an already-cached member (and upserting an absent `user`
+		// would throw), so they are guarded like every optional field below. The `!` markers still
+		// hold: a member is only ever constructed from a full payload, and a partial one can then
+		// only leave those fields untouched.
+		if ('deaf' in data && data.deaf !== undefined) {
+			this.deaf = data.deaf;
+		}
+
+		if ('mute' in data && data.mute !== undefined) {
+			this.mute = data.mute;
+		}
+
+		if ('flags' in data && data.flags !== undefined) {
+			this.flags = data.flags;
+		}
+
+		if ('roles' in data && data.roles !== undefined) {
+			this.roles = data.roles;
+		}
+
+		if ('joined_at' in data && data.joined_at !== undefined) {
+			this.joinedAt = data.joined_at;
+		}
+
+		if ('user' in data && data.user !== undefined) {
+			this.user = this.client.users.upsert(data.user);
+		}
 
 		if ('nick' in data) {
 			this.nick = data.nick;

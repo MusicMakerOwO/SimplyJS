@@ -27,10 +27,26 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 	}
 
 	patch(data: DiscordEmoji): void {
-		this.id = data.id;
-		this.name = data.name;
-		this.animated = data.animated;
-		this.available = data.available;
+		// Discord types these as always present, but the emoji objects nested in other payloads are
+		// partial - a reaction's `emoji` carries only `id`, `name`, and sometimes `animated`.
+		// Assigning them unconditionally would blank an already-cached emoji, so they are guarded
+		// like every optional field below. The `!` markers still hold: an emoji is only ever
+		// constructed from a full payload, and a partial one can then only leave those untouched.
+		if ('id' in data && data.id !== undefined) {
+			this.id = data.id;
+		}
+
+		if ('name' in data && data.name !== undefined) {
+			this.name = data.name;
+		}
+
+		if ('animated' in data && data.animated !== undefined) {
+			this.animated = data.animated;
+		}
+
+		if ('available' in data && data.available !== undefined) {
+			this.available = data.available;
+		}
 
 		if ('roles' in data && data.roles !== undefined) {
 			this.roles = data.roles;

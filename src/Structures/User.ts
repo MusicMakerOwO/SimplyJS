@@ -69,11 +69,30 @@ export class User extends APIClientStructure<DiscordUser> {
 	}
 
 	patch(data: DiscordUser): void {
-		this.id = data.id;
-		this.username = data.username;
-		this.discriminator = data.discriminator;
-		this.globalName = data.global_name;
-		this.avatar = data.avatar;
+		// Discord types these five as always present, but sends partial user objects on several payloads.
+		// `PRESENCE_UPDATE` carries only `id`. Assigning them unconditionally would blank
+		// an already-cached user, so they are guarded like every optional field below. The `!`
+		// markers still hold in practice: a user is only ever constructed from a full payload, and a
+		// partial one can then only leave those fields untouched.
+		if ('id' in data && data.id !== undefined) {
+			this.id = data.id;
+		}
+
+		if ('username' in data && data.username !== undefined) {
+			this.username = data.username;
+		}
+
+		if ('discriminator' in data && data.discriminator !== undefined) {
+			this.discriminator = data.discriminator;
+		}
+
+		if ('global_name' in data && data.global_name !== undefined) {
+			this.globalName = data.global_name;
+		}
+
+		if ('avatar' in data && data.avatar !== undefined) {
+			this.avatar = data.avatar;
+		}
 
 		if ('bot' in data && data.bot !== undefined) {
 			this.bot = data.bot;
