@@ -564,6 +564,60 @@ export type DiscordGuildCreate = DiscordGuild & {
 	soundboard_sounds?: DiscordSoundboardSound[];
 };
 
+/**
+ * A team's membership state for a given user - an invited member has not accepted yet and has no
+ * access to the team's apps.
+ * @see https://docs.discord.com/developers/topics/teams#data-models-membership-state-enum
+ */
+export const DiscordTeamMembershipStates = {
+	INVITED : 1,
+	ACCEPTED: 2
+} as const;
+
+/**
+ * A team's role for a given member. The owner is not listed as a role - it is identified by the
+ * team's `owner_user_id` - and an empty string is what Discord sends for read-only members.
+ * @see https://docs.discord.com/developers/topics/teams#team-member-roles-team-member-role-types
+ */
+export const DiscordTeamMemberRoles = {
+	/** Full access to the team and its apps, short of transferring ownership or deleting the team */
+	ADMIN    : "admin",
+	/** Can access app configuration but cannot change team membership or app ownership */
+	DEVELOPER: "developer",
+	/** Can access app information and analytics but cannot change anything */
+	READ_ONLY: "read_only"
+} as const;
+
+/**
+ * A single member of a team that owns one or more applications.
+ * @see https://docs.discord.com/developers/topics/teams#data-models-team-member-object
+ */
+export type DiscordTeamMember = {
+	/** Whether the user has accepted the invite to the team */
+	membership_state: ObjectValues<typeof DiscordTeamMembershipStates>;
+	/** ID of the parent team this member belongs to */
+	team_id: string;
+	/** Partial user object - only `avatar`, `discriminator`, `id`, and `username` are sent */
+	user: Partial<DiscordUser>;
+	/** The member's role on the team, an empty string for a plain read-only member */
+	role: ObjectValues<typeof DiscordTeamMemberRoles> | "";
+};
+
+/**
+ * A team, the group that collectively owns a set of applications.
+ * @see https://docs.discord.com/developers/topics/teams#data-models-team-object
+ */
+export type DiscordTeam = {
+	/** Hash of the team's icon, or `null` when the team has no icon */
+	icon: string | null;
+	id: string;
+	/** Members of the team, including those who have not yet accepted their invite */
+	members: DiscordTeamMember[];
+	name: string;
+	/** User ID of the team's current owner */
+	owner_user_id: string;
+};
+
 export type DiscordApplication = {
 	/** ID of the app */
 	id: string;
@@ -589,9 +643,8 @@ export type DiscordApplication = {
 	owner?: Partial<DiscordUser>;
 	/** Hex encoded key for verification in interactions and the GameSDK’s GetTicket */
 	verify_key: string;
-	/** If the app belongs to a team, this will be a list of the members of that team */
-	// TODO Set up team types
-	team?: Record<string, JSONObject>[];
+	/** Team that owns the app, or `null` when the app is owned by a single user */
+	team?: DiscordTeam | null;
 	/** Guild associated with the app. For example, a developer support server. */
 	guild_id?: string;
 	/** Partial object of the associated guild */
