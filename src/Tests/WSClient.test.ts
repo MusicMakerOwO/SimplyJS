@@ -132,6 +132,21 @@ describe("WSClient lifecycle", () => {
 		expect(() => socket.send({ op: GatewayOpCodes.Heartbeat, d: null, s: null, t: null })).toThrow(/websocket client not initialized/i);
 	});
 
+	it("sends requestGuildMembers as an op 8 frame", () => {
+		const socket = new WSClient({} as Client, {});
+		socket.setToken("token");
+		socket.initialize();
+
+		socket.requestGuildMembers({ guild_id: "guild-1", query: "", limit: 0, nonce: "abc" });
+
+		expect(JSON.parse(wsMockState.instances[0]!.sent[0]!)).toEqual({
+			op: GatewayOpCodes.RequestGuildMembers,
+			d: { guild_id: "guild-1", query: "", limit: 0, nonce: "abc" },
+			s: null,
+			t: null
+		});
+	});
+
 	it("appends gateway version and encoding to the connection URL", () => {
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");

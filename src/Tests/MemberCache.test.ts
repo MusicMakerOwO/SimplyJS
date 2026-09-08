@@ -4,6 +4,7 @@ import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { Guild } from "../Structures/Guild.js";
 import { Member } from "../Structures/Member.js";
 import { DiscordGuild, DiscordMember, DiscordRole, DiscordUser } from "../Types/DiscordAPITypes.js";
+import { MembersChunk } from "../Events/Members.js";
 
 function makeClient(): Client {
 	return new Client({ token: "test-token", intents: GatewayIntents.Guilds });
@@ -137,5 +138,91 @@ describe("MemberCache", () => {
 		expect(spy).toHaveBeenCalledWith("/guilds/guild-1/members/search?query=some+one&limit=10");
 		expect(members).toHaveLength(1);
 		expect(guild.members.has("user-4")).toBe(true);
+	});
+});
+
+describe("MemberCache.fetchGateway", () => {
+	let client: Client;
+	let guild: Guild;
+
+	beforeEach(() => {
+		client = new Client({
+			token: "test-token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers
+		});
+		guild = client.guilds.upsert(guildData());
+	});
+
+	/** Replays a chunk back through the real handler, the way the dispatcher would */
+	function respond(nonce: string | undefined, members: DiscordMember[], index: number, count: number): void {
+		void MembersChunk.handler(client, {
+			guild_id: guild.id,
+			members,
+			chunk_index: index,
+			chunk_count: count,
+			...(nonce === undefined ? {} : { nonce })
+		});
+	}
+
+	it("sends op 8 with a nonce and resolves once the last chunk arrives", async () => {
+		const spy = vi.spyOn(client.socket, "requestGuildMembers").mockImplementation(() => {});
+
+		const pending = guild.members.fetchGateway();
+
+		const sent = spy.mock.calls[0]![0];
+		expect(sent).toMatchObject({ guild_id: "guild-1", query: "", limit: 0 });
+		expect(sent.nonce).toBeTypeOf("string");
+
+		respond(sent.nonce, [ memberData("user-1") ], 0, 2);
+		respond(sent.nonce, [ memberData("user-2") ], 1, 2);
+
+		const members = await pending;
+		expect(members.map((member) => member.id)).toEqual([ "user-1", "user-2" ]);
+		expect(guild.members.has("user-2")).toBe(true);
+	});
+
+	it("ignores chunks carrying a different nonce", async () => {
+		vi.useFakeTimers();
+		const spy = vi.spyOn(client.socket, "requestGuildMembers").mockImplementation(() => {});
+
+		const pending = guild.members.fetchGateway({ time: 1000 });
+		const assertion = expect(pending).rejects.toThrow(/Timed out/);
+
+		respond("someone-elses-nonce", [ memberData("user-1") ], 0, 1);
+		await vi.advanceTimersByTimeAsync(1000);
+
+		await assertion;
+		expect(spy).toHaveBeenCalledOnce();
+		vi.useRealTimers();
+	});
+
+	it("sends user ids instead of a query when given them", () => {
+		const spy = vi.spyOn(client.socket, "requestGuildMembers").mockImplementation(() => {});
+
+		void guild.members.fetchGateway({ userIds: [ "user-1", "user-2" ], limit: 0 });
+
+		expect(spy.mock.calls[0]![0]).toMatchObject({ user_ids: [ "user-1", "user-2" ] });
+		expect(spy.mock.calls[0]![0]).not.toHaveProperty("query");
+	});
+
+	it("rejects a request that mixes a query with user ids", async () => {
+		await expect(guild.members.fetchGateway({ query: "a", userIds: [ "user-1" ] }))
+			.rejects.toThrow(/mutually exclusive/);
+	});
+
+	it("rejects more than 100 user ids", async () => {
+		const ids = Array.from({ length: 101 }, (_, i) => `user-${i}`);
+		await expect(guild.members.fetchGateway({ userIds: ids })).rejects.toThrow(/more than 100/);
+	});
+
+	it("rejects a query fetch without the GuildMembers intent", async () => {
+		const limited = new Client({ token: "test-token", intents: GatewayIntents.Guilds });
+		const limitedGuild = limited.guilds.upsert(guildData("guild-2"));
+
+		await expect(limitedGuild.members.fetchGateway()).rejects.toThrow(/GuildMembers/);
+	});
+
+	it("rejects a presence fetch without the GuildPresences intent", async () => {
+		await expect(guild.members.fetchGateway({ presences: true })).rejects.toThrow(/GuildPresences/);
 	});
 });

@@ -33,7 +33,7 @@ import { GuildCreate, GuildDelete, GuildUpdate } from "../Events/Guilds.js";
 import { Member } from "../Structures/Member.js";
 import { Role } from "../Structures/Role.js";
 import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
-import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
+import { MemberCreate, MemberDelete, MemberUpdate, MembersChunk } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
 import { Ready } from "../Events/Ready.js";
 import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
@@ -402,6 +402,72 @@ describe("Gateway event handlers mutate caches", () => {
 		await MemberDelete.handler(client, { guild_id: guildPayload.id, user: member.user });
 		expect(client.guilds.get(guildPayload.id)?.members.has(member.user.id)).toBe(false);
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberDelete, expect.objectContaining({ user: expect.objectContaining({ id: member.user.id }) }));
+	});
+
+	it("MembersChunk caches every member in the chunk and emits the mapped payload", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		const emitSpy = vi.spyOn(client, "emit");
+		const guildPayload = createGuild();
+
+		await GuildCreate.handler(client, guildPayload);
+		await MembersChunk.handler(client, {
+			guild_id: guildPayload.id,
+			members: [createMember("chunked-1"), createMember("chunked-2")],
+			chunk_index: 0,
+			chunk_count: 2,
+			not_found: ["missing-1"],
+			nonce: "test-nonce"
+		});
+
+		const guild = client.guilds.get(guildPayload.id)!;
+		expect(guild.members.has("chunked-1")).toBe(true);
+		expect(guild.members.has("chunked-2")).toBe(true);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildMembersChunk, expect.objectContaining({
+			guild,
+			chunkIndex: 0,
+			chunkCount: 2,
+			notFound: ["missing-1"],
+			nonce: "test-nonce",
+			members: expect.arrayContaining([expect.objectContaining({ id: "chunked-1" })])
+		}));
+	});
+
+	it("MembersChunk caches online presences and drops offline ones", async () => {
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers | GatewayIntents.GuildPresences
+		});
+		const guildPayload = createGuild();
+
+		await GuildCreate.handler(client, guildPayload);
+		await MembersChunk.handler(client, {
+			guild_id: guildPayload.id,
+			members: [createMember("online-1"), createMember("offline-1")],
+			chunk_index: 0,
+			chunk_count: 1,
+			presences: [
+				{ user: { id: "online-1" }, status: Status.ONLINE, activities: [], client_status: {} },
+				{ user: { id: "offline-1" }, status: Status.OFFLINE, activities: [], client_status: {} }
+			]
+		});
+
+		const guild = client.guilds.get(guildPayload.id)!;
+		expect(guild.presences.has("online-1")).toBe(true);
+		expect(guild.presences.has("offline-1")).toBe(false);
+	});
+
+	it("MembersChunk ignores chunks for an uncached guild", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MembersChunk.handler(client, {
+			guild_id: "unknown-guild",
+			members: [createMember("chunked-1")],
+			chunk_index: 0,
+			chunk_count: 1
+		});
+
+		expect(emitSpy).not.toHaveBeenCalled();
 	});
 
 	it("MessageCreate adds message author and mentions to user cache and emits MessageCreate event", async () => {
