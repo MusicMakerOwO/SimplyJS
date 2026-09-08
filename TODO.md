@@ -127,13 +127,21 @@ for them.
 - [x] Give the remaining `*Update` handlers a real "old" value
   - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
   - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
-- [ ] Seed the active thread list from `GUILD_CREATE`
+- [x] Seed the active thread list from `GUILD_CREATE`
   - Discord sends a `threads` array (every active thread the bot can see) in `GUILD_CREATE`, but `DiscordGuildCreate` (`src/Types/DiscordAPITypes.ts`) doesn't model it and `Guild.patch` doesn't read it, so `guild.channels` has no threads until a `THREAD_CREATE` or `THREAD_LIST_SYNC` arrives
   - The same payload's thread `member` blobs would seed `thread.members` for the current user at the same time
   - `channel.threads.fetchActive()` now covers this on demand, so this is about avoiding the extra request rather than about reachability
-- [ ] Model application team types in `src/Types/DiscordAPITypes.ts`
-  - Replace the current `team?: Record<string, JSONObject>[]` placeholder with typed team and team-member models
-  - Thread the new types through any application metadata consumers once they exist
+- [x] Model application team types in `src/Types/DiscordAPITypes.ts`
+  - Replaced the `team?: Record<string, JSONObject>[]` placeholder with `DiscordTeam` / `DiscordTeamMember`, plus the `DiscordTeamMembershipStates` and `DiscordTeamMemberRoles` constants
+  - Corrected the field's shape at the same time: Discord sends a single nullable team object, not an array
+  - Nothing consumes application metadata yet, so there was nothing to thread the new types through
+- [x] Replace the `unknown` fields on the `Message` structure with real types
+  - `member`, `mentionChannels`, `interaction`, and `components` were widened to `unknown` even though `DiscordMessage` already modeled them, so they now use `Partial<DiscordMember>`, `ChannelMention[]`, `MessageInteraction`, and `MessageComponent[]`
+  - `interactionMetadata` needed a new `MessageInteractionMetadata` union in `src/Types/Interactions.ts`, which also replaced the `JSONObject` placeholder on `DiscordMessage.interaction_metadata`
+  - `src/Events/Messages.ts` takes `Partial<DiscordMember>` in place of `JSONObject` to match
+- [ ] Type `user_settings` and `auth` in the `READY` payload (`src/Events/Ready.ts`)
+  - Both are still `JSONObject`. Neither is documented in Discord's bot-facing API reference - `user_settings` is a user-account field bots receive empty, and `auth` is undocumented entirely
+  - Left opaque rather than modeled from reverse-engineered sources; revisit only if Discord documents them or a consumer actually needs to read them
 
 ## Discord gateway event implementation status
 
