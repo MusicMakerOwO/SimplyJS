@@ -15,12 +15,10 @@ break or living with the gap for a full major cycle, so it goes in first.
   - `MessageManager` (`src/Managers/Messages.ts`) on `channel.messages`, with `fetch(id)` for a single message and `fetch({ limit, before, after, around })` for a page of history. Created lazily by the `Messageable` mixin, so it is on `GuildTextChannel`, `GuildVoiceChannel`, and `GuildThreadChannel`
   - Deliberately **not** a cache, unlike the other managers: message history is unbounded, so caching it would mean owning an eviction policy. Every call hits REST. Authors/mentions still populate the global user cache via `Message.patch()`
   - `before`/`after`/`around` are mutually exclusive and the manager throws rather than letting Discord reject the request
-  - Still to do:
-    - [ ] `channel.messages` on `GuildAnnouncementChannel` and `GuildStageChannel` — both are in the `MessageableChannel` union (`src/Types/SimplyJSTypes.ts`) but neither applies the `Messageable` mixin, and `GuildAnnouncementChannel` carries its own duplicate `send()`. Refitting them onto the mixin would remove that duplication and make the union honest
-- [ ] Member list fetching + `REQUEST_GUILD_MEMBERS`
-  - `Members.fetch()` only does single-member GETs; there is no `GET /guilds/{id}/members` list and no member search
-  - `GatewayOpCodes.RequestGuildMembers` (op 8) is defined but never sent, and `GUILD_MEMBERS_CHUNK` is not modeled in `GatewayEvents` or handled
-  - Without both, a guild's member cache can never be populated
+- [ ] `REQUEST_GUILD_MEMBERS` over the gateway
+  - REST member listing is done: `MemberCache.fetch()` overloads single/bulk, plus `fetchAll()` and `search()`
+  - `GatewayOpCodes.RequestGuildMembers` (op 8) is still defined but never sent, and `GUILD_MEMBERS_CHUNK` is not modeled in `GatewayEvents` or handled
+  - Needs nonce correlation to match chunks back to the request that asked for them
 - [ ] Sharding
   - `#handleHello` sends `Identify` with no `shard` array and there is no shard manager, so the library hard-stops at the ~2500 guild boundary
   - `GatewayCloseCodes.ShardingRequired` is correctly treated as fatal, which makes the ceiling a clean failure rather than a silent one - but it is still a ceiling
@@ -92,8 +90,6 @@ for them.
   - Not covered: the webhook *message* routes (`GET`/`PATCH`/`DELETE /webhooks/{id}/{token}/messages/{id}`), so a message sent by `webhook.send()` cannot be edited or deleted through the webhook afterwards
   - Not covered: `POST /channels/{id}/followers` (channel follower webhooks) and the `/webhooks/{id}/{token}/slack` and `/github` compatibility routes
   - `send()` can attach files via `attachments`
-- [ ] Thread creation
-  - Every thread *event* is handled and cached, but `POST /channels/{id}/threads`, `POST /channels/{id}/messages/{id}/threads`, and the archived-thread listing endpoints are all absent
 - [ ] Application resource
   - `/applications/@me`, application-owned emojis, role connection metadata
 - [ ] Monetization
@@ -121,21 +117,20 @@ for them.
   - Guild cache upsert/fetch/update
   - User cache upsert/fetch/update
   - Guild-scoped cache interactions (Channels, Roles, Members, Stickers, Emojis)
+  - `src/Tests/MemberCache.test.ts` and `src/Tests/PartialPayloads.test.ts` already cover the member cache's fetch paths and partial-payload upserts, so this entry is now the remaining guild/user/channel/role/sticker/emoji cache coverage
 
 ## Further planning
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
   - Voice, stage instance, and voice channel effect events are deliberately deferred with the Voice Chat work
   - The non-voice gaps are the `❌ not modeled` rows in the status table below - `USER_UPDATE` and `GUILD_MEMBERS_CHUNK` are the two that affect ordinary bots
-- [ ] Give the remaining `*Update` handlers a real "old" value
+- [x] Give the remaining `*Update` handlers a real "old" value
   - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
   - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
 - [ ] Seed the active thread list from `GUILD_CREATE`
   - Discord sends a `threads` array (every active thread the bot can see) in `GUILD_CREATE`, but `DiscordGuildCreate` (`src/Types/DiscordAPITypes.ts`) doesn't model it and `Guild.patch` doesn't read it, so `guild.channels` has no threads until a `THREAD_CREATE` or `THREAD_LIST_SYNC` arrives
   - The same payload's thread `member` blobs would seed `thread.members` for the current user at the same time
-- [ ] Harden `User.patch` against partial user payloads
-  - `src/Structures/User.ts` assigns `id`/`username`/`discriminator`/`global_name`/`avatar` unconditionally, so upserting a partial user (as `PRESENCE_UPDATE` sends) blanks those fields on an already-cached user. `PresenceUpdate` guards at the call site; guarding in `patch` would cover every future partial-user payload
-  - Tradeoff: it weakens the "always set" invariant implied by the `!` definite-assignment markers on those fields
+  - `channel.threads.fetchActive()` now covers this on demand, so this is about avoiding the extra request rather than about reachability
 - [ ] Model application team types in `src/Types/DiscordAPITypes.ts`
   - Replace the current `team?: Record<string, JSONObject>[]` placeholder with typed team and team-member models
   - Thread the new types through any application metadata consumers once they exist
@@ -231,7 +226,7 @@ Legend:
 
 [^1]: The client's own user goes stale after an app edit, since nothing refreshes `client.user`.
 
-[^2]: See the member fetching entry under "Pre-beta blockers" - the chunk event and the op 8 request that triggers it have to land together.
+[^2]: See the `REQUEST_GUILD_MEMBERS` entry under "Pre-beta blockers" - the chunk event and the op 8 request that triggers it have to land together. REST member listing (`guild.members.fetch()` / `fetchAll()` / `search()`) already covers the cache-population case.
 
 [^3]: Present in `GatewayEvents` but no handler is exported from `src/Events/index.ts`.
 

@@ -158,6 +158,14 @@ async function resolveMember(client: FullClient, guildId: string, input?: string
 }
 ```
 
+`guild.members.fetch()` is overloaded: pass an ID for one member, or pagination options for a page of them. `fetchAll()` pages through the whole guild, and `search()` matches a username or nickname prefix - both need the **privileged** `GuildMembers` intent:
+
+```ts
+const page = await guild.members.fetch({ limit: 100 });   // one page, ordered by ascending user ID
+const everyone = await guild.members.fetchAll();          // one request per 1000 members
+const matches = await guild.members.search("mus", 5);     // prefix match on username/nickname
+```
+
 Moderation actions are methods directly on the structure:
 
 ```ts
@@ -170,6 +178,28 @@ try {
 } catch {
 	await message.reply("Something went wrong - do I have the Kick Members permission?");
 }
+```
+
+### Threads
+
+Threadable channels (text, announcement, forum) expose a `threads` manager. Threads are channels, so anything it creates or lists lands in `guild.channels` rather than a separate collection:
+
+```ts
+const thread = await channel.threads.create({ name: "bug-triage", autoArchiveDuration: 1440 });
+await thread.send("Starting here.");
+
+// a thread hanging off an existing message
+await channel.threads.createFromMessage(message.id, { name: "spinoff" });
+
+// a forum post carries its first message in the same request
+await forum.threads.createForumPost({
+	name: "Read me first",
+	message: { content: "Rules and guidelines", embeds: [ embed ] },
+	appliedTags: [ tagId ],
+});
+
+const active = await channel.threads.fetchActive();
+const { threads, hasMore } = await channel.threads.fetchArchived({ limit: 25 });
 ```
 
 ### Command handlers (multi-file)
@@ -346,6 +376,8 @@ The project is alpha software; gateway resiliency and Discord API coverage are s
 - `guild.integrations` is not seeded from `GUILD_CREATE` — Discord does not send integrations there — so it starts empty and only fills from `Integration*` gateway events or an explicit `guild.integrations.fetchAll()`. `GuildIntegrationsUpdate` says only that *something* changed in a guild, so treat it as a signal to refetch.
 - `guild.webhooks` is likewise never seeded from `GUILD_CREATE`, and `WebhooksUpdate` tells you only which channel changed, not which webhook or how — call `guild.webhooks.fetchChannel(channelId)` to resync. A `Webhook` fetched without a token (anything the bot's own application did not create) cannot be executed, so `webhook.send()` throws for those.
 - `guild.soundboardSounds` is keyed by sound id, not `id` — Discord's soundboard sound object uses `sound_id`, which the `SoundboardSound` structure surfaces as `soundId`. The cache is seeded from `GUILD_CREATE` and kept current by the `SoundboardSound*` events, which need the `GuildExpressions` intent. `SoundboardSoundsUpdate` upserts every sound it carries but never evicts: Discord does not document that payload as a guaranteed full-list replacement, so `GUILD_SOUNDBOARD_SOUND_DELETE` is treated as the only authoritative removal signal.
+- `guild.members` fills from `GUILD_CREATE`, the member gateway events, and the REST fetches above. `GatewayOpCodes.RequestGuildMembers` (op 8) is not implemented, so there is no gateway-side chunked member request - a full member list means paging `fetchAll()` over REST, which costs one request per 1000 members and is heavily rate limited.
+- `channel.threads` has no cache of its own, since threads are channels: `create()`, `createForumPost()`, `createFromMessage()`, and the `fetchActive()` / `fetchArchived()` / `fetchArchivedPrivate()` / `fetchJoinedArchivedPrivate()` listings all upsert into `guild.channels`. Discord has no per-channel active listing, so `fetchActive()` requests the guild-wide one and narrows the result. `before` is an archive timestamp on the archived listings but a thread ID on the joined-private one.
 - `thread.members` is only ever complete for the current user without the **privileged** `GuildMembers` intent, and `ThreadMembersUpdate` caps its `added` list at 50 either way, so call `thread.members.fetchAll()` when you need the full membership of a busy thread. Threads themselves live in `guild.channels` alongside regular channels, not in a separate collection.
 - `PresenceUpdate` and `guild.presences` require the **privileged** `GuildPresences` intent, which must also be enabled for the application in the Discord developer portal. Without it the event never fires and the cache stays empty. Offline users are not retained, so `member.presence` is `undefined` for anyone offline, unseen, or when the intent is off.
 - No interaction/slash-command support. Only traditional message-based (prefix) commands are demonstrated, since component/interaction payloads (`src/Types/Internal.ts`) are placeholders for a later update.
