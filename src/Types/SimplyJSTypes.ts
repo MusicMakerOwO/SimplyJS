@@ -166,6 +166,27 @@ export type ThreadListSyncPayload = {
 	evicted: string[];
 };
 
+/** Payload for `GuildMembersChunk`; one slice of the members matched by a gateway member request */
+export type GuildMembersChunkPayload = {
+	/** Guild the members belong to */
+	guild: Guild;
+	/** The members in this chunk, now cached in `guild.members` */
+	members: Member[];
+	/**
+	 * Presences for the members in this chunk, now cached in `guild.presences`. Empty unless the
+	 * request asked for presences, and offline members are never included.
+	 */
+	presences: Presence[];
+	/** Zero-based index of this chunk; the last chunk of a response has `chunkIndex === chunkCount - 1` */
+	chunkIndex: number;
+	/** Total number of chunks the gateway is sending for the originating request */
+	chunkCount: number;
+	/** Requested user ids that did not match a member of the guild; empty unless ids were requested */
+	notFound: string[];
+	/** The nonce sent with the originating request, if it had one */
+	nonce?: string;
+};
+
 export const ClientEvents = {
 	/**
 	 * Fired once the client is ready for normal use.
@@ -266,6 +287,12 @@ export const ClientEvents = {
 	 * Listener arguments: `member` ({@link Member} | {@link DiscordUser}).
 	 */
 	MemberDelete: "MemberDelete",
+	/**
+	 * Fired for each chunk of members returned by a gateway member request, such as one made by
+	 * `guild.members.fetchGateway()`. Match chunks to their request with the payload's `nonce`.
+	 * Listener arguments: `payload` ({@link GuildMembersChunkPayload}).
+	 */
+	GuildMembersChunk: "GuildMembersChunk",
 
 	/**
 	 * Fired when a guild emoji sync contains newly added emojis.
@@ -620,6 +647,7 @@ export type ClientEventMap = {
 	[ClientEvents.MemberCreate]: [member: Member];
 	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];
 	[ClientEvents.MemberDelete]: [member: Member | DiscordUser];
+	[ClientEvents.GuildMembersChunk]: [payload: GuildMembersChunkPayload];
 
 	[ClientEvents.EmojiCreate]: [guild: Guild, emoji: Emoji];
 	[ClientEvents.EmojiUpdate]: [guild: Guild, oldEmoji: Emoji | undefined, newEmoji: Emoji];
