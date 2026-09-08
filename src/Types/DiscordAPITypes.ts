@@ -556,6 +556,8 @@ export type DiscordGuild = {
  */
 export type DiscordGuildCreate = DiscordGuild & {
 	channels?: DiscordChannel[];
+	/** Every active thread in the guild the current user can see, each with the current user's `member` blob when they have joined it */
+	threads?: DiscordChannel[];
 	members?: DiscordMember[];
 	guild_scheduled_events?: DiscordGuildScheduledEvent[];
 	presences?: DiscordPresence[];

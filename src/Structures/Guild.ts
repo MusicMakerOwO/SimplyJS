@@ -233,6 +233,15 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 			}
 		}
 
+		// Sent after `channels` so a thread's parent is already cached, and carrying the same
+		// `guild_id` fallback since Discord omits it on threads nested in `GUILD_CREATE`. Each
+		// thread's `member` blob seeds `thread.members` for the current user via the channel patch.
+		if ("threads" in data && data.threads !== undefined) {
+			for (const apiThread of data.threads) {
+				this.channels.upsert({ ...apiThread, guild_id: apiThread.guild_id ?? this.id });
+			}
+		}
+
 		if ("members" in data && data.members) {
 			for (const apiMember of data.members) {
 				this.members.upsert(apiMember);
