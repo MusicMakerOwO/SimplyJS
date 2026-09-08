@@ -44,7 +44,30 @@ type RestRequestOptions = {
 	headers?: Record<string, string>;
 	retryCount?: number;
 	files?: FileAttachment[];
+	multipart?: MultipartMode;
 };
+
+/**
+ * How a `multipart/form-data` body is laid out.
+ *
+ * - `payload_json` - the whole JSON body in a `payload_json` part, one `files[n]` part per file.
+ *   This is what message, webhook, and interaction endpoints expect.
+ * - `fields` - every top-level key of the JSON body as its own form field, and the single file as a
+ *   part named `file`. Sticker creation is the one endpoint that wants this and rejects `payload_json`.
+ */
+export type MultipartMode = "payload_json" | "fields";
+
+/** A file upload paired with the {@link MultipartMode} the target endpoint expects */
+export type MultipartUpload = {
+	files: FileAttachment[];
+	multipart: MultipartMode;
+};
+
+/** Normalizes the `files` argument of the public verb methods, which accepts a bare list for the default mode */
+function NormalizeUpload(files?: FileAttachment[] | MultipartUpload): MultipartUpload | undefined {
+	if (!files) return undefined;
+	return Array.isArray(files) ? { files, multipart: "payload_json" } : files;
+}
 
 /**
  * Rejects file lists Discord would reject anyway, before spending a request on them.
@@ -71,28 +94,46 @@ function ValidateFiles(files: FileAttachment[]): void {
  * {@link RestRequestOptions}, omitting whichever were not supplied rather than setting them to
  * `undefined` (the project compiles with `exactOptionalPropertyTypes`).
  */
-function RestRequestOptionsFrom(headers?: Record<string, string>, files?: FileAttachment[]): RestRequestOptions {
+function RestRequestOptionsFrom(
+	headers?: Record<string, string>,
+	files?: FileAttachment[] | MultipartUpload
+): RestRequestOptions {
+	const upload = NormalizeUpload(files);
 	return {
 		...(headers ? { headers } : {}),
-		...(files ? { files } : {})
+		...(upload ? { files: upload.files, multipart: upload.multipart } : {})
 	};
 }
 
 /**
- * Builds the `multipart/form-data` body Discord expects for uploads: the JSON payload under
- * `payload_json`, then one `files[n]` part per attachment.
+ * Builds the `multipart/form-data` body Discord expects for uploads, in whichever layout the
+ * endpoint wants - see {@link MultipartMode}.
  *
  * Rebuilt for every attempt rather than once per request - a body that has already been handed to
  * `fetch` is consumed and cannot be replayed on a `429` or `5xx` retry.
  */
-function BuildFormData(data: JSONObject | JSONArray | null, files: FileAttachment[]): FormData {
+function BuildFormData(
+	data: JSONObject | JSONArray | null,
+	files: FileAttachment[],
+	mode: MultipartMode
+): FormData {
 	const form = new FormData();
-	form.append("payload_json", JSON.stringify(data ?? {}));
+
+	if (mode === "fields") {
+		// null and undefined are dropped rather than stringified into the literal text "null"
+		for (const [key, value] of Object.entries((data ?? {}) as JSONObject)) {
+			if (value === null || value === undefined) continue;
+			form.append(key, String(value));
+		}
+	} else {
+		form.append("payload_json", JSON.stringify(data ?? {}));
+	}
 
 	for (let i = 0; i < files.length; i++) {
 		const file = files[i]!;
 		const bytes = typeof file.data === "string" ? new TextEncoder().encode(file.data) : file.data;
-		form.append(`files[${i}]`, new Blob([bytes as BlobPart]), file.name);
+		const partName = mode === "fields" ? "file" : `files[${i}]`;
+		form.append(partName, new Blob([bytes as BlobPart]), file.name);
 	}
 
 	return form;
@@ -377,8 +418,15 @@ export class Rest {
 		let transientRetryAttempt = 0;
 
 		const files = options.files ?? [];
+		const multipartMode = options.multipart ?? "payload_json";
 		const isMultipart = files.length > 0;
-		if (isMultipart) ValidateFiles(files);
+		if (isMultipart) {
+			ValidateFiles(files);
+			// every file would be appended under the same `file` part name and overwrite the last
+			if (multipartMode === "fields" && files.length > 1) {
+				throw new Error("This endpoint accepts a single file, received " + files.length);
+			}
+		}
 
 		while (true) {
 			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(method, normalizedRoute);
@@ -394,7 +442,7 @@ export class Rest {
 					...options.headers
 				},
 				body: isMultipart
-					? BuildFormData(data, files)
+					? BuildFormData(data, files, multipartMode)
 					: data ? JSON.stringify(data) : null
 			});
 
@@ -446,19 +494,21 @@ export class Rest {
 
 	/**
 	 * Sends a POST request to the provided path. This can only be used for discord requests
-	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
-	 * `data` under `payload_json` instead of as a plain JSON body.
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` instead
+	 * of as a plain JSON body. A bare list puts `data` under `payload_json`; pass a
+	 * {@link MultipartUpload} to choose a different layout.
 	 */
-	post<T>(path: string, data: JSONObject | JSONArray, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+	post<T>(path: string, data: JSONObject | JSONArray, headers?: Record<string, string>, files?: FileAttachment[] | MultipartUpload): Promise<T> {
 		return this.#request<T>("POST", path, data, RestRequestOptionsFrom(headers, files));
 	}
 
 	/**
 	 * Sends a PATCH request to the provided path. This can only be used for discord requests
-	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
-	 * `data` under `payload_json` instead of as a plain JSON body.
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` instead
+	 * of as a plain JSON body. A bare list puts `data` under `payload_json`; pass a
+	 * {@link MultipartUpload} to choose a different layout.
 	 */
-	patch<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+	patch<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[] | MultipartUpload): Promise<T> {
 		return this.#request<T>("PATCH", path, data, RestRequestOptionsFrom(headers, files));
 	}
 
@@ -469,10 +519,11 @@ export class Rest {
 
 	/**
 	 * Sends a PUT request to the provided path. This can only be used for discord requests
-	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` with
-	 * `data` under `payload_json` instead of as a plain JSON body.
+	 * @param files When provided and non-empty, the request is sent as `multipart/form-data` instead
+	 * of as a plain JSON body. A bare list puts `data` under `payload_json`; pass a
+	 * {@link MultipartUpload} to choose a different layout.
 	 */
-	put<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[]): Promise<T> {
+	put<T>(path: string, data: JSONObject | JSONArray | null, headers?: Record<string, string>, files?: FileAttachment[] | MultipartUpload): Promise<T> {
 		return this.#request<T>("PUT", path, data, RestRequestOptionsFrom(headers, files));
 	}
 }
