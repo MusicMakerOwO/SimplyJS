@@ -24,7 +24,7 @@ export const GuildDelete = defineEvent({
 export const GuildUpdate = defineEvent({
 	name: GatewayEvents.GuildUpdate,
 	handler: (client, data: DiscordGuild): void => {
-		const oldGuild = client.guilds.get(data.id);
+		const oldGuild = client.guilds.get(data.id)?.clone();
 		const newGuild = client.guilds.upsert(data);
 		client.emit(ClientEvents.GuildUpdate, oldGuild, newGuild);
 	}

@@ -29,8 +29,10 @@ export const StickersUpdate = defineEvent({
 				continue;
 			}
 
+			// Snapshot before the upsert, which patches the cached instance in place
+			const oldSnapshot = oldSticker.clone();
 			const newSticker = guild.stickers.upsert(sticker);
-			client.emit(ClientEvents.StickerUpdate, guild, oldSticker, newSticker);
+			client.emit(ClientEvents.StickerUpdate, guild, oldSnapshot, newSticker);
 		}
 
 		for (const savedSticker of guild.stickers.values()) {

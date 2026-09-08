@@ -32,7 +32,7 @@ export const MemberUpdate = defineEvent({
 	handler: (client, data: DiscordMember & { guild_id: string }): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const oldMember = guild.members.get(data.user.id);
+		const oldMember = guild.members.get(data.user.id)?.clone();
 		const newMember = guild.members.upsert(data);
 		client.emit(ClientEvents.MemberUpdate, oldMember, newMember);
 	}

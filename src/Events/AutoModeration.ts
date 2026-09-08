@@ -18,7 +18,7 @@ export const AutoModerationRuleUpdate = defineEvent({
 	handler: (client, data: DiscordAutoModerationRule): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const oldRule = guild.autoModerationRules.get(data.id);
+		const oldRule = guild.autoModerationRules.get(data.id)?.clone();
 		const newRule = guild.autoModerationRules.upsert(data);
 		client.emit(ClientEvents.AutoModerationRuleUpdate, oldRule, newRule);
 	}

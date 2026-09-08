@@ -19,7 +19,7 @@ export const GuildScheduledEventUpdate = defineEvent({
 	handler: (client, data: DiscordGuildScheduledEvent): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const oldEvent = guild.scheduledEvents.get(data.id);
+		const oldEvent = guild.scheduledEvents.get(data.id)?.clone();
 		const newEvent = guild.scheduledEvents.upsert(data);
 		client.emit(ClientEvents.GuildScheduledEventUpdate, oldEvent, newEvent);
 	}

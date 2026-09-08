@@ -30,7 +30,7 @@ export const RoleUpdate = defineEvent({
 	handler: (client, data: { guild_id: string, role: DiscordRole }): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const oldRole = guild.roles.get(data.role.id);
+		const oldRole = guild.roles.get(data.role.id)?.clone();
 		const newRole = guild.roles.upsert(data.role);
 		client.emit(ClientEvents.RoleUpdate, oldRole, newRole);
 	}

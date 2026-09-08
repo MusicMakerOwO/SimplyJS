@@ -1774,6 +1774,21 @@ describe("User.send() DM flow", () => {
 		expect(dmCreationCalls).toHaveLength(1);
 	});
 
+	it("a cloned user opens its own DM channel instead of throwing on a missing private field", async () => {
+		const dmChannel = { id: "dm-channel-1", type: 1 };
+		const spy = vi.spyOn(client.rest, "post")
+			.mockResolvedValueOnce(dmChannel)
+			.mockResolvedValue(messageData());
+
+		await user.send("first");
+		// The DM cache is keyed off a WeakMap rather than a `#private` field, which `clone()`
+		// cannot carry across - the snapshot simply starts without one
+		await user.clone().send("from the snapshot");
+
+		const dmCreationCalls = spy.mock.calls.filter(([route]) => route === "/users/@me/channels");
+		expect(dmCreationCalls).toHaveLength(2);
+	});
+
 	// ---------------------------------------------------------------------------
 	// Guild Bans
 	// ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ export const ChannelUpdate = defineEvent({
 	handler: (client, data: DiscordChannel): void => {
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
-		const oldChannel = guild.channels.get(data.id);
+		const oldChannel = guild.channels.get(data.id)?.clone();
 		const newChannel = guild.channels.upsert(data);
 		client.emit(ClientEvents.ChannelUpdate, oldChannel, newChannel);
 	}

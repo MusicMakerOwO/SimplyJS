@@ -23,7 +23,7 @@ export const IntegrationUpdate = defineEvent({
 	handler: (client, data: DiscordIntegrationUpdate): void => {
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
-		const oldIntegration = guild.integrations.get(data.id);
+		const oldIntegration = guild.integrations.get(data.id)?.clone();
 		const newIntegration = guild.integrations.upsert(data);
 		client.emit(ClientEvents.IntegrationUpdate, oldIntegration, newIntegration);
 	}

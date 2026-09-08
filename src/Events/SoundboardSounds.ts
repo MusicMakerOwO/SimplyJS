@@ -33,7 +33,7 @@ export const SoundboardSoundUpdate = defineEvent({
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
 
-		const oldSound = guild.soundboardSounds.get(data.sound_id);
+		const oldSound = guild.soundboardSounds.get(data.sound_id)?.clone();
 		const newSound = guild.soundboardSounds.upsert(data);
 		client.emit(ClientEvents.SoundboardSoundUpdate, guild, oldSound, newSound);
 	}
@@ -75,7 +75,7 @@ export const SoundboardSoundsUpdate = defineEvent({
 		if (!guild) return;
 
 		const sounds = data.soundboard_sounds.map(sound => {
-			const oldSound = guild.soundboardSounds.get(sound.sound_id);
+			const oldSound = guild.soundboardSounds.get(sound.sound_id)?.clone();
 			const newSound = guild.soundboardSounds.upsert(sound);
 
 			if (!oldSound) {

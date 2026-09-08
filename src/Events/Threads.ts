@@ -20,7 +20,7 @@ export const ThreadUpdate = defineEvent({
 	handler: (client, data: DiscordChannel): void => {
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
-		const oldThread = guild.channels.get(data.id);
+		const oldThread = guild.channels.get(data.id)?.clone();
 		const newThread = guild.channels.upsert(data);
 		client.emit(ClientEvents.ThreadUpdate, oldThread, newThread);
 	}

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
+import { Guild } from "../Structures/Guild.js";
 import {
 	DiscordAutoModerationActionExecution,
 	DiscordAutoModerationActionType,
@@ -28,7 +29,10 @@ import {
 	ThreadMembersUpdate,
 	ThreadUpdate
 } from "../Events/Threads.js";
-import { GuildCreate, GuildDelete } from "../Events/Guilds.js";
+import { GuildCreate, GuildDelete, GuildUpdate } from "../Events/Guilds.js";
+import { Member } from "../Structures/Member.js";
+import { Role } from "../Structures/Role.js";
+import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
 import { MemberCreate, MemberDelete, MemberUpdate } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
 import { Ready } from "../Events/Ready.js";
@@ -78,6 +82,16 @@ import {
 } from "../Events/SoundboardSounds.js";
 import { DiscordGuildSoundboardSoundCreate } from "../Types/DiscordAPITypes.js";
 import { DiscordIntegrationCreate, DiscordIntegrationExpireBehaviors } from "../Types/DiscordAPITypes.js";
+
+/**
+ * Pulls the payload of the first `emit` call for a given event off a spy, so a test can assert
+ * against the exact object a listener would have received.
+ */
+function emitted(emitSpy: { mock: { calls: unknown[][] } }, event: string): unknown[] {
+	const call = emitSpy.mock.calls.find(([emittedEvent]) => emittedEvent === event);
+	expect(call, `expected ${event} to have been emitted`).toBeDefined();
+	return call!.slice(1);
+}
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -776,7 +790,13 @@ describe("Thread gateway event handlers", () => {
 		expect(cachedAfter).toBe(cachedBefore);
 		expect(cachedAfter?.name).toBe("renamed-thread");
 		expect((cachedAfter as GuildThreadChannel).threadMetadata?.archived).toBe(true);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadUpdate, cachedBefore, cachedAfter);
+
+		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
+		const [oldThread, newThread] = emitted(emitSpy, ClientEvents.ThreadUpdate) as [GuildThreadChannel, GuildThreadChannel];
+		expect(newThread).toBe(cachedAfter);
+		expect(oldThread).not.toBe(cachedAfter);
+		expect(oldThread.name).toBe("help-thread");
+		expect(oldThread.threadMetadata?.archived).toBe(false);
 	});
 
 	it("ThreadDelete emits the cached thread before evicting it", async () => {
@@ -908,7 +928,14 @@ describe("Auto moderation gateway event handlers", () => {
 		expect(cachedAfter?.name).toBe("No invites");
 		expect(cachedAfter?.enabled).toBe(false);
 		expect(cachedAfter?.exemptRoles).toEqual(["role-1"]);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationRuleUpdate, cachedBefore, cachedAfter);
+
+		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
+		const [oldRule, newRule] = emitted(emitSpy, ClientEvents.AutoModerationRuleUpdate) as [AutoModerationRule, AutoModerationRule];
+		expect(newRule).toBe(cachedAfter);
+		expect(oldRule).not.toBe(cachedAfter);
+		expect(oldRule.name).toBe("No links");
+		expect(oldRule.enabled).toBe(true);
+		expect(oldRule.exemptRoles).toEqual([]);
 	});
 
 	it("AutoModerationRuleDelete emits the cached rule before evicting it", async () => {
@@ -1259,7 +1286,13 @@ describe("Guild scheduled event gateway event handlers", () => {
 		expect(updated).toBe(cached);
 		expect(updated.name).toBe("Game night II");
 		expect(updated.status).toBe(DiscordGuildScheduledEventStatus.ACTIVE);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventUpdate, cached, updated);
+
+		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
+		const [oldEvent, newEvent] = emitted(emitSpy, ClientEvents.GuildScheduledEventUpdate) as [GuildScheduledEvent, GuildScheduledEvent];
+		expect(newEvent).toBe(updated);
+		expect(oldEvent).not.toBe(updated);
+		expect(oldEvent.name).toBe("Game night");
+		expect(oldEvent.status).toBe(createScheduledEvent().status);
 	});
 
 	it("GuildScheduledEventDelete emits the cached event and drops it from the cache", async () => {
@@ -2027,7 +2060,13 @@ describe("Integration gateway event handlers", () => {
 		expect(updated).toBe(cached);
 		expect(updated.enabled).toBe(false);
 		expect(updated.subscriberCount).toBe(42);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationUpdate, cached, updated);
+
+		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
+		const [oldIntegration, newIntegration] = emitted(emitSpy, ClientEvents.IntegrationUpdate) as [Integration, Integration];
+		expect(newIntegration).toBe(updated);
+		expect(oldIntegration).not.toBe(updated);
+		expect(oldIntegration.enabled).toBe(true);
+		expect(oldIntegration.subscriberCount).toBe(3);
 	});
 
 	it("IntegrationUpdate emits an undefined old integration when it was not cached", async () => {
@@ -2173,7 +2212,14 @@ describe("Soundboard sound gateway event handlers", () => {
 		expect(updated.name).toBe("Louder Airhorn");
 		expect(updated.volume).toBe(1);
 		expect(updated.available).toBe(false);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundUpdate, guild, cached, updated);
+
+		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
+		const [, oldSound, newSound] = emitted(emitSpy, ClientEvents.SoundboardSoundUpdate) as [Guild, SoundboardSound, SoundboardSound];
+		expect(newSound).toBe(updated);
+		expect(oldSound).not.toBe(updated);
+		expect(oldSound.name).toBe("Airhorn");
+		expect(oldSound.volume).toBe(0.75);
+		expect(oldSound.available).toBe(true);
 	});
 
 	it("SoundboardSoundUpdate emits an undefined old sound when it was not cached", async () => {
@@ -2227,7 +2273,10 @@ describe("Soundboard sound gateway event handlers", () => {
 
 		const added = guild.soundboardSounds.get("sound-2")!;
 		expect(existing.name).toBe("Renamed");
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundUpdate, guild, existing, existing);
+
+		const [, oldSound, newSound] = emitted(emitSpy, ClientEvents.SoundboardSoundUpdate) as [Guild, SoundboardSound, SoundboardSound];
+		expect(newSound).toBe(existing);
+		expect(oldSound.name).toBe("Airhorn");
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundCreate, guild, added);
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundsUpdate, guild, [existing, added]);
 	});
@@ -2304,5 +2353,116 @@ describe("Soundboard sound gateway event handlers", () => {
 		await SoundboardSoundCreate.handler(client, createSoundboardSound());
 
 		expect(client.guilds.get("guild-1")!.soundboardSounds.get("sound-1")!.user).toBeUndefined();
+	});
+});
+
+/**
+ * Caches patch their entries in place, so every `*Update` handler snapshots the previous value
+ * with `clone()` before upserting. These cover the structures whose `patch()` mutates state rather
+ * than reassigning it, which a plain shallow copy would leave shared with the live instance.
+ */
+describe("Update event old-value snapshots", () => {
+	it("RoleUpdate emits an old role whose permissions survive the in-place override", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await RoleUpdate.handler(client, {
+			guild_id: "guild-1",
+			role: { ...createRole(), name: "Moderator", permissions: "8" }
+		});
+
+		const cached = client.guilds.get("guild-1")!.roles.get("role-1")!;
+		const [oldRole, newRole] = emitted(emitSpy, ClientEvents.RoleUpdate) as [Role, Role];
+		expect(newRole).toBe(cached);
+		expect(oldRole).not.toBe(cached);
+		expect(oldRole.name).toBe("Role");
+		// patch() calls permissions.override(), so a shared bitfield would read "8" on both sides
+		expect(oldRole.permissions).not.toBe(newRole.permissions);
+		expect(oldRole.permissions.toString()).toBe("0");
+		expect(newRole.permissions.toString()).toBe("8");
+	});
+
+	it("ChannelUpdate emits an old channel whose permission overwrites survive the in-place patch", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelUpdate.handler(client, {
+			...createChannel(),
+			name: "renamed",
+			permission_overwrites: [{ id: "role-1", type: 0, allow: "0", deny: "1024" }]
+		});
+
+		const cached = client.guilds.get("guild-1")!.channels.get("channel-1")!;
+		const [oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [GuildTextChannel, GuildTextChannel];
+		expect(newChannel).toBe(cached);
+		expect(oldChannel.name).toBe("general");
+		expect(newChannel.name).toBe("renamed");
+		// patch() updates the manager in place, so a shared one would show the new overwrite on both sides
+		expect(oldChannel.permissionOverwrites).not.toBe(newChannel.permissionOverwrites);
+		expect(oldChannel.permissionOverwrites!.has("role-1")).toBe(false);
+		expect(newChannel.permissionOverwrites!.has("role-1")).toBe(true);
+	});
+
+	it("a cloned channel builds its own message manager rather than throwing", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		await ChannelCreate.handler(client, createChannel());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ChannelUpdate.handler(client, { ...createChannel(), name: "renamed" });
+
+		// `messages` is lazily built off a WeakMap precisely so a clone, which carries no private
+		// fields across, still resolves it
+		const [oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [GuildTextChannel, GuildTextChannel];
+		expect(oldChannel.messages).toBeDefined();
+		expect(oldChannel.messages).not.toBe(newChannel.messages);
+	});
+
+	it("MemberUpdate emits an old member whose user survives the in-place patch", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		await GuildCreate.handler(client, createGuild());
+		await MemberCreate.handler(client, createMember());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		const member = createMember();
+		await MemberUpdate.handler(client, {
+			...member,
+			nick: "updated-nick",
+			roles: ["role-1", "role-2"],
+			user: { ...member.user, username: "renamed" }
+		});
+
+		const cached = client.guilds.get("guild-1")!.members.get("member-1")!;
+		const [oldMember, newMember] = emitted(emitSpy, ClientEvents.MemberUpdate) as [Member, Member];
+		expect(newMember).toBe(cached);
+		expect(oldMember).not.toBe(cached);
+		expect(oldMember.nick).toBeUndefined();
+		expect(oldMember.roles).toEqual(["role-1"]);
+		expect(newMember.roles).toEqual(["role-1", "role-2"]);
+		// users.upsert() patches the shared User in place, so the snapshot needs its own copy
+		expect(oldMember.user).not.toBe(newMember.user);
+		expect(oldMember.user.username).toBe("tester");
+		expect(newMember.user.username).toBe("renamed");
+	});
+
+	it("GuildUpdate emits an old guild that keeps its fields but shares the live sub-caches", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		await GuildCreate.handler(client, createGuild());
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await GuildUpdate.handler(client, { ...createGuild(), name: "Updated Guild" });
+
+		const cached = client.guilds.get("guild-1")!;
+		const [oldGuild, newGuild] = emitted(emitSpy, ClientEvents.GuildUpdate) as [Guild, Guild];
+		expect(newGuild).toBe(cached);
+		expect(oldGuild).not.toBe(cached);
+		expect(oldGuild.name).toBe("Guild");
+		expect(newGuild.name).toBe("Updated Guild");
+		// sub-caches are deliberately aliased, not copied - GUILD_UPDATE only changes guild fields
+		expect(oldGuild.members).toBe(newGuild.members);
+		expect(oldGuild.roles).toBe(newGuild.roles);
 	});
 });

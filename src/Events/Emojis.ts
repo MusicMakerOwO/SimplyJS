@@ -29,8 +29,10 @@ export const EmojisUpdate = defineEvent({
 				continue;
 			}
 
+			// Snapshot before the upsert, which patches the cached instance in place
+			const oldSnapshot = oldEmoji.clone();
 			const newEmoji = guild.emojis.upsert(emoji);
-			client.emit(ClientEvents.EmojiUpdate, guild, oldEmoji, newEmoji);
+			client.emit(ClientEvents.EmojiUpdate, guild, oldSnapshot, newEmoji);
 		}
 
 		for (const savedEmoji of guild.emojis.values()) {
