@@ -1,7 +1,12 @@
 import { EventEmitter } from "node:events";
 import { platform } from "node:os";
 import WebSocket from "ws";
-import { GatewayCloseCodes, GatewayOpCodes, GatewayPayload } from "./Types/DiscordGateway.js";
+import {
+	GatewayCloseCodes,
+	GatewayOpCodes,
+	GatewayPayload,
+	RequestGuildMembersPayload
+} from "./Types/DiscordGateway.js";
 import { Client } from "./Client.js";
 import { CreateDispatch, DispatchFunction, EventCallback } from "./EventDispatcher.js";
 import { GatewayEventName, JSONObject } from "./Types/Internal.js";
@@ -293,6 +298,19 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	send(msg: GatewayPayload): void {
 		this.#checkInitialization();
 		this.#socket!.send(JSON.stringify(msg));
+	}
+
+	/**
+	 * Sends a `RequestGuildMembers` (op 8) packet, asking the gateway to stream a guild's members
+	 * back as `GUILD_MEMBERS_CHUNK` dispatches.
+	 *
+	 * This is the raw send and returns immediately - the chunks arrive later as
+	 * `ClientEvents.GuildMembersChunk`. Prefer `guild.members.fetchGateway()`, which validates the
+	 * request, attaches a nonce, and resolves once the last chunk lands.
+	 * @param data The request body.
+	 */
+	requestGuildMembers(data: RequestGuildMembersPayload): void {
+		this.send({ op: GatewayOpCodes.RequestGuildMembers, d: data, t: null, s: null });
 	}
 
 	/**

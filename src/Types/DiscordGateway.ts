@@ -113,6 +113,31 @@ export type GatewayPayload<T = unknown> = {
 };
 
 /**
+ * Body of a `RequestGuildMembers` (op 8) packet, asking the gateway to stream a guild's members
+ * back as `GUILD_MEMBERS_CHUNK` dispatches.
+ *
+ * `query` and `user_ids` are mutually exclusive - send one or the other, never both. Discord
+ * answers with one or more chunks regardless of how many members matched, so a request that
+ * matches nothing still produces a single empty chunk.
+ *
+ * @see https://discord.com/developers/docs/topics/gateway-events#request-guild-members
+ */
+export type RequestGuildMembersPayload = {
+	/** Id of the guild to fetch members from */
+	guild_id: string;
+	/** Username/nickname prefix to match; `""` matches every member. Requires the privileged `GuildMembers` intent. */
+	query?: string;
+	/** Maximum number of members to return, or `0` for no limit. Required, and must be `0` when `query` is `""`. */
+	limit: number;
+	/** Whether to include each member's presence in the chunks. Requires the privileged `GuildPresences` intent. */
+	presences?: boolean;
+	/** Specific user ids to fetch, up to 100. Ids without a matching member come back in the chunk's `not_found`. */
+	user_ids?: string | string[];
+	/** Opaque string (max 32 characters) echoed back on every chunk, used to match chunks to this request */
+	nonce?: string;
+};
+
+/**
  * Gateway intents are a bitfield that tells Discord which groups of events your bot wants to receive.
  *
  * Discord uses this to filter events before they are sent over the gateway connection:
@@ -519,6 +544,14 @@ export const GatewayEvents = {
 	 * Required intent: `GatewayIntents.GuildMembers` (privileged)
 	 */
 	GuildMemberRemove: "GUILD_MEMBER_REMOVE",
+	/**
+	 * Response to a `RequestGuildMembers` (op 8) request, delivering a slice of the matched members.
+	 *
+	 * Required intent: none - this is only sent in reply to a request you made, though the request
+	 * itself needs `GatewayIntents.GuildMembers` to query by name and
+	 * `GatewayIntents.GuildPresences` to ask for presences.
+	 */
+	GuildMembersChunk: "GUILD_MEMBERS_CHUNK",
 	/**
 	 * New guild audit log entry created.
 	 *
