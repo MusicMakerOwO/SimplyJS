@@ -12,13 +12,19 @@ import { CreateMessagePayload, Message, SplitAttachments } from "./Message.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
 
 /**
+ * Cached DM channels used by `User.send()` after the first create/open call, keyed by user.
+ *
+ * Held out here rather than in a `#private` field so that `clone()` - which copies own properties
+ * onto a bare instance and cannot carry private fields across - produces a usable `User`. A clone
+ * simply starts with no cached DM channel and opens its own on first send.
+ */
+const dmChannels = new WeakMap<User, DiscordChannel>();
+
+/**
  * A Discord user account. Represents the global identity behind a {@link Member} in a guild,
  * or the other party in a direct message.
  */
 export class User extends APIClientStructure<DiscordUser> {
-	/** Cached DM channel used by `send()` after the first create/open call */
-	#dmChannel: DiscordChannel | undefined;
-
 	id!: string
 	/** Username without discriminator formatting */
 	username!: string
@@ -164,13 +170,15 @@ export class User extends APIClientStructure<DiscordUser> {
 	async send(content: string | MessagePayload): Promise<Message> {
 		const { body, files } = SplitAttachments(CreateMessagePayload(content));
 
-		if (!this.#dmChannel) {
-			this.#dmChannel = await this.client.rest.post<DiscordChannel>(`/users/@me/channels`, {
+		let dmChannel = dmChannels.get(this);
+		if (!dmChannel) {
+			dmChannel = await this.client.rest.post<DiscordChannel>(`/users/@me/channels`, {
 				recipient_id: this.id
-			})
+			});
+			dmChannels.set(this, dmChannel);
 		}
 
-		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.#dmChannel.id}/messages`, body, undefined, files);
+		const response = await this.client.rest.post<DiscordMessage>(`/channels/${dmChannel.id}/messages`, body, undefined, files);
 		return new Message(this.client, response);
 	}
 }

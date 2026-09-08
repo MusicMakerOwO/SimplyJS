@@ -14,6 +14,15 @@ type MessageableClass<T> = {
 	bulkDeleteMessages(messages: MessageResolvable[], reason?: string): Promise<string[]>;
 } & T;
 
+/**
+ * Lazily created message managers, keyed by channel.
+ *
+ * Held out here rather than in a `#private` field so that `clone()` - which copies own properties
+ * onto a bare instance and cannot carry private fields across - produces a usable channel. A clone
+ * simply starts with no manager and builds its own on first access.
+ */
+const messageManagers = new WeakMap<BaseChannel, MessageManager>();
+
 /** Extracts an ID from a {@link MessageResolvable}, passing plain string IDs through unchanged */
 function resolveMessageId(message: MessageResolvable): string {
 	return typeof message === "string"
@@ -31,14 +40,17 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 	Base: TBase,
 ): Constructor<MessageableClass<InstanceType<TBase>>> {
 	return class extends Base {
-		#messages?: MessageManager;
-
 		/**
 		 * This manager reads this channel's messages straight from the API; nothing is cached, since
 		 * a channel's message history is unbounded.
 		 */
 		get messages(): MessageManager {
-			return this.#messages ??= new MessageManager(this.client, this);
+			let manager = messageManagers.get(this);
+			if (!manager) {
+				manager = new MessageManager(this.client, this);
+				messageManagers.set(this, manager);
+			}
+			return manager;
 		}
 
 		/**
