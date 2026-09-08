@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Rest } from "../Rest.js";
 import { CreateMessagePayload, SplitAttachments } from "../Structures/Message.js";
+import { DetectMimeType, ResolveUpload, ToDataURI } from "../Utils.js";
+import { StickerCache } from "../Managers/Stickers.js";
+import { Client } from "../Client.js";
+import { Guild } from "../Structures/Guild.js";
 
 /** Builds a `Rest` with a token already set, matching the setup used across `Rest.test.ts` */
 function makeRest(): Rest {
@@ -130,6 +134,155 @@ describe("Rest multipart uploads", () => {
 			.rejects.toThrow("Cannot upload more than 10 files at once, received 11");
 
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("sends flat form fields and a single `file` part in fields mode", async () => {
+		const rest = makeRest();
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(JSON.stringify({ id: "1" }), { status: 200 })
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await rest.post(
+			"/guilds/1/stickers",
+			{ name: "blob", description: "a blob", tags: "smile", ignored: null },
+			undefined,
+			{ files: [{ name: "blob.png", data: "png bytes" }], multipart: "fields" }
+		);
+
+		const body = requestInit(fetchMock).body as FormData;
+		expect(body).toBeInstanceOf(FormData);
+		expect(body.get("payload_json")).toBeNull();
+		expect(body.get("name")).toBe("blob");
+		expect(body.get("description")).toBe("a blob");
+		expect(body.get("tags")).toBe("smile");
+		// null fields are dropped rather than sent as the literal text "null"
+		expect(body.get("ignored")).toBeNull();
+		expect(body.get("files[0]")).toBeNull();
+
+		const file = body.get("file") as File;
+		expect(file.name).toBe("blob.png");
+		await expect(file.text()).resolves.toBe("png bytes");
+	});
+
+	it("rejects more than one file in fields mode, where they would share a part name", async () => {
+		const rest = makeRest();
+		const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(rest.post("/guilds/1/stickers", {}, undefined, {
+			files: [{ name: "a.png", data: "1" }, { name: "b.png", data: "2" }],
+			multipart: "fields"
+		})).rejects.toThrow("This endpoint accepts a single file, received 2");
+
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+});
+
+describe("DetectMimeType", () => {
+	const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+
+	it("identifies formats by their magic bytes", () => {
+		expect(DetectMimeType(PNG)).toBe("image/png");
+		expect(DetectMimeType(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39]))).toBe("image/gif");
+		expect(DetectMimeType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe("image/jpeg");
+		expect(DetectMimeType(
+			new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50])
+		)).toBe("image/webp");
+	});
+
+	it("accepts a Buffer as well as a Uint8Array", () => {
+		expect(DetectMimeType(Buffer.from(PNG))).toBe("image/png");
+	});
+
+	it("recognizes Lottie JSON by its leading brace", () => {
+		expect(DetectMimeType(Buffer.from('  {"v":"5.5.7"}'))).toBe("application/json");
+	});
+
+	it("throws when the contents match no supported type", () => {
+		expect(() => DetectMimeType(new Uint8Array([1, 2, 3])))
+			.toThrow("Could not determine the file type from its contents");
+		expect(() => DetectMimeType(new Uint8Array())).toThrow("Could not determine the file type");
+	});
+});
+
+describe("ResolveUpload", () => {
+	const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]);
+
+	it("names the file after the fallback and its detected type", () => {
+		const lottie = Buffer.from('{"v":"5.5.7"}');
+		expect(ResolveUpload(PNG, "blob")).toEqual({ name: "blob.png", data: PNG });
+		expect(ResolveUpload(lottie, "wave")).toEqual({ name: "wave.json", data: lottie });
+	});
+
+	it("throws rather than naming a file it cannot identify", () => {
+		expect(() => ResolveUpload(new Uint8Array([1, 2, 3]), "blob"))
+			.toThrow("Could not determine the file type from its contents");
+	});
+});
+
+describe("StickerCache.create", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	/** Builds a `StickerCache` against a stub guild, capturing the `rest.post` call */
+	function makeCache() {
+		const post = vi.fn().mockResolvedValue({ id: "1", name: "blob", tags: "smile" });
+		const client = { rest: { post } } as unknown as Client;
+		const guild = { id: "9" } as Guild;
+		return { cache: new StickerCache(client, guild), post };
+	}
+
+	it("serializes a Lottie animation given as an object", async () => {
+		const { cache, post } = makeCache();
+
+		await cache.create({
+			name: "wave",
+			description: "a wave",
+			tags: ["smile", "wave"],
+			file: { v: "5.5.7", layers: [] }
+		});
+
+		const [path, body, headers, upload] = post.mock.calls[0]!;
+		expect(path).toBe("/guilds/9/stickers");
+		expect(body).toEqual({ name: "wave", description: "a wave", tags: "smile,wave" });
+		expect(headers).toBeUndefined();
+		expect(upload.multipart).toBe("fields");
+		expect(upload.files).toEqual([
+			{ name: "wave.json", data: Buffer.from('{"v":"5.5.7","layers":[]}') }
+		]);
+	});
+
+	it("rejects a file that is not a supported sticker format", async () => {
+		const { cache, post } = makeCache();
+
+		await expect(cache.create({
+			name: "nope",
+			description: "d",
+			tags: "smile",
+			// a JPEG, which Discord does not accept as a sticker
+			file: new Uint8Array([0xff, 0xd8, 0xff, 0xe0])
+		})).rejects.toThrow("Stickers must be a PNG, APNG, GIF, or Lottie JSON file, received image/jpeg");
+
+		expect(post).not.toHaveBeenCalled();
+	});
+});
+
+describe("ToDataURI", () => {
+	it("encodes file contents as a base64 data URI", () => {
+		const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+		expect(ToDataURI(bytes))
+			.toBe(`data:image/png;base64,${Buffer.from(bytes).toString("base64")}`);
+	});
+
+	it("passes an already-encoded data URI through untouched", () => {
+		expect(ToDataURI("data:image/png;base64,AAAA")).toBe("data:image/png;base64,AAAA");
+	});
+
+	it("rejects a plain string that is not a data URI", () => {
+		expect(() => ToDataURI("./icon.png")).toThrow("An image string must already be a data URI");
 	});
 });
 
