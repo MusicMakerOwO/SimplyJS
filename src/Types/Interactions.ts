@@ -202,6 +202,54 @@ export type MessageInteraction = {
 	member?: Partial<DiscordMember>;
 };
 
+/** Fields shared by every variant of {@link MessageInteractionMetadata} */
+type BaseMessageInteractionMetadata<TType extends InteractionType> = {
+	/** id of the interaction */
+	id: string;
+	/** type of interaction */
+	type: TType;
+	/** user who triggered the interaction */
+	user: DiscordUser;
+	/** mapping of installation contexts that the interaction was authorized for to related user/guild ids */
+	authorizing_integration_owners: AuthorizingIntegrationOwners;
+	/** id of the original response message, present only on follow-up messages */
+	original_response_message_id?: string;
+};
+
+/** Metadata for a message created as a response to a slash, user, or message command */
+export type ApplicationCommandInteractionMetadata =
+	BaseMessageInteractionMetadata<typeof InteractionTypes.APPLICATION_COMMAND> & {
+		/** id of the user the command was run on, present only on user command interactions */
+		target_user?: DiscordUser;
+		/** id of the message the command was run on, present only on message command interactions */
+		target_message_id?: string;
+	};
+
+/** Metadata for a message created as a response to a button click or select menu choice */
+export type MessageComponentInteractionMetadata =
+	BaseMessageInteractionMetadata<typeof InteractionTypes.MESSAGE_COMPONENT> & {
+		/** id of the message that contained the interactive component */
+		interacted_message_id: string;
+	};
+
+/** Metadata for a message created as a response to a modal submission */
+export type ModalSubmitInteractionMetadata =
+	BaseMessageInteractionMetadata<typeof InteractionTypes.MODAL_SUBMIT> & {
+		/** metadata for the interaction that was used to open the modal */
+		triggering_interaction_metadata: ApplicationCommandInteractionMetadata | MessageComponentInteractionMetadata;
+	};
+
+/**
+ * Metadata about the interaction a message was created in response to, discriminated on `type`.
+ * Supersedes the deprecated {@link MessageInteraction}.
+ *
+ * @see https://docs.discord.com/developers/resources/message#message-interaction-metadata-object
+ */
+export type MessageInteractionMetadata =
+	| ApplicationCommandInteractionMetadata
+	| MessageComponentInteractionMetadata
+	| ModalSubmitInteractionMetadata;
+
 /**
  * The type of payload Discord expects back when responding to an interaction, determining the
  * shape of the response's `data` field.

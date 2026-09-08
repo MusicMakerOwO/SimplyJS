@@ -1,12 +1,13 @@
-import { defineEvent, JSONObject } from "../Types/Internal.js";
+import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
+import { DiscordMember } from "../Types/DiscordAPITypes.js";
 import { Message } from "../Structures/Message.js";
 import { ClientEvents, MessageDeleteBulkPayload, MessageDeletePayload } from "../Types/SimplyJSTypes.js";
 
 export const MessageCreate = defineEvent({
 	name: GatewayEvents.MessageCreate,
-	handler: (client, data: DiscordMessage & { guild_id: string | null; member?: JSONObject }) => {
+	handler: (client, data: DiscordMessage & { guild_id: string | null; member?: Partial<DiscordMember> }) => {
 		client.emit(ClientEvents.MessageCreate, new Message(client, data) );
 	}
 });
@@ -47,7 +48,7 @@ export const MessageDeleteBulk = defineEvent({
 
 export const MessageUpdate = defineEvent({
 	name: GatewayEvents.MessageUpdate,
-	handler: (client, data: DiscordMessage & { guild_id: string | null; member?: JSONObject }) => {
+	handler: (client, data: DiscordMessage & { guild_id: string | null; member?: Partial<DiscordMember> }) => {
 		client.emit(ClientEvents.MessageUpdate, new Message(client, data) );
 	}
 });

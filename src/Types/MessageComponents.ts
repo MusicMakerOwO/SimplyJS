@@ -7,9 +7,8 @@ import {
 	DiscordSticker,
 	DiscordUser
 } from "./DiscordAPITypes.js";
-import { JSONObject } from "./Internal.js";
 import { MessageComponent } from "./Components.js";
-import { MessageInteraction } from "./Interactions.js";
+import { MessageInteraction, MessageInteractionMetadata } from "./Interactions.js";
 
 export const EmbedTypes = {
 	/** generic embed rendered from embed attributes */
@@ -278,7 +277,7 @@ export type Reaction = {
 	/** Whether the current user super-reacted using this emoji */
 	me_burst: boolean;
 	/** Emoji information (partial emoji object) */
-	emoji: Partial<DiscordEmoji>; // Replace 'any' with a PartialEmoji type if available
+	emoji: Partial<DiscordEmoji>;
 	/** HEX colors used for super reaction */
 	burst_colors: string[];
 };
@@ -522,8 +521,7 @@ export type DiscordMessage = {
 	/** the message associated with the message_reference */
 	referenced_message?: DiscordMessage | null;
 	/** Sent if the message is sent as a result of an interaction */
-	// TODO Interactions coming in a later update
-	interaction_metadata?: JSONObject;
+	interaction_metadata?: MessageInteractionMetadata;
 	/** Deprecated in favor of interaction_metadata; sent if the message is a response to an interaction */
 	interaction?: MessageInteraction;
 	/** the thread that was started from this message, includes thread member object */
