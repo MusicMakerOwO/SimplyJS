@@ -9,20 +9,19 @@ break or living with the gap for a full major cycle, so it goes in first.
   - `post()`/`patch()`/`put()` take an optional 4th `files: FileAttachment[]`; a non-empty list switches `#execute` to a `payload_json` + `FormData` body and drops the hardcoded `Content-Type` so `fetch` can set the boundary. The form is rebuilt per attempt so 429/5xx retries can replay it
   - `MessagePayload.attachments` accepts `{ name, data: Buffer | Uint8Array | string, description? }`; `SplitAttachments()` in `src/Structures/Message.ts` splits it into the wire `attachments` descriptors (which is what makes `attachment://<name>` resolve) and the files to upload
   - Wired into `channel.send()`, `message.reply()`, `message.update()`, `user.send()`, `webhook.send()`, and the interaction responses (`reply()`, `editReply()`, `followUp()`, `update()`)
+  - `guild.emojis.create({ name, image, roles? })` and `guild.stickers.create({ name, description, tags, file })` both take raw file data - the bytes of the file (`UploadInput`, `Buffer | Uint8Array`) with no filename - Discord ignores it on these endpoints and the name is already an argument. A Lottie sticker may also be passed as the animation object, which is stringified for you. `DetectMimeType()` in `src/Utils.ts` reads the type from magic bytes only, never an extension, since nothing here touches the disk and an extension is only a claim; `ToDataURI()` builds the emoji data URI from it (an already-encoded one still passes through) and `ResolveUpload()` supplies the filename the sticker form needs
+  - Sticker creation uses the `fields` multipart layout - flat form fields plus a single part named `file`, since that endpoint rejects `payload_json`. Pass `{ files, multipart: "fields" }` instead of a bare list to select it
   - Still to do:
-    - [ ] Emoji / sticker / soundboard uploads from a file, and guild icon/banner uploads - all still require a pre-encoded data URI
+    - [ ] Soundboard sound uploads from a file (`sound` still needs a pre-encoded data URI), plus guild icon/banner/splash and scheduled event images - all can reuse `ToDataURI()`
+    - [ ] Application-owned emojis (`/applications/{id}/emojis`) have no create path
 - [x] Message fetching
   - `MessageManager` (`src/Managers/Messages.ts`) on `channel.messages`, with `fetch(id)` for a single message and `fetch({ limit, before, after, around })` for a page of history. Created lazily by the `Messageable` mixin, so it is on `GuildTextChannel`, `GuildVoiceChannel`, and `GuildThreadChannel`
   - Deliberately **not** a cache, unlike the other managers: message history is unbounded, so caching it would mean owning an eviction policy. Every call hits REST. Authors/mentions still populate the global user cache via `Message.patch()`
   - `before`/`after`/`around` are mutually exclusive and the manager throws rather than letting Discord reject the request
-- [ ] `REQUEST_GUILD_MEMBERS` over the gateway
+- [x] `REQUEST_GUILD_MEMBERS` over the gateway
   - REST member listing is done: `MemberCache.fetch()` overloads single/bulk, plus `fetchAll()` and `search()`
-  - `GatewayOpCodes.RequestGuildMembers` (op 8) is still defined but never sent, and `GUILD_MEMBERS_CHUNK` is not modeled in `GatewayEvents` or handled
-  - Needs nonce correlation to match chunks back to the request that asked for them
-- [ ] Sharding
-  - `#handleHello` sends `Identify` with no `shard` array and there is no shard manager, so the library hard-stops at the ~2500 guild boundary
-  - `GatewayCloseCodes.ShardingRequired` is correctly treated as fatal, which makes the ceiling a clean failure rather than a silent one - but it is still a ceiling
-  - Likely reshapes `Client` / `WSClient` construction, which is exactly why it belongs before the API freezes
+  - `WSClient.requestGuildMembers()` sends op 8; `GUILD_MEMBERS_CHUNK` is modeled in `GatewayEvents` and handled by `MembersChunk` (`src/Events/Members.ts`), which caches members/presences and emits `ClientEvents.GuildMembersChunk`
+  - `MemberCache.fetchGateway()` is the awaitable wrapper: it validates the request against the resolved intents, attaches a generated nonce, and reassembles the chunks with a `Collector` filtered on that nonce, resolving on `chunk_index === chunk_count - 1`
 
 ## Active backlog
 
@@ -92,13 +91,22 @@ for them.
   - `send()` can attach files via `attachments`
 - [ ] Application resource
   - `/applications/@me`, application-owned emojis, role connection metadata
-- [ ] Monetization
-  - Entitlements, SKUs, and subscriptions - no REST and no events
-  - `BaseInteraction.entitlements` is still typed `JSONObject[]`, and `SKUButtonBuilder` can produce a purchase button whose result the library cannot observe
+- [ ] Entitlements REST/events support
+- [ ] SKUs REST/events support
+- [ ] Subscriptions REST/events support
+- [ ] Fix `BaseInteraction.entitlements` typing (currently `JSONObject[]`)
+- [ ] Fix `SKUButtonBuilder` purchase button observation
 - [ ] Poll endpoints
   - `Message.poll` is read-only; no answer-voters fetch and no expire endpoint
-- [ ] Guild extras
-  - Onboarding, welcome screen, templates, widget, prune, vanity URL, MFA level, guild preview, `/sticker-packs`
+- [ ] Guild onboarding
+- [ ] Guild welcome screen
+- [ ] Guild templates
+- [ ] Guild widget
+- [ ] Guild prune
+- [ ] Guild vanity URL
+- [ ] Guild MFA level
+- [ ] Guild preview
+- [ ] Sticker packs endpoint (`/sticker-packs`)
 - [ ] Announcement channel follow (`POST /channels/{id}/followers`)
 - [ ] Application command permission endpoints
 
@@ -123,7 +131,7 @@ for them.
 
 - [ ] Continue gateway parity pass for remaining high-value dispatch events
   - Voice, stage instance, and voice channel effect events are deliberately deferred with the Voice Chat work
-  - The non-voice gaps are the `❌ not modeled` rows in the status table below - `USER_UPDATE` and `GUILD_MEMBERS_CHUNK` are the two that affect ordinary bots
+  - The non-voice gaps are the `⬜ not modeled` rows in the status table below - `USER_UPDATE` is the one left that affects ordinary bots
 - [x] Give the remaining `*Update` handlers a real "old" value
   - `MemberUpdate`, `GuildUpdate`, `ChannelUpdate`, `RoleUpdate`, `GuildScheduledEventUpdate`, and `AutoModerationRuleUpdate` all call `cache.get()` then `cache.upsert()`; since `upsert` patches the existing instance in place, the `old` and `new` arguments they emit are the *same, already-mutated* object, so listeners cannot diff them
   - `PresenceUpdate` solves this with `Presence.clone()` (`src/Structures/Presence.ts`); the same treatment needs a `clone()` on each of the other structures
@@ -142,6 +150,10 @@ for them.
 - [ ] Type `user_settings` and `auth` in the `READY` payload (`src/Events/Ready.ts`)
   - Both are still `JSONObject`. Neither is documented in Discord's bot-facing API reference - `user_settings` is a user-account field bots receive empty, and `auth` is undocumented entirely
   - Left opaque rather than modeled from reverse-engineered sources; revisit only if Discord documents them or a consumer actually needs to read them
+- [ ] Sharding
+  - `#handleHello` sends `Identify` with no `shard` array and there is no shard manager, so the library hard-stops at the ~2500 guild boundary
+  - `GatewayCloseCodes.ShardingRequired` is correctly treated as fatal, which makes the ceiling a clean failure rather than a silent one - but it is still a ceiling
+  - Likely reshapes `Client` / `WSClient` construction, will result in a v2 bump
 
 ## Discord gateway event implementation status
 
@@ -159,7 +171,7 @@ Legend:
 | READY                                  | ✅           |
 | RESUMED                                | ❌ [^3]      |
 | USER_UPDATE                            | ⬜ [^1]      |
-| GUILD_MEMBERS_CHUNK                    | ⬜ [^2]      |
+| GUILD_MEMBERS_CHUNK                    | ✅           |
 | ENTITLEMENT_CREATE                     | ⬜           |
 | ENTITLEMENT_UPDATE                     | ⬜           |
 | ENTITLEMENT_DELETE                     | ⬜           |
@@ -233,8 +245,6 @@ Legend:
 | INTERACTION_CREATE                     | ✅           |
 
 [^1]: The client's own user goes stale after an app edit, since nothing refreshes `client.user`.
-
-[^2]: See the `REQUEST_GUILD_MEMBERS` entry under "Pre-beta blockers" - the chunk event and the op 8 request that triggers it have to land together. REST member listing (`guild.members.fetch()` / `fetchAll()` / `search()`) already covers the cache-population case.
 
 [^3]: Present in `GatewayEvents` but no handler is exported from `src/Events/index.ts`.
 

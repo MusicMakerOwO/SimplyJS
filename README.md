@@ -11,6 +11,8 @@ A Discord.JS alternative focused on minimalism and developer experience.
 	- [Direct messages](#direct-messages)
 	- [Embeds](#embeds)
 	- [Fetching & moderation](#fetching--moderation)
+	- [Emojis & stickers](#emojis--stickers)
+	- [Threads](#threads)
 	- [Command handlers (multi-file)](#command-handlers-multi-file)
 	- [Event handlers (multi-file)](#event-handlers-multi-file)
 	- [Overriding gateway event handlers](#overriding-gateway-event-handlers)
@@ -166,6 +168,22 @@ const everyone = await guild.members.fetchAll();          // one request per 100
 const matches = await guild.members.search("mus", 5);     // prefix match on username/nickname
 ```
 
+`fetchGateway()` asks over the gateway instead of REST, using `RequestGuildMembers` (op 8). It is not rate limited per 1000 members, and it is the only way to fetch members together with their presences or to look up a batch of user IDs in one call. It resolves once the last chunk of the response arrives:
+
+```ts
+const everyone = await guild.members.fetchGateway();                       // whole guild, one request
+const some = await guild.members.fetchGateway({ userIds: ["1", "2"] });    // batch lookup, no intent needed
+const withPresences = await guild.members.fetchGateway({ presences: true });
+```
+
+`query` and `userIds` are mutually exclusive, `userIds` is capped at 100, and the manager throws rather than sending a request Discord would silently drop for a missing intent. Every chunk is also emitted as `GuildMembersChunk` as it lands, so a very large fetch can be streamed instead of awaited:
+
+```ts
+client.on(ClientEvents.GuildMembersChunk, ({ members, chunkIndex, chunkCount }) => {
+	console.log(`chunk ${chunkIndex + 1}/${chunkCount}: ${members.length} members`);
+});
+```
+
 Moderation actions are methods directly on the structure:
 
 ```ts
@@ -179,6 +197,39 @@ try {
 	await message.reply("Something went wrong - do I have the Kick Members permission?");
 }
 ```
+
+### Emojis & stickers
+
+`guild.emojis.create()` and `guild.stickers.create()` upload from raw file bytes - the type is read from the contents, so you never pass an extension or a path, and nothing is read from disk for you:
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const emoji = await guild.emojis.create({
+	name: "blobwave",
+	image: await readFile("./blobwave.png")   // PNG, GIF, JPEG, or WebP
+});
+
+const sticker = await guild.stickers.create({
+	name: "wave",
+	description: "a waving blob",
+	tags: ["wave", "hello"],                  // a single string works too
+	file: await readFile("./wave.png")        // PNG, APNG, GIF, or Lottie JSON
+});
+```
+
+`image` also accepts a data URI if you already encoded one yourself, and a Lottie sticker can be handed over as the animation object rather than bytes:
+
+```ts
+await guild.stickers.create({
+	name: "spin",
+	description: "a spinning blob",
+	tags: "spin",
+	file: { v: "5.5.7", layers: [] }          // serialized for you
+});
+```
+
+Both throw before spending a request when the file is not a format the endpoint accepts.
 
 ### Threads
 
@@ -376,9 +427,10 @@ The project is alpha software; gateway resiliency and Discord API coverage are s
 - `guild.integrations` is not seeded from `GUILD_CREATE` — Discord does not send integrations there — so it starts empty and only fills from `Integration*` gateway events or an explicit `guild.integrations.fetchAll()`. `GuildIntegrationsUpdate` says only that *something* changed in a guild, so treat it as a signal to refetch.
 - `guild.webhooks` is likewise never seeded from `GUILD_CREATE`, and `WebhooksUpdate` tells you only which channel changed, not which webhook or how — call `guild.webhooks.fetchChannel(channelId)` to resync. A `Webhook` fetched without a token (anything the bot's own application did not create) cannot be executed, so `webhook.send()` throws for those.
 - `guild.soundboardSounds` is keyed by sound id, not `id` — Discord's soundboard sound object uses `sound_id`, which the `SoundboardSound` structure surfaces as `soundId`. The cache is seeded from `GUILD_CREATE` and kept current by the `SoundboardSound*` events, which need the `GuildExpressions` intent. `SoundboardSoundsUpdate` upserts every sound it carries but never evicts: Discord does not document that payload as a guaranteed full-list replacement, so `GUILD_SOUNDBOARD_SOUND_DELETE` is treated as the only authoritative removal signal.
-- `guild.members` fills from `GUILD_CREATE`, the member gateway events, and the REST fetches above. `GatewayOpCodes.RequestGuildMembers` (op 8) is not implemented, so there is no gateway-side chunked member request - a full member list means paging `fetchAll()` over REST, which costs one request per 1000 members and is heavily rate limited.
+- `guild.members` fills from `GUILD_CREATE`, the member gateway events, and both fetch paths above. Prefer `fetchGateway()` over `fetchAll()` for a full member list: `fetchAll()` costs one heavily rate limited REST request per 1000 members, while the gateway streams the same members back as `GUILD_MEMBERS_CHUNK` dispatches. Chunks are matched to their request by a `nonce` the manager generates, so concurrent `fetchGateway()` calls do not cross-talk; a request whose chunks never arrive rejects on its `time` timeout (30s by default) rather than hanging.
 - `channel.threads` has no cache of its own, since threads are channels: `create()`, `createForumPost()`, `createFromMessage()`, and the `fetchActive()` / `fetchArchived()` / `fetchArchivedPrivate()` / `fetchJoinedArchivedPrivate()` listings all upsert into `guild.channels`. Discord has no per-channel active listing, so `fetchActive()` requests the guild-wide one and narrows the result. `before` is an archive timestamp on the archived listings but a thread ID on the joined-private one. Active threads are seeded into `guild.channels` from `GUILD_CREATE`, so they are readable on connect without a fetch; archived threads still require one.
 - `thread.members` is only ever complete for the current user without the **privileged** `GuildMembers` intent, and `ThreadMembersUpdate` caps its `added` list at 50 either way, so call `thread.members.fetchAll()` when you need the full membership of a busy thread. Threads themselves live in `guild.channels` alongside regular channels, not in a separate collection.
+- File uploads take raw bytes, never a path — this library never touches the disk, so you read the file and it identifies the type from the contents rather than trusting an extension. `guild.emojis.create()` and `guild.stickers.create()` are the only resource uploads wired up so far; soundboard sounds, guild icons/banners/splashes, and scheduled event images still expect a data URI you encoded yourself, and application-owned emojis have no create path at all.
 - `PresenceUpdate` and `guild.presences` require the **privileged** `GuildPresences` intent, which must also be enabled for the application in the Discord developer portal. Without it the event never fires and the cache stays empty. Offline users are not retained, so `member.presence` is `undefined` for anyone offline, unseen, or when the intent is off.
 - Interactions are supported — slash and context menu commands, autocomplete, buttons, select menus, and modals all have typed structures (`src/Structures/Interactions/`) and builders (`src/Builders/`), and commands are registered with `client.registerPublicCommands()` / `client.registerGuildCommands()`. Two gaps remain. Components v2 is only partly built: `TextDisplay` and `Separator` have builders, but `Thumbnail`, `Section`, `MediaGallery`, `File`, and `Container` do not, and the send path does not yet set `IS_COMPONENTS_V2` or enforce the v1/v2 mixing rules — so v2 payloads have to be hand-written for now. Monetization is unmodeled: `interaction.entitlements` is still a raw `JSONObject[]`, and while `SKUButtonBuilder` can render a purchase button, there is no entitlement or SKU API and no way to observe the result.
 - Large portions of `src/` still lack JSDoc coverage (tracked file-by-file in `docs.md`).
