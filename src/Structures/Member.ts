@@ -85,6 +85,16 @@ export class Member extends APIGuildStructure<DiscordMember> {
 		}
 	}
 
+	/**
+	 * `user` points at the shared cached {@link User}, which `patch()` updates in place, and
+	 * `roles` is handed straight out of the payload - both need detaching so a snapshot can still
+	 * show the username, avatar, and roles the member had when it was cloned.
+	 */
+	protected override detach(source: this): void {
+		this.user = source.user.clone();
+		this.roles = [...source.roles];
+	}
+
 	/** The member's user id, proxied from {@link Member.user} for convenience */
 	get id(): string {
 		return this.user.id;

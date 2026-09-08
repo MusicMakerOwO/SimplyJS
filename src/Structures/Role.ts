@@ -98,6 +98,14 @@ export class Role extends APIGuildStructure<DiscordRole> {
 		if (tags.guild_connections !== undefined) this.tags.guildConnections = tags.guild_connections;
 	}
 
+	/**
+	 * `patch()` mutates the existing bitfield with `override()` instead of replacing it, so a
+	 * snapshot needs its own to keep reporting the permissions the role had when it was cloned.
+	 */
+	protected override detach(source: this): void {
+		this.permissions = new BitField(DiscordPermissions, source.permissions.value);
+	}
+
 	/** Asks the API to delete the current role, might fail due to permissions or role order (can't delete roles above your own) */
 	async delete(): Promise<void> {
 		await this.client.rest.delete(`/guilds/${this.guild.id}/roles/${this.id}`);

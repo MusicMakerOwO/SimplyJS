@@ -208,22 +208,11 @@ export class Presence extends APIGuildStructure<DiscordPresence> {
 	}
 
 	/**
-	 * Creates a detached copy of this presence, sharing no mutable state with the cached instance.
-	 *
-	 * Caches patch entries in place, so a reference taken before an update reflects the *new* state
-	 * by the time a listener sees it. `PresenceUpdate` clones the previous presence before upserting
-	 * so consumers get a real before/after pair to diff.
+	 * The activity objects and the client status map are handed out to listeners as-is, so a
+	 * snapshot takes its own copies rather than letting a caller mutate the cached presence's.
 	 */
-	clone(): Presence {
-		const copy = new Presence(this.client, this.guild, {
-			user: { id: this.userId },
-			guild_id: this.guildId,
-			status: this.status,
-			activities: [],
-			client_status: { ...this.clientStatus }
-		});
-
-		copy.activities = this.activities.map(activity => structuredClone(activity));
-		return copy;
+	protected override detach(source: this): void {
+		this.activities = source.activities.map(activity => structuredClone(activity));
+		this.clientStatus = { ...source.clientStatus };
 	}
 }

@@ -31,5 +31,17 @@ export function PermissionOverwrites<TBase extends Constructor<BaseChannel>>(
 				this.permissionOverwrites.patch(data.permission_overwrites);
 			}
 		}
+
+		/**
+		 * `patch()` updates the existing manager in place instead of replacing it, so a snapshot
+		 * needs its own to keep reporting the overwrites the channel had when it was cloned.
+		 */
+		protected detach(source: this): void {
+			this.permissionOverwrites = new ChannelPermissionManager(
+				this.client,
+				this,
+				[...source.permissionOverwrites.cache.values()]
+			);
+		}
 	} as unknown as Constructor<PermissionOverwritesClass<InstanceType<TBase>>>;
 }

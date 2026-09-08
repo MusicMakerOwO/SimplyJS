@@ -35,6 +35,10 @@ import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
 /**
  * A Discord guild (server), including its cached channels, roles, emojis, stickers, and members.
  *
+ * A guild's sub-caches are deliberately *shared* with any snapshot taken by `clone()` - the
+ * `GUILD_UPDATE` event only ever changes the guild's own fields, so `oldGuild.members` is the same
+ * live cache as `newGuild.members` rather than a copy of every member in the guild.
+ *
  * @see https://docs.discord.com/developers/resources/guild#guild-object
  */
 export class Guild extends APIClientStructure<DiscordGuild> {

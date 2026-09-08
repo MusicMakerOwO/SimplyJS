@@ -35,6 +35,9 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 	/**
 	 * Cache of the users who have joined this thread, keyed by user id. Assigned on first
 	 * `patch()` rather than by a field initializer - see the note above on `declare`.
+	 *
+	 * Maintained by the `ThreadMembers*` events rather than by `ThreadUpdate`, so it is shared
+	 * with - not copied into - any snapshot taken by `clone()`.
 	 */
 	declare members: ThreadMemberCache
 	// no permissionOverwrites - threads inherit from parent
