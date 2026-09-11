@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Rest } from "../Rest.js";
 import { CreateMessagePayload, SplitAttachments } from "../Structures/Message.js";
-import { DetectMimeType, ResolveUpload, ToDataURI } from "../Utils.js";
+import { DetectMimeType, EncodeImage, ResolveUpload, ToDataURI } from "../Utils.js";
 import { StickerCache } from "../Managers/Stickers.js";
+import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
 import { Client } from "../Client.js";
 import { Guild } from "../Structures/Guild.js";
 
@@ -195,6 +196,13 @@ describe("DetectMimeType", () => {
 		expect(DetectMimeType(Buffer.from(PNG))).toBe("image/png");
 	});
 
+	it("identifies the audio formats soundboard sounds accept", () => {
+		expect(DetectMimeType(Buffer.from("OggS\0\0\0"))).toBe("audio/ogg");
+		expect(DetectMimeType(Buffer.from("ID3\x04\0\0"))).toBe("audio/mpeg");
+		// an MP3 with no ID3 tag, opening straight on a frame header
+		expect(DetectMimeType(new Uint8Array([0xff, 0xfb, 0x90, 0x00]))).toBe("audio/mpeg");
+	});
+
 	it("recognizes Lottie JSON by its leading brace", () => {
 		expect(DetectMimeType(Buffer.from('  {"v":"5.5.7"}'))).toBe("application/json");
 	});
@@ -283,6 +291,46 @@ describe("ToDataURI", () => {
 
 	it("rejects a plain string that is not a data URI", () => {
 		expect(() => ToDataURI("./icon.png")).toThrow("An image string must already be a data URI");
+	});
+});
+
+describe("JSON image fields", () => {
+	const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+	const PNG_URI = `data:image/png;base64,${Buffer.from(PNG).toString("base64")}`;
+
+	it("encodes the images of a guild edit, passing `null` through to clear them", async () => {
+		const patch = vi.fn().mockResolvedValue(undefined);
+		const client = { rest: { patch } } as unknown as Client;
+		const guild = new Guild(client, { id: "9" } as never);
+
+		await guild.modify({ name: "guild", icon: PNG, banner: PNG_URI, splash: null });
+
+		const body = patch.mock.calls[0]![1];
+		expect(body.icon).toBe(PNG_URI);
+		expect(body.banner).toBe(PNG_URI);
+		expect(body.splash).toBeNull();
+		expect(body.discovery_splash).toBeUndefined();
+	});
+
+	it("encodes a soundboard sound from its bytes", async () => {
+		const post = vi.fn().mockResolvedValue({ sound_id: "1", name: "boom" });
+		const client = { rest: { post } } as unknown as Client;
+		const guild = { id: "9" } as Guild;
+		const mp3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+
+		await new SoundboardSoundCache(client, guild).create({ name: "boom", sound: mp3 });
+
+		expect(post.mock.calls[0]![1].sound)
+			.toBe(`data:audio/mpeg;base64,${Buffer.from(mp3).toString("base64")}`);
+	});
+});
+
+describe("EncodeImage", () => {
+	it("encodes file contents, leaving the absent and cleared cases alone", () => {
+		const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+		expect(EncodeImage(bytes)).toBe(`data:image/png;base64,${Buffer.from(bytes).toString("base64")}`);
+		expect(EncodeImage(null)).toBeNull();
+		expect(EncodeImage(undefined)).toBeUndefined();
 	});
 });
 
