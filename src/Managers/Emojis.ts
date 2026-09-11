@@ -3,7 +3,7 @@ import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordEmoji } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
-import { JSONObject, UploadInput } from "../Types/Internal.js";
+import { ImageInput, JSONObject } from "../Types/Internal.js";
 import { ToDataURI } from "../Utils.js";
 
 /** Cache of a single guild's custom {@link Emoji}s. */
@@ -39,7 +39,7 @@ export class EmojiCache extends GuildScopedCache<string, Emoji, DiscordEmoji> {
 	 */
 	async create(options: {
 		name: string;
-		image: UploadInput | string;
+		image: ImageInput;
 		roles?: (string | { id: string })[];
 	}): Promise<Emoji> {
 		const body: JSONObject = { name: options.name, image: ToDataURI(options.image) };

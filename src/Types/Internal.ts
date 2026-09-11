@@ -48,6 +48,16 @@ export type JSONArray = JSONValue[];
 export type UploadInput = Buffer | Uint8Array;
 
 /**
+ * A file for one of Discord's JSON image fields - a guild icon, an avatar, a soundboard sound, and
+ * so on - either as raw bytes or as a data URI you encoded yourself.
+ *
+ * These endpoints take the file inline in the JSON body rather than as a multipart upload, so the
+ * bytes are encoded with `ToDataURI()` before being sent. A `string` must already be a data URI;
+ * nothing here reads from the disk.
+ */
+export type ImageInput = UploadInput | string;
+
+/**
  * A file to upload alongside a message.
  *
  * Sending one of these switches the request from a JSON body to `multipart/form-data`; see

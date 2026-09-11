@@ -1,5 +1,5 @@
 import { BitField, BitFieldValue } from "./DataStructures/BitField.js";
-import { FileAttachment, UploadInput } from "./Types/Internal.js";
+import { FileAttachment, ImageInput, UploadInput } from "./Types/Internal.js";
 
 /**
  * Builds a BitField from any supported bitfield input format.
@@ -37,7 +37,7 @@ export function SerializeBitFieldValue<FlagMap extends Record<string, bigint>>(
 }
 
 /**
- * MIME types Discord's image endpoints accept, mapped to the extension a file of that type is
+ * MIME types Discord's upload endpoints accept, mapped to the extension a file of that type is
  * named with, see {@link ResolveUpload}.
  */
 const EXTENSIONS_BY_MIME_TYPE: Record<string, string> = {
@@ -45,7 +45,9 @@ const EXTENSIONS_BY_MIME_TYPE: Record<string, string> = {
 	"image/gif": "gif",
 	"image/jpeg": "jpg",
 	"image/webp": "webp",
-	"application/json": "json"
+	"application/json": "json",
+	"audio/mpeg": "mp3",
+	"audio/ogg": "ogg"
 };
 
 /** Whether the bytes look like a JSON object, ignoring leading whitespace */
@@ -85,6 +87,10 @@ export function DetectMimeType(bytes: UploadInput): string {
 	) {
 		return "image/webp";
 	}
+	if (StartsWith(bytes, [0x4f, 0x67, 0x67, 0x53])) return "audio/ogg"; // "OggS"
+	if (StartsWith(bytes, [0x49, 0x44, 0x33])) return "audio/mpeg"; // "ID3" tag ahead of the audio
+	// An MP3 without an ID3 tag opens on a frame header, whose first 11 bits are all set
+	if (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) return "audio/mpeg";
 	// Lottie stickers are JSON, which has no signature - the first non-whitespace byte is the tell
 	if (IsJSONObject(bytes)) return "application/json";
 
@@ -122,11 +128,29 @@ export function ResolveUpload(data: UploadInput, fallbackName: string): FileAtta
  * @returns A `data:<mime>;base64,<data>` string.
  * @throws {Error} When the file type cannot be determined, see {@link DetectMimeType}.
  */
-export function ToDataURI(file: UploadInput | string): string {
+export function ToDataURI(file: ImageInput): string {
 	if (typeof file === "string") {
 		if (!file.startsWith("data:")) throw new Error("An image string must already be a data URI");
 		return file;
 	}
 
 	return `data:${DetectMimeType(file)};base64,${Buffer.from(file).toString("base64")}`;
+}
+
+/**
+ * {@link ToDataURI} for the optional, nullable image fields of an edit.
+ *
+ * Discord's image fields distinguish three states: absent leaves the image alone, `null` clears it,
+ * and a data URI replaces it. Only the last is a file, so the other two pass straight through.
+ *
+ * @param file The file to encode, an already-encoded data URI, `null` to clear, or `undefined`.
+ * @returns The encoded image, or `file` unchanged when it is `null` or `undefined`.
+ * @throws {Error} When the file type cannot be determined, see {@link DetectMimeType}.
+ */
+export function EncodeImage<T extends ImageInput | null | undefined>(
+	file: T,
+): T extends ImageInput ? string : T {
+	type Result = T extends ImageInput ? string : T;
+	if (file === null || file === undefined) return file as Result;
+	return ToDataURI(file) as Result;
 }
