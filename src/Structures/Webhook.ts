@@ -9,7 +9,8 @@ import {
 } from "../Types/index.js";
 import { Client } from "../Client.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
-import { MessagePayload } from "../Types/Internal.js";
+import { ImageInput, MessagePayload } from "../Types/Internal.js";
+import { EncodeImage } from "../Utils.js";
 import { CreateMessagePayload, Message, SplitAttachments } from "./Message.js";
 import { Guild } from "./Guild.js";
 import { User } from "./User.js";
@@ -18,8 +19,8 @@ import { User } from "./User.js";
 export type WebhookEditOptions = {
 	/** the default name of the webhook */
 	name?: string;
-	/** image for the default webhook avatar, as a data URI, or `null` to clear it */
-	avatar?: string | null;
+	/** image for the default webhook avatar, as file bytes or a data URI, or `null` to clear it */
+	avatar?: ImageInput | null;
 	/** the new channel id this webhook should be moved to, not available on token authenticated edits */
 	channel_id?: string;
 }
@@ -147,7 +148,12 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 		}
 
 		const path = this.token ? `/webhooks/${this.id}/${this.token}` : `/webhooks/${this.id}`;
-		const response = await this.client.rest.patch<DiscordWebhook>(path, options, reason ? { 'X-Audit-Log-Reason': reason } : {});
+		const { avatar, ...rest } = options;
+		const response = await this.client.rest.patch<DiscordWebhook>(
+			path,
+			{ ...rest, ...(avatar !== undefined && { avatar: EncodeImage(avatar) }) },
+			reason ? { 'X-Audit-Log-Reason': reason } : {}
+		);
 
 		this.patch(response);
 		return this;

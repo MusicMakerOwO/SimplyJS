@@ -10,7 +10,8 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
-import { JSONObject } from "../Types/index.js";
+import { ImageInput, JSONObject } from "../Types/index.js";
+import { EncodeImage } from "../Utils.js";
 
 /**
  * Cache of a single guild's {@link GuildScheduledEvent}s.
@@ -73,14 +74,15 @@ export class GuildScheduledEventCache extends GuildScopedCache<string, GuildSche
 		description?: string
 		/** Where the event is hosted */
 		entityType: ObjectValues<typeof DiscordGuildScheduledEventEntityTypes>
-		/** Cover image for the event, as a data URI */
-		image?: string
+		/** Cover image for the event, as file bytes or a data URI */
+		image?: ImageInput
 		/** How often the event should repeat */
 		recurrenceRule?: DiscordGuildScheduledEventRecurrenceRule
 	}): Promise<GuildScheduledEvent> {
-		const { channelId, entityMetadata, privacyLevel, scheduledStartTime, scheduledEndTime, entityType, recurrenceRule, ...rest } = data;
+		const { channelId, entityMetadata, privacyLevel, scheduledStartTime, scheduledEndTime, entityType, recurrenceRule, image, ...rest } = data;
 		const payload = {
 			...rest,
+			image: EncodeImage(image),
 			channel_id: channelId,
 			entity_metadata: entityMetadata,
 			privacy_level: privacyLevel,

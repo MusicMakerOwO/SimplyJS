@@ -16,7 +16,8 @@ import {
 	Status
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
-import { JSONObject } from "../Types/Internal.js";
+import { ImageInput, JSONObject } from "../Types/Internal.js";
+import { EncodeImage } from "../Utils.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { RoleCache } from "../Managers/Roles.js";
 import { StickerCache } from "../Managers/Stickers.js";
@@ -356,14 +357,14 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		afkChannelId?: string | null;
 		/** How long, in seconds, a voice-inactive member waits before being moved to the AFK channel */
 		afkTimeout?: number;
-		/** New icon image data, or `null` to remove the icon */
-		icon?: string | null;
-		/** New invite splash image data, or `null` to remove it */
-		splash?: string | null;
-		/** New discovery splash image data, or `null` to remove it */
-		discoverySplash?: string | null;
-		/** New banner image data, or `null` to remove it */
-		banner?: string | null;
+		/** New icon, as file bytes or a data URI, or `null` to remove the icon */
+		icon?: ImageInput | null;
+		/** New invite splash, as file bytes or a data URI, or `null` to remove it */
+		splash?: ImageInput | null;
+		/** New discovery splash, as file bytes or a data URI, or `null` to remove it */
+		discoverySplash?: ImageInput | null;
+		/** New banner, as file bytes or a data URI, or `null` to remove it */
+		banner?: ImageInput | null;
 		/** Channel for system messages (joins, boosts, etc.), or `null` to disable them */
 		systemChannelId?: string | null;
 		/** Bitfield controlling which system messages are suppressed in the system channel */
@@ -387,10 +388,10 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 			explicit_content_filter: changes.explicitContentFilter,
 			afk_channel_id: changes.afkChannelId,
 			afk_timeout: changes.afkTimeout,
-			icon: changes.icon,
-			splash: changes.splash,
-			discovery_splash: changes.discoverySplash,
-			banner: changes.banner,
+			icon: EncodeImage(changes.icon),
+			splash: EncodeImage(changes.splash),
+			discovery_splash: EncodeImage(changes.discoverySplash),
+			banner: EncodeImage(changes.banner),
 			system_channel_id: changes.systemChannelId,
 			system_channel_flags: changes.systemChannelFlags,
 			rules_channel_id: changes.rulesChannelId,

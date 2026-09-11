@@ -3,7 +3,8 @@ import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordSoundboardSound } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
-import { JSONObject } from "../Types/Internal.js";
+import { ImageInput, JSONObject } from "../Types/Internal.js";
+import { ToDataURI } from "../Utils.js";
 
 /** Cache of a single guild's {@link SoundboardSound}s, keyed by `soundId`. */
 export class SoundboardSoundCache extends GuildScopedCache<string, SoundboardSound, DiscordSoundboardSound> {
@@ -42,15 +43,15 @@ export class SoundboardSoundCache extends GuildScopedCache<string, SoundboardSou
 	 * Creates a new soundboard sound in the guild. Requires the `CREATE_GUILD_EXPRESSIONS`
 	 * permission and will error otherwise.
 	 *
-	 * @param options The sound to create. `sound` is a base64 data URI (`data:audio/mp3;base64,...`)
-	 * of an MP3 or OGG file, at most 512kb and 5.2 seconds long.
+	 * @param options The sound to create. `sound` is the bytes of an MP3 or OGG file (or a data URI
+	 * you encoded yourself), at most 512kb and 5.2 seconds long.
 	 * @see https://docs.discord.com/developers/resources/soundboard#create-guild-soundboard-sound
 	 */
 	async create(options: {
 		/** Name of the sound, 2-32 characters */
 		name: string;
-		/** The sound file as a base64 data URI */
-		sound: string;
+		/** The sound file, as raw bytes or an already-encoded data URI */
+		sound: ImageInput;
 		/** Playback volume, from 0 to 1, defaults to 1 */
 		volume?: number | null;
 		/** Id of a custom emoji to use as the icon */
@@ -58,7 +59,7 @@ export class SoundboardSoundCache extends GuildScopedCache<string, SoundboardSou
 		/** Unicode character of a standard emoji to use as the icon */
 		emojiName?: string | null;
 	}): Promise<SoundboardSound> {
-		const body: JSONObject = { name: options.name, sound: options.sound };
+		const body: JSONObject = { name: options.name, sound: ToDataURI(options.sound) };
 
 		if ("volume" in options && options.volume !== undefined) body.volume = options.volume;
 		if ("emojiId" in options && options.emojiId !== undefined) body.emoji_id = options.emojiId;

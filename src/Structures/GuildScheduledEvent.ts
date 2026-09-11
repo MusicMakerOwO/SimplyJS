@@ -11,7 +11,8 @@ import {
 import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
-import { JSONObject } from "../Types/index.js";
+import { ImageInput, JSONObject } from "../Types/index.js";
+import { EncodeImage } from "../Utils.js";
 
 /**
  * An event scheduled in a guild, such as a stage, voice, or external meetup.
@@ -105,14 +106,15 @@ export class GuildScheduledEvent extends APIGuildStructure<DiscordGuildScheduled
 		entityType?: ObjectValues<typeof DiscordGuildScheduledEventEntityTypes>
 		/** Lifecycle state to move the event to, used to start, complete, or cancel it */
 		status?: ObjectValues<typeof DiscordGuildScheduledEventStatus>
-		/** Cover image for the event, as a data URI */
-		image?: string
+		/** Cover image for the event, as file bytes or a data URI */
+		image?: ImageInput
 		/** How often the event should repeat, or `null` to make it one-off */
 		recurrenceRule?: DiscordGuildScheduledEventRecurrenceRule | null
 	}): Promise<void> {
-		const { channelId, entityMetadata, privacyLevel, scheduledStartTime, scheduledEndTime, entityType, recurrenceRule, ...rest } = changes;
+		const { channelId, entityMetadata, privacyLevel, scheduledStartTime, scheduledEndTime, entityType, recurrenceRule, image, ...rest } = changes;
 		const payload = {
 			...rest,
+			image: EncodeImage(image),
 			channel_id: channelId,
 			entity_metadata: entityMetadata,
 			privacy_level: privacyLevel,

@@ -5,8 +5,8 @@ import { DiscordRole } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { BitFieldValue } from "../DataStructures/BitField.js";
 import { DiscordPermissions } from "../Constants.js";
-import { JSONObject } from "../Types/index.js";
-import { SerializeBitFieldValue } from "../Utils.js";
+import { ImageInput, JSONObject } from "../Types/index.js";
+import { EncodeImage, SerializeBitFieldValue } from "../Utils.js";
 
 /** Cache of a single guild's {@link Role}s. */
 export class RoleCache extends GuildScopedCache<string, Role, DiscordRole> {
@@ -71,15 +71,15 @@ export class RoleCache extends GuildScopedCache<string, Role, DiscordRole> {
 		colors?: DiscordRole["colors"]
 		/** Whether this role is shown separately in the member list */
 		hoist?: boolean
-		/** Optional role icon data */
-		icon?: string | null
+		/** Optional role icon, as file bytes or a data URI */
+		icon?: ImageInput | null
 		/** Optional Unicode emoji shown as the role icon */
 		unicodeEmoji?: string | null
 		/** Whether this role can be mentioned by anyone */
 		mentionable?: boolean
 	}): Promise<Role> {
-		const { unicodeEmoji, ...rest } = data;
-		const payload = { ...rest, unicode_emoji: unicodeEmoji };
+		const { unicodeEmoji, icon, ...rest } = data;
+		const payload = { ...rest, unicode_emoji: unicodeEmoji, icon: EncodeImage(icon) };
 		payload.permissions = SerializeBitFieldValue(DiscordPermissions, payload.permissions);
 
 		const roleData = await this.client.rest.post<DiscordRole>(`/guilds/${this.guild.id}/roles`, payload as unknown as JSONObject);

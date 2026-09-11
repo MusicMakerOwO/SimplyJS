@@ -3,13 +3,15 @@ import { GuildScopedCache } from "../Contracts/CacheStructure.js";
 import { Client } from "../Client.js";
 import { DiscordWebhook } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
+import { ImageInput } from "../Types/Internal.js";
+import { EncodeImage } from "../Utils.js";
 
 /** The fields accepted by {@link WebhookCache.create} */
 export type WebhookCreateOptions = {
 	/** name of the webhook, 1-80 characters and cannot contain "clyde" or "discord" */
 	name: string;
-	/** image for the default webhook avatar, as a data URI */
-	avatar?: string | null;
+	/** image for the default webhook avatar, as file bytes or a data URI */
+	avatar?: ImageInput | null;
 }
 
 /**
@@ -81,9 +83,10 @@ export class WebhookCache extends GuildScopedCache<string, Webhook, DiscordWebho
 	 * @see https://docs.discord.com/developers/resources/webhook#create-webhook
 	 */
 	async create(channelId: string, options: WebhookCreateOptions, reason?: string): Promise<Webhook> {
+		const { avatar, ...rest } = options;
 		const created = await this.client.rest.post<DiscordWebhook>(
 			`/channels/${channelId}/webhooks`,
-			options,
+			{ ...rest, ...(avatar !== undefined && { avatar: EncodeImage(avatar) }) },
 			reason ? { 'X-Audit-Log-Reason': reason } : {}
 		);
 		return this.upsert(created);

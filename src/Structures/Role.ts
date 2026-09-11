@@ -4,8 +4,8 @@ import { DiscordRole } from "../Types/DiscordAPITypes.js";
 import { Guild } from "./Guild.js";
 import { BitField, BitFieldValue } from "../DataStructures/BitField.js";
 import { DiscordPermissions } from "../Constants.js";
-import { JSONObject } from "../Types/index.js";
-import { SerializeBitFieldValue } from "../Utils.js";
+import { ImageInput, JSONObject } from "../Types/index.js";
+import { EncodeImage, SerializeBitFieldValue } from "../Utils.js";
 
 /**
  * A guild role, granting permissions and cosmetic styling (color, icon, hoisting) to its members.
@@ -125,16 +125,20 @@ export class Role extends APIGuildStructure<DiscordRole> {
 		}
 		/** Whether to display the role separately from online members in the member list */
 		hoist?: boolean
-		/** New role icon, or `null` to remove it; mutually exclusive with `unicodeEmoji` */
-		icon?: string | null
+		/**
+		 * New role icon, as file bytes or a data URI, or `null` to remove it; mutually exclusive
+		 * with `unicodeEmoji`
+		 */
+		icon?: ImageInput | null
 		/** New Unicode emoji for the role icon, or `null` to remove it; mutually exclusive with `icon` */
 		unicodeEmoji?: string | null
 		/** Whether members may `@mention` this role */
 		mentionable?: boolean
 	}): Promise<void> {
-		const { colors, unicodeEmoji, ...rest } = options;
+		const { colors, unicodeEmoji, icon, ...rest } = options;
 		const payload = {
 			...rest,
+			icon: EncodeImage(icon),
 			colors: colors ? {
 				primary_color: colors.primaryColor,
 				secondary_color: colors.secondaryColor,
