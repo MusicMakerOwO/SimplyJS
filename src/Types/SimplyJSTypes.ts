@@ -199,6 +199,16 @@ export const ClientEvents = {
 	 */
 	Ready: "Ready",
 	/**
+	 * Fired when a dropped connection is resumed and the gateway has replayed any missed events.
+	 *
+	 * Listener arguments: none.
+	 *
+	 * Note: this replaces `Ready` for the reconnect - the client was already ready, so `Ready`
+	 * is not emitted again.
+	 */
+	Resumed: "Resumed",
+
+	/**
 	 * Fired when a cached user's profile changes.
 	 * Listener arguments: `oldUser` ({@link User} | `undefined`), `newUser` ({@link User}).
 	 */
@@ -628,6 +638,7 @@ export const ClientEvents = {
 
 export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
+	[ClientEvents.Resumed]: [];
 
 	[ClientEvents.UserUpdate]: [oldUser: User | undefined, newUser: User];
 

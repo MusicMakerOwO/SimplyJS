@@ -3,6 +3,7 @@ import { platform } from "node:os";
 import WebSocket from "ws";
 import {
 	GatewayCloseCodes,
+	GatewayEvents,
 	GatewayOpCodes,
 	GatewayPayload,
 	RequestGuildMembersPayload
@@ -360,9 +361,12 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			return;
 		}
 
-		if (data.t === "RESUMED") {
+		if (data.t === GatewayEvents.Resumed) {
 			this.#connectionSucceeded();
 			this.emit(WSEvents.Resumed);
+
+			// `RESUMED` carries a null `d`, so it has to be dispatched before the payload guard below
+			this.dispatch(this.client, data.t, {});
 			return;
 		}
 
