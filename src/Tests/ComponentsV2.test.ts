@@ -527,6 +527,15 @@ describe("ContainerBuilder", () => {
 		expect(builder.id).toBe(17);
 	});
 
+	it("reports a nested container as itself when hydrating from a payload", () => {
+		const payload = {
+			type: ComponentTypes.CONTAINER,
+			components: [{ type: ComponentTypes.CONTAINER, components: [] } as never]
+		};
+
+		expect(() => ContainerBuilder.from(payload)).toThrow(/cannot contain another container/);
+	});
+
 	it("validates a complete builder without throwing", () => {
 		expect(() => new ContainerBuilder().addComponents(text()).validate()).not.toThrow();
 	});

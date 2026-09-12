@@ -18,8 +18,15 @@ const childTypes: readonly number[] = [
 	ComponentTypes.SEPARATOR
 ];
 
-/** Builds the appropriate builder for a raw {@link Container} child, based on its type */
+/**
+ * Builds the appropriate builder for a raw {@link Container} child, based on its type.
+ *
+ * Asserts first so an unsupported child is reported as itself - mapping a nested container would
+ * otherwise fall through to `undefined` and leave `setComponents` complaining about that instead.
+ */
 function buildContainerChild(component: ContainerChild): ContainerChild {
+	assertContainerChildType(component);
+
 	switch (component.type) {
 		case ComponentTypes.ACTION_ROW: return ActionRowBuilder.from(component);
 		case ComponentTypes.TEXT_DISPLAY: return TextDisplayBuilder.from(component);
