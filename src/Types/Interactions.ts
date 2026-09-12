@@ -7,7 +7,7 @@ import {
 } from "./ApplicationCommand.js";
 import { DiscordChannel, DiscordGuild, DiscordMember, DiscordUser } from "./DiscordAPITypes.js";
 import { AllowedMentions, DiscordMessage, Embed, PollLayoutTypes, PollMedia, ResolvedData } from "./MessageComponents.js";
-import { ComponentType, MessageComponent, ModalComponent } from "./Components.js";
+import { ComponentType, Label, MessageComponent, ModalComponent } from "./Components.js";
 import { JSONObject, MessageAttachmentInput } from "./Internal.js";
 
 /**
@@ -347,8 +347,14 @@ export type InteractionCallbackModal = {
 	custom_id: string;
 	/** title of the modal, max 45 characters */
 	title: string;
-	/** 1-5 components making up the modal */
-	components: ModalComponent[];
+	/**
+	 * 1-5 components making up the modal, each a {@link Label} wrapping its field.
+	 *
+	 * Narrower than the inbound {@link ModalSubmitData.components}, which also admits the legacy
+	 * `ActionRow`: Discord still *returns* rows on a submission, but `ModalBuilder` will not send
+	 * one, so accepting it here would type a payload that always fails at runtime.
+	 */
+	components: Label[];
 };
 
 type BaseInteractionResponse<TType extends InteractionCallbackType> = {

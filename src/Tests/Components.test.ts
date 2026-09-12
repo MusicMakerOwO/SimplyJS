@@ -1312,11 +1312,14 @@ describe("ModalBuilder", () => {
 	});
 
 	it("throws from static from when a top-level component is an action row", () => {
-		const payload: InteractionCallbackModal = {
+		// the cast is the point: InteractionCallbackModal.components is Label[], so the compiler
+		// now refuses a row outright. The runtime guard still has to hold for JS callers and for
+		// anything built from an inbound submission, which may legitimately carry one
+		const payload = {
 			custom_id: "feedback-modal",
 			title: "Feedback",
 			components: [{ type: ComponentTypes.ACTION_ROW, components: [] }]
-		};
+		} as unknown as InteractionCallbackModal;
 
 		expect(() => ModalBuilder.from(payload)).toThrow(/ModalBuilder only supports Label-wrapped fields, not action rows/);
 	});
@@ -1419,11 +1422,13 @@ describe("ModalBuilder", () => {
 		});
 
 		it("static validate throws when a top-level component is an action row", () => {
-			const payload: InteractionCallbackModal = {
+			// see the note on the `from` case above - the cast proves the type blocks what the
+			// runtime blocks, rather than the two disagreeing as they used to
+			const payload = {
 				custom_id: "feedback-modal",
 				title: "Feedback",
 				components: [{ type: ComponentTypes.ACTION_ROW, components: [] }]
-			};
+			} as unknown as InteractionCallbackModal;
 
 			expect(() => ModalBuilder.validate(payload)).toThrow(/ModalBuilder only supports Label-wrapped fields, not action rows/);
 		});

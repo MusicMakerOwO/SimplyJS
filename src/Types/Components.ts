@@ -407,7 +407,13 @@ export type Label = BaseComponent<typeof ComponentTypes.LABEL> & {
 /** Any top-level component that can appear in a message's `components` array */
 export type MessageComponent = ActionRow | Section | TextDisplay | MediaGallery | FileComponent | Separator | Container;
 
-/** Any top-level component that can appear in a modal's `components` array */
+/**
+ * Any top-level component that can appear in a modal submission's `components` array.
+ *
+ * This is the **inbound** union: Discord still returns the legacy `ActionRow` on a `MODAL_SUBMIT`,
+ * so {@link ModalSubmitData} and `ModalInteraction.fields` have to admit one. Sending is narrower -
+ * {@link InteractionCallbackModal} takes `Label[]` only, since `ModalBuilder` rejects a row.
+ */
 export type ModalComponent = Label | ActionRow;
 
 /** Any known message or modal component */

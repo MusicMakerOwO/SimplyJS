@@ -4,7 +4,14 @@ import { LabelBuilder } from "./LabelBuilder.js";
 
 const MAX_COMPONENTS = 5;
 
-/** Narrows a modal component to a `Label`, rejecting the legacy action-row wrapping this builder doesn't support */
+/**
+ * Narrows a modal component to a `Label`, rejecting the legacy action-row wrapping this builder
+ * doesn't support.
+ *
+ * A runtime guard rather than a type-level one: {@link InteractionCallbackModal.components} is
+ * `Label[]`, so a row cannot reach here from typed code. It still can from JavaScript callers, and
+ * from anything shaped like an inbound {@link ModalSubmitData}, which does admit rows.
+ */
 function assertLabelComponent(component: ModalComponent): Label {
 	if (component.type !== ComponentTypes.LABEL) {
 		throw new Error("ModalBuilder only supports Label-wrapped fields, not action rows");
