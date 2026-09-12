@@ -1579,6 +1579,18 @@ export type DiscordWebhook = {
 	url?: string;
 }
 
+/**
+ * The result of following an announcement channel - the channel that was followed, and the
+ * Channel Follower webhook created in the target channel to relay its posts.
+ * @see https://docs.discord.com/developers/resources/channel#followed-channel-object
+ */
+export type DiscordFollowedChannel = {
+	/** source channel id, the announcement channel that was followed */
+	channel_id: string;
+	/** created target webhook id, living in the channel the posts are relayed into */
+	webhook_id: string;
+}
+
 export const DiscordWebhookType = {
 	/** Incoming Webhooks can post messages to channels with a generated token */
 	Incoming: 1,
