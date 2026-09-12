@@ -144,6 +144,51 @@ await message.reply({ embeds: [embed] });
 > **NOTE**\
 > If you're coming from `discord.js`: there's no named-color constant support (hex string or decimal number only), fields can be set via plain property assignment (`embed.description = "..."`) as well as setters, and validation errors throw synchronously as soon as a limit is exceeded rather than surfacing later as a Discord API error. `EmbedBuilder.from(embed)` hydrates a builder from an existing payload if you need to edit one you fetched.
 
+### Components v2
+
+Components v2 replaces a message's `content` and `embeds` with a component tree you lay out yourself. You do not set the flag or check the rules - passing v2 components to any send path is enough:
+
+```ts
+import { readFile } from "node:fs/promises";
+import {
+	ContainerBuilder,
+	SectionBuilder,
+	SeparatorBuilder,
+	TextDisplayBuilder,
+	ThumbnailBuilder
+} from "simplyjs";
+
+const container = new ContainerBuilder()
+	.setAccentColor("#5865F2")
+	.addComponents(
+		new SectionBuilder()
+			.addComponents(new TextDisplayBuilder().setContent("## Welcome\nGlad you made it."))
+			.setAccessory(new ThumbnailBuilder().setMedia("attachment://banner.png")),
+		new SeparatorBuilder(),
+		new TextDisplayBuilder().setContent("-# Sent by SimplyJS")
+	);
+
+await message.channel.send({
+	components: [container],
+	attachments: [{ name: "banner.png", data: await readFile("./banner.png") }]
+});
+```
+
+`TextDisplay`, `Thumbnail`, `Section`, `MediaGallery`, `File`, `Separator`, and `Container` all have builders, and each one *is* its wire payload, so a tree can be sent, logged, or cloned as-is. Media setters take a bare url string as shorthand for the full media object, and `MediaGalleryBuilder.addItems()` takes either.
+
+The rules that no single component can check for itself are enforced when you send:
+
+| Checked on send | Behavior |
+| --- | --- |
+| `IS_COMPONENTS_V2` | Set for you when the payload uses a v2-only component. An action-row-only message stays v1 |
+| `content` / `embeds` / `sticker_ids` / `poll` | Rejected on a v2 message, which is what Discord does - with an error naming the v2 replacement |
+| Component count | 40 max, counting nested children |
+| Text length | 4000 characters across every `TextDisplay`, which is a message-wide budget rather than a per-component one |
+| `attachment://` references | Cross-checked against the message's own `attachments`, so a typo'd filename throws locally instead of returning a 400 |
+
+> **NOTE**\
+> Editing a message that is already v2 keeps it held to the v2 rules even when the edit alone would not look like one - `message.update()` and a component interaction's `update()` both read the flags of the message they are editing. `interaction.editReply()` cannot: it addresses the original response by token and never sees its flags.
+
 ### Fetching & moderation
 
 Resolve a `@mention` or raw ID against the guild's member cache, falling back to a fetch:
@@ -230,6 +275,13 @@ await guild.stickers.create({
 ```
 
 Both throw before spending a request when the file is not a format the endpoint accepts.
+
+The same is true of the image fields that travel inline in a JSON body - `guild.modify()`'s icon, splash, discovery splash, and banner, `guild.roles.create()` / `role.modify()`'s icon, a scheduled event's image, a webhook's avatar, and `guild.soundboardSounds.create()`'s sound - all take bytes and are encoded on the way out. On an edit, leaving a field out keeps the current image and passing `null` clears it:
+
+```ts
+await guild.modify({ icon: await readFile("./icon.png") });
+await guild.modify({ banner: null });     // removes the banner
+```
 
 ### Threads
 
@@ -421,18 +473,19 @@ npm run linecount   # top 10 largest .ts files by line count
 
 The project is alpha software; gateway resiliency and Discord API coverage are still being built out (tracked in `TODO.md`). Notably:
 
-- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. Reconnects are close-code aware: fatal codes (bad token, disallowed intents, bad shard/API version) stop retrying and emit `WSEvents.Disconnect`, session-invalidating codes re-identify instead of resuming, and everything else retries with exponential backoff + jitter up to `maxReconnectAttempts` (default 10).
-- Gateway event coverage is partial. Dispatch handlers exist for guilds, channels, threads (including membership), members, roles, messages, reactions, emojis, stickers, soundboard sounds, invites, integrations, presences, and typing indicators, but events like `VoiceStateUpdate`, stage instances, and voice channel effects are not yet handled.
+- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. Reconnects are close-code aware: fatal codes (bad token, disallowed intents, bad shard/API version) stop retrying and emit `WSEvents.Disconnect`, session-invalidating codes re-identify instead of resuming, and everything else retries with exponential backoff + jitter up to `maxReconnectAttempts` (default 10). A successful resume is observable as `ClientEvents.Resumed`; `ClientEvents.Ready` is not emitted again, since the client was already ready and the gateway replays whatever was missed.
+- Gateway event coverage is partial. Dispatch handlers exist for guilds, channels, threads (including membership), members, roles, messages, reactions, emojis, stickers, soundboard sounds, invites, integrations, presences, user profile updates, and typing indicators, but events like `VoiceStateUpdate`, stage instances, voice channel effects, entitlements, and subscriptions are not yet handled.
 - `channel.messages` holds no cache, unlike every other manager. A channel's message history is unbounded, so `fetch(id)` and `fetch({ limit, before, after, around })` always hit the API and hand back fresh `Message` instances — there is nothing to read synchronously and nothing to go stale. It is available on text, voice, and thread channels; announcement and stage channels do not have it yet. `before`, `after`, and `around` are mutually exclusive.
 - `guild.integrations` is not seeded from `GUILD_CREATE` — Discord does not send integrations there — so it starts empty and only fills from `Integration*` gateway events or an explicit `guild.integrations.fetchAll()`. `GuildIntegrationsUpdate` says only that *something* changed in a guild, so treat it as a signal to refetch.
-- `guild.webhooks` is likewise never seeded from `GUILD_CREATE`, and `WebhooksUpdate` tells you only which channel changed, not which webhook or how — call `guild.webhooks.fetchChannel(channelId)` to resync. A `Webhook` fetched without a token (anything the bot's own application did not create) cannot be executed, so `webhook.send()` throws for those.
+- `guild.webhooks` is likewise never seeded from `GUILD_CREATE`, and `WebhooksUpdate` tells you only which channel changed, not which webhook or how — call `guild.webhooks.fetchChannel(channelId)` to resync. A `Webhook` fetched without a token (anything the bot's own application did not create) cannot be executed, so `webhook.send()` throws for those — as do `fetchMessage()`, `editMessage()`, and `deleteMessage()`, which have no bot-authenticated route to fall back on.
+- `webhook.send()` returns a `WebhookMessage`, not a `Message`. The message belongs to the webhook rather than to the bot, so editing and deleting it go through the webhook's token instead of the channel — which is also why they need no permissions. Its `reply()`, `pin()`, and `react()` are still ordinary channel operations and need the bot's own permissions as usual.
 - `guild.soundboardSounds` is keyed by sound id, not `id` — Discord's soundboard sound object uses `sound_id`, which the `SoundboardSound` structure surfaces as `soundId`. The cache is seeded from `GUILD_CREATE` and kept current by the `SoundboardSound*` events, which need the `GuildExpressions` intent. `SoundboardSoundsUpdate` upserts every sound it carries but never evicts: Discord does not document that payload as a guaranteed full-list replacement, so `GUILD_SOUNDBOARD_SOUND_DELETE` is treated as the only authoritative removal signal.
 - `guild.members` fills from `GUILD_CREATE`, the member gateway events, and both fetch paths above. Prefer `fetchGateway()` over `fetchAll()` for a full member list: `fetchAll()` costs one heavily rate limited REST request per 1000 members, while the gateway streams the same members back as `GUILD_MEMBERS_CHUNK` dispatches. Chunks are matched to their request by a `nonce` the manager generates, so concurrent `fetchGateway()` calls do not cross-talk; a request whose chunks never arrive rejects on its `time` timeout (30s by default) rather than hanging.
 - `channel.threads` has no cache of its own, since threads are channels: `create()`, `createForumPost()`, `createFromMessage()`, and the `fetchActive()` / `fetchArchived()` / `fetchArchivedPrivate()` / `fetchJoinedArchivedPrivate()` listings all upsert into `guild.channels`. Discord has no per-channel active listing, so `fetchActive()` requests the guild-wide one and narrows the result. `before` is an archive timestamp on the archived listings but a thread ID on the joined-private one. Active threads are seeded into `guild.channels` from `GUILD_CREATE`, so they are readable on connect without a fetch; archived threads still require one.
 - `thread.members` is only ever complete for the current user without the **privileged** `GuildMembers` intent, and `ThreadMembersUpdate` caps its `added` list at 50 either way, so call `thread.members.fetchAll()` when you need the full membership of a busy thread. Threads themselves live in `guild.channels` alongside regular channels, not in a separate collection.
-- File uploads take raw bytes, never a path — this library never touches the disk, so you read the file and it identifies the type from the contents rather than trusting an extension. `guild.emojis.create()` and `guild.stickers.create()` are the only resource uploads wired up so far; soundboard sounds, guild icons/banners/splashes, and scheduled event images still expect a data URI you encoded yourself, and application-owned emojis have no create path at all.
+- File uploads take raw bytes, never a path — this library never touches the disk, so you read the file and it identifies the type from the contents rather than trusting an extension. That covers `guild.emojis.create()`, `guild.stickers.create()`, and every inline image field (guild icon/splash/discovery splash/banner, role icons, scheduled event images, webhook avatars, and soundboard sounds); an already-encoded data URI is still accepted everywhere. Application-owned emojis have no create path at all.
 - `PresenceUpdate` and `guild.presences` require the **privileged** `GuildPresences` intent, which must also be enabled for the application in the Discord developer portal. Without it the event never fires and the cache stays empty. Offline users are not retained, so `member.presence` is `undefined` for anyone offline, unseen, or when the intent is off.
-- Interactions are supported — slash and context menu commands, autocomplete, buttons, select menus, and modals all have typed structures (`src/Structures/Interactions/`) and builders (`src/Builders/`), and commands are registered with `client.registerPublicCommands()` / `client.registerGuildCommands()`. Two gaps remain. Components v2 is only partly built: `TextDisplay` and `Separator` have builders, but `Thumbnail`, `Section`, `MediaGallery`, `File`, and `Container` do not, and the send path does not yet set `IS_COMPONENTS_V2` or enforce the v1/v2 mixing rules — so v2 payloads have to be hand-written for now. Monetization is unmodeled: `interaction.entitlements` is still a raw `JSONObject[]`, and while `SKUButtonBuilder` can render a purchase button, there is no entitlement or SKU API and no way to observe the result.
+- Interactions are supported — slash and context menu commands, autocomplete, buttons, select menus, and modals all have typed structures (`src/Structures/Interactions/`) and builders (`src/Builders/`), and commands are registered with `client.registerPublicCommands()` / `client.registerGuildCommands()`. Components v2 is built out: `TextDisplay`, `Thumbnail`, `Section`, `MediaGallery`, `File`, `Separator`, and `Container` all have builders, and the send path sets `IS_COMPONENTS_V2` for you, rejects the v1/v2 combinations Discord refuses, enforces the message-wide limits, and resolves `attachment://` references against the payload's own attachments so a mismatched filename throws locally instead of coming back as a 400. One gap remains — monetization is unmodeled: `interaction.entitlements` is still a raw `JSONObject[]`, and while `SKUButtonBuilder` can render a purchase button, there is no entitlement or SKU API and no way to observe the result.
 - Large portions of `src/` still lack JSDoc coverage (tracked file-by-file in `docs.md`).
 
 ## Contributing
