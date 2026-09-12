@@ -3,6 +3,7 @@ import { Client } from "../Client.js";
 import { WSClient, WSEvents } from "../WSClient.js";
 import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
 import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
+import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 type MessageHandler = (data: { toString(): string }) => void;
 type CloseHandler = (code?: number) => void;
@@ -455,11 +456,14 @@ describe("WSClient lifecycle", () => {
 		});
 		expect(secondSocket.sent.map((raw) => (JSON.parse(raw) as GatewayPayload).op)).toContain(GatewayOpCodes.Resume);
 
+		const emitSpy = vi.spyOn(client, "emit");
 		secondSocket.emitMessage({ op: GatewayOpCodes.Dispatch, d: null, s: 2, t: "RESUMED" });
 
 		expect(socket.ready).toBe(true);
 		expect(resumedSpy).toHaveBeenCalledTimes(1);
 		expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("RESUMED"));
+		// RESUMED carries a null `d`, but still has to reach the dispatcher
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
 	});
 
 	it("does not reconnect after destroy()", () => {

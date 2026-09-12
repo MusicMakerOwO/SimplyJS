@@ -36,6 +36,9 @@ import { GuildTextChannel } from "../Structures/Channels/GuildTextChannel.js";
 import { MemberCreate, MemberDelete, MemberUpdate, MembersChunk } from "../Events/Members.js";
 import { MessageCreate, MessageDelete, MessageUpdate } from "../Events/Messages.js";
 import { Ready } from "../Events/Ready.js";
+import { Resumed } from "../Events/Resumed.js";
+import { UserUpdate } from "../Events/Users.js";
+import { User } from "../Structures/User.js";
 import { RoleCreate, RoleDelete, RoleUpdate } from "../Events/Roles.js";
 import { GuildBanAdd, GuildBanRemove } from "../Events/Bans.js";
 import { AuditLogEntryCreate } from "../Events/AuditLogs.js";
@@ -2530,5 +2533,55 @@ describe("Update event old-value snapshots", () => {
 		// sub-caches are deliberately aliased, not copied - GUILD_UPDATE only changes guild fields
 		expect(oldGuild.members).toBe(newGuild.members);
 		expect(oldGuild.roles).toBe(newGuild.roles);
+	});
+
+	it("UserUpdate caches an unknown user and emits an undefined old user", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await UserUpdate.handler(client, createUser());
+
+		const cached = client.users.get("user-1");
+		expect(cached?.username).toBe("tester");
+		expect(emitted(emitSpy, ClientEvents.UserUpdate)).toEqual([undefined, cached]);
+	});
+
+	it("UserUpdate patches the cached user in place and emits a snapshot of the old one", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		client.users.upsert(createUser());
+		const cached = client.users.get("user-1")!;
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await UserUpdate.handler(client, { ...createUser(), username: "renamed", avatar: "avatar-hash" });
+
+		const [oldUser, newUser] = emitted(emitSpy, ClientEvents.UserUpdate) as [User, User];
+		expect(newUser).toBe(cached);
+		expect(oldUser).not.toBe(cached);
+		expect(oldUser.username).toBe("tester");
+		expect(oldUser.avatar).toBeNull();
+		expect(newUser.username).toBe("renamed");
+		expect(newUser.avatar).toBe("avatar-hash");
+	});
+
+	it("UserUpdate keeps client.user in sync when the bot's own profile changes", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		client.user = client.users.upsert(createUser("self-1"));
+		client.users.upsert(createUser("other-1"));
+
+		await UserUpdate.handler(client, { ...createUser("other-1"), username: "unrelated" });
+		expect(client.user.username).toBe("tester");
+
+		await UserUpdate.handler(client, { ...createUser("self-1"), username: "renamed" });
+		expect(client.user).toBe(client.users.get("self-1"));
+		expect(client.user.username).toBe("renamed");
+	});
+
+	it("Resumed emits the client resumed event with no arguments", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await Resumed.handler(client, {});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
 	});
 });

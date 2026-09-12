@@ -162,6 +162,25 @@ describe("EventDispatcher", () => {
 		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unhandled event"));
 	});
 
+	it("routes USER_UPDATE and RESUMED to registered handlers", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const dispatch = CreateDispatch();
+		const emitSpy = vi.spyOn(client, "emit");
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+		dispatch(client, GatewayEvents.UserUpdate, { ...createUser(), username: "renamed" });
+		dispatch(client, GatewayEvents.Resumed, {});
+
+		expect(warnSpy).not.toHaveBeenCalled();
+		expect(client.users.get("user-1")?.username).toBe("renamed");
+		expect(emitSpy).toHaveBeenCalledWith(
+			ClientEvents.UserUpdate,
+			undefined,
+			expect.objectContaining({ id: "user-1", username: "renamed" })
+		);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
+	});
+
 	it("routes READY to the registered handler", () => {
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		const dispatch = CreateDispatch();
