@@ -9,6 +9,7 @@ import {
 	EmbedVideo
 } from "../Types/MessageComponents.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
+import { ResolveColor } from "../Utils.js";
 
 /** Throws if `value` exceeds `maxLength`, used to enforce Discord's per-field embed character limits */
 function AssertMaxLength(fieldName: string, value: string, maxLength: number): void {
@@ -193,15 +194,7 @@ export class EmbedBuilder implements Embed {
 	 * Sets the embed color from a number or `#RRGGBB` string
 	 */
 	setColor(value: number | string): this {
-		if (typeof value === "number") {
-			this.color = value;
-		} else {
-			// hex color code
-			const hexRegex = /^#[0-9a-fA-F]{6}$/;
-			if (!hexRegex.test(value)) throw new Error("Must be a hex color code (#123456)");
-
-			this.color = parseInt(value.slice(1), 16);
-		}
+		this.color = ResolveColor(value);
 		return this;
 	}
 

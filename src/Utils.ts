@@ -154,3 +154,21 @@ export function EncodeImage<T extends ImageInput | null | undefined>(
 	if (file === null || file === undefined) return file as Result;
 	return ToDataURI(file) as Result;
 }
+/**
+ * Normalizes a color into the decimal integer Discord expects.
+ *
+ * Shared by the two places a color is accepted - an embed's `color` and a container's
+ * `accent_color` - so both take the same inputs and reject the same way.
+ *
+ * @param value A decimal color, or a `#RRGGBB` hex string.
+ * @returns The color as a decimal integer.
+ * @throws {Error} When a string is not a 6-digit hex color code.
+ */
+export function ResolveColor(value: number | string): number {
+	if (typeof value === "number") return value;
+
+	const hexRegex = /^#[0-9a-fA-F]{6}$/;
+	if (!hexRegex.test(value)) throw new Error("Must be a hex color code (#123456)");
+
+	return parseInt(value.slice(1), 16);
+}
