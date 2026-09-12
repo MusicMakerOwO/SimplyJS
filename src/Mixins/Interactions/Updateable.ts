@@ -1,5 +1,5 @@
 import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.js";
-import { SplitAttachments } from "../../Structures/Message.js";
+import { Message, PreparePayload } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { InteractionCallbackTypes } from "../../Types/Interactions.js";
 import { InteractionReplyPayload } from "./Repliable.js";
@@ -30,7 +30,11 @@ export function Updateable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async update(content: InteractionReplyPayload): Promise<void> {
-			const { body, files } = SplitAttachments(resolveReplyPayload(content));
+			// `message` is declared by MessageComponentInteraction, the only class applying this
+			// mixin - the mixin's own base is BaseInteraction, which does not know about it
+			const { message } = this as Partial<{ message: Message }>;
+			// the attached message's flags, so editing a v2 message keeps it held to the v2 rules
+			const { body, files } = PreparePayload(resolveReplyPayload(content), message?.flags);
 			// the callback route nests the message in `data`, but uploads stay top-level form parts
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.UPDATE_MESSAGE,

@@ -8,7 +8,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { MessagePayload } from "../Types/Internal.js";
-import { CreateMessagePayload, Message, SplitAttachments } from "./Message.js";
+import { CreateMessagePayload, Message, PreparePayload } from "./Message.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
 
 /**
@@ -187,7 +187,7 @@ export class User extends APIClientStructure<DiscordUser> {
 
 	/** Send a direct message to the user, might fail if they have DMs closed or have blocked the bot */
 	async send(content: string | MessagePayload): Promise<Message> {
-		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		const { body, files } = PreparePayload(CreateMessagePayload(content));
 
 		let dmChannel = dmChannels.get(this);
 		if (!dmChannel) {

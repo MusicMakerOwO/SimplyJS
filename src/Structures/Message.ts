@@ -17,6 +17,7 @@ import { Emoji } from "./Emoji.js";
 import { Guild } from "./Guild.js";
 import { MessageableChannel } from "../Types/index.js";
 import { MessageComponent } from "../Types/Components.js";
+import { ResolveComponentsV2Flags } from "../Builders/ComponentsV2.js";
 import { MessageInteraction, MessageInteractionMetadata } from "../Types/Interactions.js";
 
 /**
@@ -80,6 +81,48 @@ export function SplitAttachments<T extends MessagePayload>(
 	});
 
 	return { body: { ...rest, attachments: descriptors }, files };
+}
+
+/**
+ * The JSON body {@link PreparePayload} produces - the payload with its attachments replaced by wire
+ * descriptors, and `flags` always present since the v2 rules may add it whether the caller set it or not.
+ */
+type PreparedBody<T> = Omit<T, 'attachments' | 'flags'> & {
+	attachments?: AttachmentDescriptor[];
+	flags?: number;
+};
+
+/**
+ * Turns a normalized payload into the request to send, applying the Components V2 rules on the way.
+ *
+ * Every send path funnels through here - `channel.send()`, `message.reply()`/`.update()`,
+ * `user.send()`, `webhook.send()`, thread creation, and the interaction responses - which is what
+ * makes the v2 rules unskippable: a message using v2 components is flagged automatically, and the
+ * combinations Discord rejects are caught before the request leaves. See
+ * {@link ResolveComponentsV2Flags} for what is checked.
+ *
+ * The v2 flags are applied to the body {@link SplitAttachments} copies out, never to the caller's
+ * own payload.
+ * @param payload The normalized payload from {@link CreateMessagePayload}.
+ * @param existingFlags Flags of the message being edited, so an edit to a message that is already v2
+ * is held to the v2 rules even when the new payload alone would not look like one. Omitted by the
+ * paths that create a message rather than edit one.
+ * @returns The JSON body to send, and the files to upload alongside it.
+ * @throws {Error} When the payload breaks one of the Components V2 rules.
+ */
+export function PreparePayload<T extends MessagePayload>(
+	payload: T,
+	existingFlags?: number
+): { body: PreparedBody<T>; files: FileAttachment[] } {
+	const flags = ResolveComponentsV2Flags(payload, existingFlags);
+	const { body, files } = SplitAttachments(payload);
+
+	// `Omit` over a generic is opaque to the compiler, so it cannot see that the two bodies differ
+	// only in `flags` - which this function is the one allowed to fill in
+	const prepared = body as PreparedBody<T>;
+	if (flags !== undefined) prepared.flags = flags;
+
+	return { body: prepared, files };
 }
 
 /**
@@ -243,7 +286,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * @returns The created reply message.
 	 */
 	async reply(content: string | MessagePayload, options: { ping?: boolean } = {}): Promise<Message> {
-		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		const { body, files } = PreparePayload(CreateMessagePayload(content));
 		body.message_reference = {
 			message_id: this.id
 		}
@@ -272,7 +315,8 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 */
 	async update(content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>): Promise<Message> {
 		if (this.user.id !== this.client.user!.id) throw new Error("Can only edit messages sent by the bot");
-		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		// this message's own flags, so editing a v2 message keeps it held to the v2 rules
+		const { body, files } = PreparePayload(CreateMessagePayload(content), this.flags);
 		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channelId}/messages/${this.id}`, body, undefined, files);
 		return new Message(this.client, response);
 	}

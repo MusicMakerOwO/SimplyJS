@@ -2,7 +2,7 @@ import { Client } from "../Client.js";
 import { BaseChannel } from "../Structures/Channels/BaseChannel.js";
 import { Guild } from "../Structures/Guild.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
-import { CreateMessagePayload, SplitAttachments } from "../Structures/Message.js";
+import { CreateMessagePayload, PreparePayload } from "../Structures/Message.js";
 import { DiscordChannel, DiscordChannelTypes, DiscordThreadMember } from "../Types/DiscordAPITypes.js";
 import { JSONObject, MessagePayload } from "../Types/Internal.js";
 
@@ -135,7 +135,7 @@ export class ThreadManager {
 	 */
 	async createForumPost(options: ForumThreadCreateOptions): Promise<GuildThreadChannel> {
 		const { message, autoArchiveDuration, rateLimitPerUser, appliedTags, reason, ...rest } = options;
-		const { body, files } = SplitAttachments(CreateMessagePayload(message));
+		const { body, files } = PreparePayload(CreateMessagePayload(message));
 		const payload: JSONObject = { ...rest, message: body as JSONObject };
 		if (autoArchiveDuration !== undefined) payload.auto_archive_duration = autoArchiveDuration;
 		if (rateLimitPerUser !== undefined) payload.rate_limit_per_user = rateLimitPerUser;

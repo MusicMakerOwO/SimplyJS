@@ -1,5 +1,5 @@
 import { BaseChannel } from "../../Structures/Channels/BaseChannel.js";
-import { CreateMessagePayload, Message, SplitAttachments } from "../../Structures/Message.js";
+import { CreateMessagePayload, Message, PreparePayload } from "../../Structures/Message.js";
 import { Constructor, MessagePayload } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { MessageManager } from "../../Managers/Messages.js";
@@ -59,7 +59,7 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 		 * @returns The created message.
 		 */
 		async send(content: string | MessagePayload): Promise<Message> {
-			const { body, files } = SplitAttachments(CreateMessagePayload(content));
+			const { body, files } = PreparePayload(CreateMessagePayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.id}/messages`, body, undefined, files);
 			return new Message(this.client, response);
 		}

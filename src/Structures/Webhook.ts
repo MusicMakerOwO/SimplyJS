@@ -11,7 +11,7 @@ import { Client } from "../Client.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { ImageInput, MessagePayload } from "../Types/Internal.js";
 import { EncodeImage } from "../Utils.js";
-import { CreateMessagePayload, Message, SplitAttachments } from "./Message.js";
+import { CreateMessagePayload, Message, PreparePayload } from "./Message.js";
 import { Guild } from "./Guild.js";
 import { User } from "./User.js";
 
@@ -182,7 +182,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 	async send(content: string | MessagePayload, options: WebhookExecuteOptions = {}): Promise<Message> {
 		if (!this.token) throw new Error(`Webhook "${this.id}" has no token and cannot be executed`);
 
-		const { body, files } = SplitAttachments(CreateMessagePayload(content));
+		const { body, files } = PreparePayload(CreateMessagePayload(content));
 		const { thread_id, ...overrides } = options;
 
 		// `wait` makes Discord return the created message instead of a 204

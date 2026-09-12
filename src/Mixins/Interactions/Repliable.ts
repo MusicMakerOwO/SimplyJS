@@ -1,5 +1,5 @@
 import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.js";
-import { Message, SplitAttachments } from "../../Structures/Message.js";
+import { Message, PreparePayload } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
 import { InteractionCallbackMessages, InteractionCallbackTypes } from "../../Types/Interactions.js";
@@ -36,7 +36,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async reply(content: InteractionReplyPayload): Promise<void> {
-			const { body, files } = SplitAttachments(resolveReplyPayload(content));
+			const { body, files } = PreparePayload(resolveReplyPayload(content));
 			if (typeof content === 'object' && content.ephemeral) {
 				body.flags ??= 0;
 				body.flags |= MessageFlags.EPHEMERAL;
@@ -62,10 +62,15 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 
 		/**
 		 * Edits this interaction's original response.
+		 *
+		 * Unlike `message.update()`, this cannot hold an edit to the Components V2 rules on the
+		 * strength of what it is editing - the original response is addressed by token rather than
+		 * fetched, so its flags are never seen here. An edit that looks like v2 on its own is still
+		 * checked; one that does not is left to Discord.
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async editReply(content: InteractionReplyPayload): Promise<Message> {
-			const { body, files } = SplitAttachments(resolveReplyPayload(content));
+			const { body, files } = PreparePayload(resolveReplyPayload(content));
 			const response = await this.client.rest.patch<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}/messages/@original`,
 				body,
@@ -81,7 +86,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async followUp(content: InteractionReplyPayload): Promise<Message> {
-			const { body, files } = SplitAttachments(resolveReplyPayload(content));
+			const { body, files } = PreparePayload(resolveReplyPayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}`,
 				body,
