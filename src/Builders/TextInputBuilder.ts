@@ -1,4 +1,5 @@
 import { ComponentTypes, TextInput, TextInputStyles } from "../Types/Components.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks shared by `TextInputBuilder#validate` and the static `TextInputBuilder.validate` */
 function validateTextInputShape(input: {
@@ -7,6 +8,7 @@ function validateTextInputShape(input: {
 	min_length?: number | undefined;
 	max_length?: number | undefined;
 	value?: string | undefined;
+	id?: number | undefined;
 }): void {
 	if (!input.custom_id || input.custom_id.length === 0) throw new Error("Text input must have a customId");
 	if (input.custom_id.length > 100) throw new Error(`Text input customId must be 100 characters or fewer - Received ${input.custom_id.length} characters`);
@@ -26,13 +28,15 @@ function validateTextInputShape(input: {
 	if (input.value && input.value.length > 4000) {
 		throw new Error(`Text input value must be 4000 characters or fewer - Received ${input.value.length} characters`);
 	}
+
+	validateComponentId(input);
 }
 
 /**
  * Fluent builder for a modal text input, validating limits as they're set. The builder *is* a
  * {@link TextInput} payload - its fields carry their wire names - so it can be sent as-is.
  */
-export class TextInputBuilder implements TextInput {
+export class TextInputBuilder extends ComponentBuilder<typeof ComponentTypes.TEXT_INPUT> implements TextInput {
 	/**
 	 * Creates a builder from an existing text input payload
 	 */
@@ -46,6 +50,7 @@ export class TextInputBuilder implements TextInput {
 		if (value.required !== undefined) input.setRequired(value.required);
 		if (value.value !== undefined) input.setValue(value.value);
 		if (value.placeholder !== undefined) input.setPlaceholder(value.placeholder);
+		if (value.id !== undefined) input.setId(value.id);
 
 		return input;
 	}

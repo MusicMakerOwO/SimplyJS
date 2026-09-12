@@ -90,8 +90,7 @@ type BaseComponent<TType extends ComponentType> = {
 };
 
 /** Non-interactive button styles, which require `custom_id` and receive an interaction when clicked */
-type BaseButton = {
-	type: typeof ComponentTypes.BUTTON;
+type BaseButton = BaseComponent<typeof ComponentTypes.BUTTON> & {
 	/** text that appears on the button, max 80 characters */
 	label: string;
 	/** emoji displayed on the button */
@@ -112,8 +111,7 @@ export type LinkButton = Prettify< BaseButton & {
 	url: string;
 } >;
 
-export type PremiumButton = {
-	type: typeof ComponentTypes.BUTTON
+export type PremiumButton = BaseComponent<typeof ComponentTypes.BUTTON> & {
 	style: typeof ButtonStyles.PREMIUM;
 	/** id of the SKU the button purchases; no interaction is sent when clicked */
 	sku_id: string;

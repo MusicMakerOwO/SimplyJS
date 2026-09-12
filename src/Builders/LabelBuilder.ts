@@ -5,6 +5,7 @@ import { RoleSelectBuilder } from "./RoleSelectBuilder.js";
 import { StringSelectBuilder } from "./StringSelectBuilder.js";
 import { TextInputBuilder } from "./TextInputBuilder.js";
 import { UserSelectBuilder } from "./UserSelectBuilder.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks of the label/description text, shared by both the raw-payload and builder validation paths */
 function validateLabelText(label: { label?: string; description?: string }): void {
@@ -46,7 +47,7 @@ function validateLabelChild(component: LabelChild): void {
  * payload, and so is every component builder it can wrap, so `component` takes a builder or a
  * plain object interchangeably.
  */
-export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
+export class LabelBuilder<T extends LabelChild = LabelChild> extends ComponentBuilder<typeof ComponentTypes.LABEL> implements Label {
 	/**
 	 * Creates a builder from an existing label payload, inferring the right builder for `component`
 	 */
@@ -56,6 +57,7 @@ export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
 		label.setLabel(value.label);
 		if (value.description !== undefined) label.setDescription(value.description);
 		label.setComponent(buildLabelChild(value.component));
+		if (value.id !== undefined) label.setId(value.id);
 
 		return label;
 	}
@@ -67,6 +69,8 @@ export class LabelBuilder<T extends LabelChild = LabelChild> implements Label {
 		validateLabelText(label);
 		if (!label.component) throw new Error("Label must have a component");
 		validateLabelChild(label.component);
+
+		validateComponentId(label);
 	}
 
 	readonly type = ComponentTypes.LABEL;

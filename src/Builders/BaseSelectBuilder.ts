@@ -1,4 +1,5 @@
 import { ComponentType } from "../Types/Components.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks shared by every select builder's `validate`/static `validate` */
 export function validateBaseSelectShape(
@@ -7,6 +8,7 @@ export function validateBaseSelectShape(
 		placeholder?: string | undefined;
 		min_values?: number | undefined;
 		max_values?: number | undefined;
+		id?: number | undefined;
 	},
 	label: string
 ): void {
@@ -25,6 +27,8 @@ export function validateBaseSelectShape(
 	if (minValues < 0 || minValues > 25) throw new Error(`${label} minValues must be between 0 and 25`);
 	if (maxValues < 1 || maxValues > 25) throw new Error(`${label} maxValues must be between 1 and 25`);
 	if (minValues > maxValues) throw new Error(`${label} minValues cannot exceed maxValues`);
+
+	validateComponentId(select);
 }
 
 /**
@@ -37,8 +41,7 @@ export function validateBaseSelectShape(
  * {@link EntitySelectBuilder}, which extends this with that field rather than putting it here,
  * since string select has developer-defined `options` instead.
  */
-export abstract class BaseSelectBuilder<TType extends ComponentType> {
-	abstract readonly type: TType;
+export abstract class BaseSelectBuilder<TType extends ComponentType> extends ComponentBuilder<TType> {
 	/** Developer-defined identifier, max 100 characters, must be unique per message/modal - only populated once set, see `validate` */
 	custom_id!: string;
 	/** Placeholder text shown when nothing is selected, max 150 characters */

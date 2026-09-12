@@ -37,6 +37,7 @@ export class StringSelectBuilder extends BaseSelectBuilder<typeof ComponentTypes
 		if (value.required !== undefined) select.setRequired(value.required);
 		if (value.disabled !== undefined) select.setDisabled(value.disabled);
 		if (value.options) select.setOptions(value.options);
+		if (value.id !== undefined) select.setId(value.id);
 
 		return select;
 	}

@@ -19,6 +19,7 @@ export class UserSelectBuilder extends EntitySelectBuilder<typeof ComponentTypes
 		if (value.required !== undefined) select.setRequired(value.required);
 		if (value.disabled !== undefined) select.setDisabled(value.disabled);
 		if (value.default_values) select.setDefaultValues(value.default_values);
+		if (value.id !== undefined) select.setId(value.id);
 
 		return select;
 	}

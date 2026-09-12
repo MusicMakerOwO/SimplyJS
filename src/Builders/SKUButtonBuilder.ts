@@ -1,8 +1,11 @@
 import { ButtonStyles, ComponentTypes, PremiumButton } from "../Types/Components.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks shared by `SKUButtonBuilder#validate` and the static `SKUButtonBuilder.validate` */
-function validateSKUButtonShape(button: { sku_id?: string | undefined }): void {
+function validateSKUButtonShape(button: { sku_id?: string | undefined; id?: number | undefined }): void {
 	if (!button.sku_id || button.sku_id.length === 0) throw new Error("SKU button must have a skuId");
+
+	validateComponentId(button);
 }
 
 /**
@@ -13,7 +16,7 @@ function validateSKUButtonShape(button: { sku_id?: string | undefined }): void {
  * The builder *is* a {@link PremiumButton} payload, so it can be used interchangeably with a
  * plain object anywhere a button is accepted.
  */
-export class SKUButtonBuilder implements PremiumButton {
+export class SKUButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BUTTON> implements PremiumButton {
 	/**
 	 * Creates a builder from an existing SKU button payload
 	 */
@@ -22,6 +25,7 @@ export class SKUButtonBuilder implements PremiumButton {
 
 		button.setSkuId(value.sku_id);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);
+		if (value.id !== undefined) button.setId(value.id);
 
 		return button;
 	}

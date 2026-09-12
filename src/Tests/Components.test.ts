@@ -1491,3 +1491,65 @@ describe("builders are their wire payloads", () => {
 		});
 	});
 });
+
+// The v1 builders share `ComponentBuilder`'s `id` with the Components V2 ones, so `setId` and its
+// checks are covered once in ComponentsV2.test.ts - what matters here is that every one of these
+// builders actually inherits it, and carries it through `from` and `validate`
+describe("component id on the v1 builders", () => {
+	const button = () => new ButtonBuilder().setStyle(ButtonStyles.PRIMARY).setLabel("Go").setCustomId("go");
+	const link = () => new LinkButtonBuilder().setLabel("Docs").setURL("https://example.com");
+	const sku = () => new SKUButtonBuilder().setSkuId("1");
+	const textInput = () => new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.SHORT);
+	const label = () => new LabelBuilder().setLabel("How did we do?").setComponent(textInput());
+	const selects = () => [
+		new StringSelectBuilder().setCustomId("s").setOptions([{ label: "a", value: "a" }]),
+		new UserSelectBuilder().setCustomId("u"),
+		new RoleSelectBuilder().setCustomId("r"),
+		new MentionableSelectBuilder().setCustomId("m"),
+		new ChannelSelectBuilder().setCustomId("c")
+	];
+
+	it("sets an id on every button builder", () => {
+		expect(button().setId(1).id).toBe(1);
+		expect(link().setId(2).id).toBe(2);
+		expect(sku().setId(3).id).toBe(3);
+	});
+
+	it("sets an id on every select builder", () => {
+		for (const select of selects()) expect(select.setId(7).id).toBe(7);
+	});
+
+	it("sets an id on the modal component builders", () => {
+		expect(textInput().setId(4).id).toBe(4);
+		expect(label().setId(5).id).toBe(5);
+	});
+
+	it("leaves the id absent when never set", () => {
+		expect(button().id).toBeUndefined();
+		expect(textInput().id).toBeUndefined();
+	});
+
+	it("rejects a malformed id from validate", () => {
+		const invalid = { id: 1.5 };
+
+		expect(() => ButtonBuilder.validate({ ...button(), ...invalid })).toThrow(/must be an integer/);
+		expect(() => LinkButtonBuilder.validate({ ...link(), ...invalid })).toThrow(/must be an integer/);
+		expect(() => SKUButtonBuilder.validate({ ...sku(), ...invalid })).toThrow(/must be an integer/);
+		expect(() => TextInputBuilder.validate({ ...textInput(), ...invalid })).toThrow(/must be an integer/);
+		expect(() => LabelBuilder.validate({ ...label(), ...invalid })).toThrow(/must be an integer/);
+		expect(() => StringSelectBuilder.validate({ ...selects()[0]!, ...invalid } as never)).toThrow(/must be an integer/);
+	});
+
+	it("carries the id through static from", () => {
+		expect(ButtonBuilder.from({ ...button(), id: 11 }).id).toBe(11);
+		expect(LinkButtonBuilder.from({ ...link(), id: 12 }).id).toBe(12);
+		expect(SKUButtonBuilder.from({ ...sku(), id: 13 }).id).toBe(13);
+		expect(TextInputBuilder.from({ ...textInput(), id: 14 }).id).toBe(14);
+		expect(LabelBuilder.from({ ...label(), id: 15 }).id).toBe(15);
+		expect(StringSelectBuilder.from({ ...selects()[0]!, id: 16 } as never).id).toBe(16);
+		expect(UserSelectBuilder.from({ ...selects()[1]!, id: 17 } as never).id).toBe(17);
+		expect(RoleSelectBuilder.from({ ...selects()[2]!, id: 18 } as never).id).toBe(18);
+		expect(MentionableSelectBuilder.from({ ...selects()[3]!, id: 19 } as never).id).toBe(19);
+		expect(ChannelSelectBuilder.from({ ...selects()[4]!, id: 20 } as never).id).toBe(20);
+	});
+});

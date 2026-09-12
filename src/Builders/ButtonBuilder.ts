@@ -1,5 +1,6 @@
 import { ButtonStyles, ComponentEmoji, ComponentTypes, InteractiveButton } from "../Types/Components.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Style of a button that sends an interaction when clicked, ie. every non-premium style except LINK */
 export type InteractiveButtonStyle = Exclude<ObjectValues<typeof ButtonStyles>, typeof ButtonStyles.LINK | typeof ButtonStyles.PREMIUM>;
@@ -11,12 +12,14 @@ export function validateButtonLabel(label: string | undefined): void {
 }
 
 /** Runtime checks shared by `ButtonBuilder#validate` and the static `ButtonBuilder.validate` */
-function validateInteractiveButtonShape(button: { label?: string | undefined; custom_id?: string | undefined; url?: string | undefined }): void {
+function validateInteractiveButtonShape(button: { label?: string | undefined; custom_id?: string | undefined; url?: string | undefined; id?: number | undefined }): void {
 	validateButtonLabel(button.label);
 
 	if (!button.custom_id) throw new Error("Non-link buttons must have a customId");
 	if (button.custom_id.length > 100) throw new Error(`Button customId must be 100 characters or fewer - Received ${button.custom_id.length} characters`);
 	if (button.url) throw new Error("Non-link buttons cannot have a url");
+
+	validateComponentId(button);
 }
 
 /**
@@ -36,7 +39,7 @@ function validateInteractiveButtonShape(button: { label?: string | undefined; cu
  * @note Fields are typed as always-present so the builder lines up with the payload type, but
  * they're only populated once you set them - call {@link ButtonBuilder#validate} to check.
  */
-export class ButtonBuilder implements InteractiveButton {
+export class ButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BUTTON> implements InteractiveButton {
 	/**
 	 * Creates a builder from an existing interactive button payload
 	 */
@@ -47,6 +50,7 @@ export class ButtonBuilder implements InteractiveButton {
 		button.setCustomId(value.custom_id);
 		if (value.emoji) button.setEmoji(value.emoji);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);
+		if (value.id !== undefined) button.setId(value.id);
 
 		return button;
 	}
@@ -71,6 +75,7 @@ export class ButtonBuilder implements InteractiveButton {
 	custom_id!: string;
 
 	constructor(style: InteractiveButtonStyle = ButtonStyles.PRIMARY) {
+		super();
 		this.style = style;
 	}
 

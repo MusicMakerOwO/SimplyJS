@@ -1,13 +1,16 @@
 import { ButtonStyles, ComponentEmoji, ComponentTypes, LinkButton } from "../Types/Components.js";
 import { validateButtonLabel } from "./ButtonBuilder.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks shared by `LinkButtonBuilder#validate` and the static `LinkButtonBuilder.validate` */
-function validateLinkButtonShape(button: { label?: string; url?: string; custom_id?: string }): void {
+function validateLinkButtonShape(button: { label?: string; url?: string; custom_id?: string; id?: number | undefined }): void {
 	validateButtonLabel(button.label);
 
 	if (!button.url) throw new Error("Link buttons must have a url");
 	if (button.url.length > 512) throw new Error(`Button url must be 512 characters or fewer - Received ${button.url.length} characters`);
 	if (button.custom_id) throw new Error("Link buttons cannot have a custom_id");
+
+	validateComponentId(button);
 }
 
 /**
@@ -21,7 +24,7 @@ function validateLinkButtonShape(button: { label?: string; url?: string; custom_
  * @note Fields are typed as always-present so the builder lines up with the payload type, but
  * they're only populated once you set them - call {@link LinkButtonBuilder#validate} to check.
  */
-export class LinkButtonBuilder implements LinkButton {
+export class LinkButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BUTTON> implements LinkButton {
 	/**
 	 * Creates a builder from an existing link button payload
 	 */
@@ -32,6 +35,7 @@ export class LinkButtonBuilder implements LinkButton {
 		button.setURL(value.url);
 		if (value.emoji) button.setEmoji(value.emoji);
 		if (value.disabled !== undefined) button.setDisabled(value.disabled);
+		if (value.id !== undefined) button.setId(value.id);
 
 		return button;
 	}

@@ -22,6 +22,7 @@ export class ChannelSelectBuilder extends EntitySelectBuilder<typeof ComponentTy
 		if (value.disabled !== undefined) select.setDisabled(value.disabled);
 		if (value.default_values) select.setDefaultValues(value.default_values);
 		if (value.channel_types) select.setChannelTypes(...value.channel_types);
+		if (value.id !== undefined) select.setId(value.id);
 
 		return select;
 	}
