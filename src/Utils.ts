@@ -59,6 +59,29 @@ function IsJSONObject(bytes: Uint8Array): boolean {
 	return false;
 }
 
+/**
+ * Whether the bytes open on an MPEG audio frame header describing Layer III audio, ie. an MP3
+ * without an ID3 tag ahead of it.
+ *
+ * The 11 sync bits alone are not enough of a signature to go on: they also match a UTF-16LE byte
+ * order mark, so `FF FE ...` text would be detected as audio. The rest of the header's fixed fields
+ * are checked to rule that out - the reserved encodings of the version, layer, bitrate index, and
+ * sample rate are all rejected, and the layer is required to be III specifically, which is what
+ * `audio/mpeg` means here and what a `FF FE`/`FF FF` lead-in cannot claim (both decode as Layer I).
+ */
+function IsMP3FrameHeader(bytes: Uint8Array): boolean {
+	if (bytes.length < 3) return false;
+	if (bytes[0] !== 0xff || (bytes[1]! & 0xe0) !== 0xe0) return false;
+
+	if (((bytes[1]! >> 3) & 0b11) === 0b01) return false; // reserved MPEG version
+	if (((bytes[1]! >> 1) & 0b11) !== 0b01) return false; // layer, where 01 is Layer III
+
+	const bitrateIndex = (bytes[2]! >> 4) & 0b1111;
+	if (bitrateIndex === 0b0000 || bitrateIndex === 0b1111) return false; // free and invalid
+
+	return ((bytes[2]! >> 2) & 0b11) !== 0b11; // reserved sample rate
+}
+
 /** Whether `bytes` begins with the given byte sequence, ignoring positions given as `null` */
 function StartsWith(bytes: Uint8Array, signature: (number | null)[]): boolean {
 	if (bytes.length < signature.length) return false;
@@ -89,8 +112,8 @@ export function DetectMimeType(bytes: UploadInput): string {
 	}
 	if (StartsWith(bytes, [0x4f, 0x67, 0x67, 0x53])) return "audio/ogg"; // "OggS"
 	if (StartsWith(bytes, [0x49, 0x44, 0x33])) return "audio/mpeg"; // "ID3" tag ahead of the audio
-	// An MP3 without an ID3 tag opens on a frame header, whose first 11 bits are all set
-	if (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) return "audio/mpeg";
+	// An MP3 without an ID3 tag opens on a frame header rather than a signature
+	if (IsMP3FrameHeader(bytes)) return "audio/mpeg";
 	// Lottie stickers are JSON, which has no signature - the first non-whitespace byte is the tell
 	if (IsJSONObject(bytes)) return "application/json";
 

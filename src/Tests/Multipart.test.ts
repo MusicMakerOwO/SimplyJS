@@ -201,6 +201,24 @@ describe("DetectMimeType", () => {
 		expect(DetectMimeType(Buffer.from("ID3\x04\0\0"))).toBe("audio/mpeg");
 		// an MP3 with no ID3 tag, opening straight on a frame header
 		expect(DetectMimeType(new Uint8Array([0xff, 0xfb, 0x90, 0x00]))).toBe("audio/mpeg");
+		// the other two MPEG versions that carry Layer III audio
+		expect(DetectMimeType(new Uint8Array([0xff, 0xf3, 0x90, 0x00]))).toBe("audio/mpeg");
+		expect(DetectMimeType(new Uint8Array([0xff, 0xe3, 0x90, 0x00]))).toBe("audio/mpeg");
+	});
+
+	it("does not mistake a UTF-16 byte order mark for an MP3 frame header", () => {
+		// `FF FE`/`FF FF` carry the 11 sync bits, so the header's other fixed fields are what
+		// rule them out - both decode as Layer I rather than the Layer III `audio/mpeg` means here
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xfe, 0x48, 0x00]))).toThrow(/file type/);
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xff, 0x00, 0x00]))).toThrow(/file type/);
+	});
+
+	it("rejects a frame header carrying a reserved or invalid field", () => {
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xfb, 0xf0, 0x00]))).toThrow(/file type/); // invalid bitrate index
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xfb, 0x00, 0x00]))).toThrow(/file type/); // free bitrate
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xfb, 0x9c, 0x00]))).toThrow(/file type/); // reserved sample rate
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xeb, 0x90, 0x00]))).toThrow(/file type/); // reserved MPEG version
+		expect(() => DetectMimeType(new Uint8Array([0xff, 0xfb]))).toThrow(/file type/); // too short to check
 	});
 
 	it("recognizes Lottie JSON by its leading brace", () => {
