@@ -130,10 +130,32 @@ describe("ButtonBuilder", () => {
 			expect(() => builder.validate()).not.toThrow();
 		});
 
-		it("throws when label is missing", () => {
+		it("throws when it has neither a label nor an emoji", () => {
 			const builder = new ButtonBuilder().setCustomId("click");
 
-			expect(() => builder.validate()).toThrow(/Button must have a label/);
+			expect(() => builder.validate()).toThrow("Button must have a label or an emoji");
+		});
+
+		it("accepts an emoji in place of a label", () => {
+			const unicode = new ButtonBuilder().setCustomId("click").setEmoji({ name: "👍" });
+			const custom = new ButtonBuilder().setCustomId("click").setEmoji({ id: "123456789012345678" });
+
+			expect(() => unicode.validate()).not.toThrow();
+			expect(() => custom.validate()).not.toThrow();
+			expect(unicode.label).toBeUndefined();
+		});
+
+		it("rejects an emoji that identifies nothing", () => {
+			// every ComponentEmoji field is optional, so presence alone is not enough - without an
+			// id or a name there is no emoji to render and the button would have a blank face
+			expect(() => new ButtonBuilder().setEmoji({})).toThrow("Button emoji must have an id or a name");
+			expect(() => new ButtonBuilder().setEmoji({ animated: true })).toThrow("Button emoji must have an id or a name");
+		});
+
+		it("still rejects an over-long label even when an emoji is set", () => {
+			const builder = { type: ComponentTypes.BUTTON, style: ButtonStyles.PRIMARY, custom_id: "click", label: "a".repeat(81), emoji: { name: "👍" } } as InteractiveButton;
+
+			expect(() => ButtonBuilder.validate(builder)).toThrow(/80 characters or fewer/);
 		});
 
 		it("throws when custom_id is missing", () => {
@@ -217,10 +239,17 @@ describe("LinkButtonBuilder", () => {
 			expect(() => builder.validate()).not.toThrow();
 		});
 
-		it("throws when label is missing", () => {
+		it("throws when it has neither a label nor an emoji", () => {
 			const builder = new LinkButtonBuilder().setURL("https://example.com");
 
-			expect(() => builder.validate()).toThrow(/Button must have a label/);
+			expect(() => builder.validate()).toThrow("Button must have a label or an emoji");
+		});
+
+		it("accepts an emoji in place of a label", () => {
+			const builder = new LinkButtonBuilder().setURL("https://example.com").setEmoji({ name: "🔗" });
+
+			expect(() => builder.validate()).not.toThrow();
+			expect(builder.label).toBeUndefined();
 		});
 
 		it("throws when url is missing", () => {
@@ -1466,6 +1495,15 @@ describe("builders are their wire payloads", () => {
 			style: ButtonStyles.DANGER,
 			label: "Delete",
 			custom_id: "delete"
+		});
+
+		// an emoji-only button carries no `label` key at all, rather than an empty string - the
+		// field is declared optional, so it is simply never assigned
+		expect({ ...new ButtonBuilder(ButtonStyles.SECONDARY).setEmoji({ name: "👍" }).setCustomId("like") }).toEqual({
+			type: ComponentTypes.BUTTON,
+			style: ButtonStyles.SECONDARY,
+			emoji: { name: "👍" },
+			custom_id: "like"
 		});
 
 		expect({ ...new TextInputBuilder().setCustomId("feedback").setStyle(TextInputStyles.PARAGRAPH).setMaxLength(200) }).toEqual({

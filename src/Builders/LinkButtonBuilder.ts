@@ -1,10 +1,10 @@
 import { ButtonStyles, ComponentEmoji, ComponentTypes, LinkButton } from "../Types/Components.js";
-import { validateButtonLabel } from "./ButtonBuilder.js";
+import { hasEmoji, validateButtonContent } from "./ButtonBuilder.js";
 import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 
 /** Runtime checks shared by `LinkButtonBuilder#validate` and the static `LinkButtonBuilder.validate` */
-function validateLinkButtonShape(button: { label?: string; url?: string; custom_id?: string; id?: number | undefined }): void {
-	validateButtonLabel(button.label);
+function validateLinkButtonShape(button: { label?: string; emoji?: ComponentEmoji | undefined; url?: string; custom_id?: string; id?: number | undefined }): void {
+	validateButtonContent(button);
 
 	if (!button.url) throw new Error("Link buttons must have a url");
 	if (button.url.length > 512) throw new Error(`Button url must be 512 characters or fewer - Received ${button.url.length} characters`);
@@ -49,8 +49,8 @@ export class LinkButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BU
 
 	readonly type = ComponentTypes.BUTTON;
 	readonly style = ButtonStyles.LINK;
-	/** Text that appears on the button, max 80 characters - only populated once set, see {@link LinkButtonBuilder#validate} */
-	label!: string;
+	/** Text that appears on the button, max 80 characters. Optional when an {@link emoji} is set */
+	label?: string;
 	/** Emoji displayed on the button */
 	emoji?: ComponentEmoji;
 	/** Whether the button is disabled, defaults to false */
@@ -70,9 +70,11 @@ export class LinkButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BU
 	}
 
 	/**
-	 * Sets the button's emoji
+	 * Sets the button's emoji, which can stand in for the label on its own
+	 * @throws {Error} When the emoji identifies nothing - it needs an `id` or a `name`
 	 */
 	setEmoji(emoji: ComponentEmoji): this {
+		if (!hasEmoji(emoji)) throw new Error("Button emoji must have an id or a name");
 		this.emoji = emoji;
 		return this;
 	}

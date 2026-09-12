@@ -91,9 +91,14 @@ type BaseComponent<TType extends ComponentType> = {
 
 /** Non-interactive button styles, which require `custom_id` and receive an interaction when clicked */
 type BaseButton = BaseComponent<typeof ComponentTypes.BUTTON> & {
-	/** text that appears on the button, max 80 characters */
-	label: string;
-	/** emoji displayed on the button */
+	/**
+	 * text that appears on the button, max 80 characters.
+	 *
+	 * Optional, but only one of `label` and `emoji` may be omitted - a button showing neither has
+	 * nothing to click on, and Discord rejects it
+	 */
+	label?: string;
+	/** emoji displayed on the button, which stands in for the `label` when there is none */
 	emoji?: ComponentEmoji;
 	/** whether the button is disabled, defaults to false */
 	disabled?: boolean;

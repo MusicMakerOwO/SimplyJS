@@ -5,15 +5,39 @@ import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 /** Style of a button that sends an interaction when clicked, ie. every non-premium style except LINK */
 export type InteractiveButtonStyle = Exclude<ObjectValues<typeof ButtonStyles>, typeof ButtonStyles.LINK | typeof ButtonStyles.PREMIUM>;
 
-/** Label check shared by every button builder - every button style but PREMIUM carries a label */
-export function validateButtonLabel(label: string | undefined): void {
-	if (!label || label.length === 0) throw new Error("Button must have a label");
-	if (label.length > 80) throw new Error(`Button label must be 80 characters or fewer - Received ${label.length} characters`);
+/**
+ * Whether an emoji reference actually identifies an emoji.
+ *
+ * Every field of {@link ComponentEmoji} is optional, so the object being present proves nothing -
+ * a custom emoji is identified by `id` and a unicode one by `name`, and either alone is enough.
+ * `{}` and `{ animated: true }` identify nothing.
+ */
+export function hasEmoji(emoji: ComponentEmoji | undefined): boolean {
+	if (!emoji) return false;
+	return (emoji.id?.length ?? 0) > 0 || (emoji.name?.length ?? 0) > 0;
+}
+
+/**
+ * Content check shared by every button builder that has a face - ie. every style but PREMIUM,
+ * which shows Discord's own purchase text.
+ *
+ * Discord requires *at least one of* `label` and `emoji`: a button with an emoji and no label is
+ * an ordinary icon button, and only one showing neither is rejected.
+ * @param button The button payload to check.
+ * @throws {Error} When the button has neither a label nor an emoji, or its label is too long.
+ */
+export function validateButtonContent(button: { label?: string | undefined; emoji?: ComponentEmoji | undefined }): void {
+	const hasLabel = (button.label?.length ?? 0) > 0;
+
+	if (!hasLabel && !hasEmoji(button.emoji)) throw new Error("Button must have a label or an emoji");
+	if (button.label && button.label.length > 80) {
+		throw new Error(`Button label must be 80 characters or fewer - Received ${button.label.length} characters`);
+	}
 }
 
 /** Runtime checks shared by `ButtonBuilder#validate` and the static `ButtonBuilder.validate` */
-function validateInteractiveButtonShape(button: { label?: string | undefined; custom_id?: string | undefined; url?: string | undefined; id?: number | undefined }): void {
-	validateButtonLabel(button.label);
+function validateInteractiveButtonShape(button: { label?: string | undefined; emoji?: ComponentEmoji | undefined; custom_id?: string | undefined; url?: string | undefined; id?: number | undefined }): void {
+	validateButtonContent(button);
 
 	if (!button.custom_id) throw new Error("Non-link buttons must have a customId");
 	if (button.custom_id.length > 100) throw new Error(`Button customId must be 100 characters or fewer - Received ${button.custom_id.length} characters`);
@@ -65,8 +89,8 @@ export class ButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BUTTON
 	readonly type = ComponentTypes.BUTTON;
 	/** The button's style, defaults to PRIMARY */
 	style: InteractiveButtonStyle;
-	/** Text that appears on the button, max 80 characters - only populated once set, see {@link ButtonBuilder#validate} */
-	label!: string;
+	/** Text that appears on the button, max 80 characters. Optional when an {@link emoji} is set */
+	label?: string;
 	/** Emoji displayed on the button */
 	emoji?: ComponentEmoji;
 	/** Whether the button is disabled, defaults to false */
@@ -100,9 +124,11 @@ export class ButtonBuilder extends ComponentBuilder<typeof ComponentTypes.BUTTON
 	}
 
 	/**
-	 * Sets the button's emoji
+	 * Sets the button's emoji, which can stand in for the label on its own
+	 * @throws {Error} When the emoji identifies nothing - it needs an `id` or a `name`
 	 */
 	setEmoji(emoji: ComponentEmoji): this {
+		if (!hasEmoji(emoji)) throw new Error("Button emoji must have an id or a name");
 		this.emoji = emoji;
 		return this;
 	}
