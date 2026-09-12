@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { Webhook } from "../Structures/Webhook.js";
+import { WebhookMessage } from "../Structures/WebhookMessage.js";
 import { Guild } from "../Structures/Guild.js";
 import { Message } from "../Structures/Message.js";
+import { GuildAnnouncementChannel } from "../Structures/Channels/GuildAnnouncementChannel.js";
+import { DiscordMessage } from "../Types/MessageComponents.js";
 import {
 	DiscordChannel,
 	DiscordChannelTypes,
@@ -85,6 +88,27 @@ function webhookData(overrides: { [K in keyof DiscordWebhook]?: DiscordWebhook[K
 	}
 
 	return data;
+}
+
+/** A minimal message payload, as Discord returns from an executed webhook */
+function messageData(overrides: Partial<DiscordMessage> = {}): DiscordMessage {
+	return {
+		id: "message-1",
+		channel_id: "channel-1",
+		author: userData(),
+		content: "hello",
+		timestamp: "2026-01-01T00:00:00.000Z",
+		edited_timestamp: null,
+		tts: false,
+		mention_everyone: false,
+		mentions: [],
+		mention_roles: [],
+		attachments: [],
+		embeds: [],
+		pinned: false,
+		type: 0,
+		...overrides
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +378,166 @@ describe("Webhook actions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Webhook message routes
+// ---------------------------------------------------------------------------
+
+describe("Webhook message routes", () => {
+	let client: Client;
+	let webhook: Webhook;
+
+	beforeEach(() => {
+		client = makeClient();
+		webhook = new Webhook(client, webhookData());
+	});
+
+	it("hands back a WebhookMessage carrying the webhook identity", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		const message = await webhook.send("hello");
+
+		expect(message).toBeInstanceOf(WebhookMessage);
+		expect(message.webhookId).toBe("webhook-1");
+		expect(message.webhookToken).toBe("secret-token");
+		expect(message.threadId).toBeUndefined();
+	});
+
+	it("remembers the thread a message was sent into", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData({ channel_id: "thread-1" }));
+
+		const message = await webhook.send("hello", { thread_id: "thread-1" });
+
+		expect(message.threadId).toBe("thread-1");
+	});
+
+	it("takes the thread a `thread_name` send created from the returned message", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData({ channel_id: "thread-2" }));
+
+		const message = await webhook.send("hello", { thread_name: "Release notes" });
+
+		expect(message.threadId).toBe("thread-2");
+	});
+
+	it("edits a sent message over the webhook route instead of the channel route", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+		const patch = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData({ content: "goodbye" }));
+
+		const message = await webhook.send("hello");
+		const edited = await message.update("goodbye");
+
+		expect(patch).toHaveBeenCalledWith(
+			"/webhooks/webhook-1/secret-token/messages/message-1",
+			{ content: "goodbye" },
+			undefined,
+			[]
+		);
+		expect(edited).toBeInstanceOf(WebhookMessage);
+		expect(edited.content).toBe("goodbye");
+		expect(edited.webhookToken).toBe("secret-token");
+	});
+
+	it("does not hold a webhook message to the bot-author check", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+		vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
+
+		const message = await webhook.send("hello");
+
+		// `client.user` is unset here, exactly as it is before login - `Message.update` would reject
+		// the edit on the author comparison alone, well before the request
+		expect(client.user).toBeNull();
+		await expect(message.update("goodbye")).resolves.toBeInstanceOf(WebhookMessage);
+	});
+
+	it("keeps the thread on the route when editing a threaded message", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData({ channel_id: "thread-1" }));
+		const patch = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData({ channel_id: "thread-1" }));
+
+		const message = await webhook.send("hello", { thread_id: "thread-1" });
+		await message.update("goodbye");
+
+		expect(patch).toHaveBeenCalledWith(
+			"/webhooks/webhook-1/secret-token/messages/message-1?thread_id=thread-1",
+			{ content: "goodbye" },
+			undefined,
+			[]
+		);
+	});
+
+	it("deletes a sent message over the webhook route instead of the channel route", async () => {
+		vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+		const del = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		const message = await webhook.send("hello");
+		await message.delete();
+
+		expect(del).toHaveBeenCalledWith("/webhooks/webhook-1/secret-token/messages/message-1");
+	});
+
+	it("fetches a message by id", async () => {
+		const get = vi.spyOn(client.rest, "get").mockResolvedValue(messageData());
+
+		const message = await webhook.fetchMessage("message-1");
+
+		expect(get).toHaveBeenCalledWith("/webhooks/webhook-1/secret-token/messages/message-1");
+		expect(message).toBeInstanceOf(WebhookMessage);
+		expect(message.id).toBe("message-1");
+	});
+
+	it("fetches a threaded message with the thread query", async () => {
+		const get = vi.spyOn(client.rest, "get").mockResolvedValue(messageData({ channel_id: "thread-1" }));
+
+		const message = await webhook.fetchMessage("message-1", "thread-1");
+
+		expect(get).toHaveBeenCalledWith("/webhooks/webhook-1/secret-token/messages/message-1?thread_id=thread-1");
+		expect(message.threadId).toBe("thread-1");
+	});
+
+	it("edits a message by id without fetching it first", async () => {
+		const get = vi.spyOn(client.rest, "get");
+		const patch = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData({ content: "goodbye" }));
+
+		const edited = await webhook.editMessage("message-1", "goodbye", "thread-1");
+
+		expect(get).not.toHaveBeenCalled();
+		expect(patch).toHaveBeenCalledWith(
+			"/webhooks/webhook-1/secret-token/messages/message-1?thread_id=thread-1",
+			{ content: "goodbye" },
+			undefined,
+			[]
+		);
+		expect(edited.threadId).toBe("thread-1");
+	});
+
+	it("forwards attachments when editing a message by id", async () => {
+		const patch = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
+
+		await webhook.editMessage("message-1", { attachments: [{ name: "log.txt", data: "contents" }] });
+
+		expect(patch).toHaveBeenCalledWith(
+			"/webhooks/webhook-1/secret-token/messages/message-1",
+			{ attachments: [{ id: "0", filename: "log.txt" }] },
+			undefined,
+			[{ name: "log.txt", data: "contents" }]
+		);
+	});
+
+	it("deletes a message by id", async () => {
+		const del = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await webhook.deleteMessage("message-1", "thread-1");
+
+		expect(del).toHaveBeenCalledWith("/webhooks/webhook-1/secret-token/messages/message-1?thread_id=thread-1");
+	});
+
+	it("throws on every message route when there is no token", async () => {
+		const tokenless = new Webhook(client, webhookData({ token: undefined }));
+
+		await expect(tokenless.fetchMessage("message-1")).rejects.toThrow(/no token/);
+		await expect(tokenless.editMessage("message-1", "goodbye")).rejects.toThrow(/no token/);
+		await expect(tokenless.deleteMessage("message-1")).rejects.toThrow(/no token/);
+	});
+});
+
+// ---------------------------------------------------------------------------
 // WebhookCache
 // ---------------------------------------------------------------------------
 
@@ -418,5 +602,59 @@ describe("WebhookCache", () => {
 			{ "X-Audit-Log-Reason": "for releases" }
 		);
 		expect(guild.webhooks.get("webhook-1")).toBe(created);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Channel follower webhooks
+// ---------------------------------------------------------------------------
+
+describe("GuildAnnouncementChannel.follow", () => {
+	let client: Client;
+	let channel: GuildAnnouncementChannel;
+
+	beforeEach(() => {
+		client = makeClient();
+		const guild = client.guilds.upsert(guildData());
+		channel = guild.channels.upsert({
+			...channelData("announcements"),
+			type: DiscordChannelTypes.GUILD_ANNOUNCEMENT
+		}) as GuildAnnouncementChannel;
+	});
+
+	it("posts the target channel to the followers endpoint", async () => {
+		const spy = vi.spyOn(client.rest, "post")
+			.mockResolvedValue({ channel_id: "announcements", webhook_id: "webhook-9" });
+
+		const followed = await channel.follow("channel-2");
+
+		expect(spy).toHaveBeenCalledWith(
+			"/channels/announcements/followers",
+			{ webhook_channel_id: "channel-2" },
+			{}
+		);
+		expect(followed).toEqual({ channel_id: "announcements", webhook_id: "webhook-9" });
+	});
+
+	it("passes an audit log reason", async () => {
+		const spy = vi.spyOn(client.rest, "post")
+			.mockResolvedValue({ channel_id: "announcements", webhook_id: "webhook-9" });
+
+		await channel.follow("channel-2", "relaying releases");
+
+		expect(spy).toHaveBeenCalledWith(
+			"/channels/announcements/followers",
+			{ webhook_channel_id: "channel-2" },
+			{ "X-Audit-Log-Reason": "relaying releases" }
+		);
+	});
+
+	it("does not cache the created webhook, which lives in the target guild", async () => {
+		vi.spyOn(client.rest, "post")
+			.mockResolvedValue({ channel_id: "announcements", webhook_id: "webhook-9" });
+
+		await channel.follow("channel-2");
+
+		expect(client.guilds.get("guild-1")!.webhooks.size).toBe(0);
 	});
 });
