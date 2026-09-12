@@ -725,6 +725,12 @@ export const GatewayEvents = {
 	 */
 	TypingStart: "TYPING_START",
 	/**
+	 * Properties of a user the bot shares a guild with changed (username, avatar, banner, ...).
+	 *
+	 * Required intent: none (sent regardless of intents)
+	 */
+	UserUpdate: "USER_UPDATE",
+	/**
 	 * Guild scheduled event created.
 	 *
 	 * Required intent: `GatewayIntents.GuildScheduledEvents`

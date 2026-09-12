@@ -198,6 +198,11 @@ export const ClientEvents = {
 	 * fallback timeout completes.
 	 */
 	Ready: "Ready",
+	/**
+	 * Fired when a cached user's profile changes.
+	 * Listener arguments: `oldUser` ({@link User} | `undefined`), `newUser` ({@link User}).
+	 */
+	UserUpdate: "UserUpdate",
 
 	/**
 	 * Fired when a guild becomes available to the client.
@@ -623,6 +628,8 @@ export const ClientEvents = {
 
 export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
+
+	[ClientEvents.UserUpdate]: [oldUser: User | undefined, newUser: User];
 
 	[ClientEvents.GuildCreate]: [guild: Guild];
 	[ClientEvents.GuildUpdate]: [oldGuild: Guild | undefined, newGuild: Guild];

@@ -56,4 +56,5 @@ export {
 } from "./Integrations.js";
 export { MessagePollVoteAdd, MessagePollVoteRemove } from "./Polls.js";
 export { InteractionCreate } from "./Interactions.js";
+export { UserUpdate } from "./Users.js";
 export { Ready } from "./Ready.js";
