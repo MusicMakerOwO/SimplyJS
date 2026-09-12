@@ -621,4 +621,209 @@ describe("WSClient lifecycle", () => {
 		vi.advanceTimersByTime(4001);
 		expect(wsMockState.instances).toHaveLength(2);
 	});
+
+	it("sends an out-of-cycle heartbeat when the gateway asks for one", () => {
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const heartbeatSpy = vi.fn();
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+
+		mockSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+		mockSocket.sent.length = 0;
+		// op 1 inbound is the gateway asking for a beat now rather than at the next interval
+		mockSocket.emitMessage({ op: GatewayOpCodes.Heartbeat, d: null, s: 5, t: null });
+
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+		// the beat carries the last sequence number seen, which this frame's own `s` just advanced
+		expect(JSON.parse(mockSocket.sent[0]!) as GatewayPayload).toMatchObject({
+			op: GatewayOpCodes.Heartbeat,
+			d: 5
+		});
+	});
+
+	it("resumes rather than re-identifying on a resumable InvalidSession", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
+		const invalidSessionSpy = vi.fn();
+		client.socket.on(WSEvents.InvalidSession, invalidSessionSpy);
+
+		client.socket.initialize();
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: createReadyPayload(createUser()),
+			s: 7,
+			t: GatewayEvents.Ready
+		});
+
+		// `d: true` means the session survives - keep it and RESUME, rather than dropping it
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.InvalidSession, d: true, s: null, t: null });
+		expect(invalidSessionSpy).toHaveBeenCalledWith(true);
+		vi.advanceTimersByTime(5000);
+
+		const secondSocket = wsMockState.instances[1]!;
+		secondSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+
+		const resume = secondSocket.sent
+			.map((raw) => JSON.parse(raw) as GatewayPayload)
+			.find((payload) => payload.op === GatewayOpCodes.Resume);
+		expect(resume?.d).toMatchObject({ session_id: "session-1", seq: 7 });
+	});
+
+	it("reconnects when the gateway never acknowledges a heartbeat", async () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const heartbeatSpy = vi.fn();
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+
+		mockSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 100 }, s: null, t: null });
+		await vi.advanceTimersByTimeAsync(100);
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+
+		// no HeartbeatACK comes back, so the next beat finds the connection dead and reconnects
+		// instead of sending into it
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+		expect(wsMockState.instances).toHaveLength(2);
+	});
+
+	it("stops heartbeating once the connection is gone", async () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const heartbeatSpy = vi.fn();
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+
+		mockSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 100 }, s: null, t: null });
+		await vi.advanceTimersByTimeAsync(100);
+		mockSocket.emitMessage({ op: GatewayOpCodes.HeartbeatACK, d: null, s: null, t: null });
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+
+		// the replacement connection sends no HELLO, so nothing should be beating on the old interval
+		mockSocket.close();
+		await vi.advanceTimersByTimeAsync(1000);
+
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+	});
+
+	// destroy() clears the heartbeat timer itself *and* closes the socket, whose close handler tears
+	// the same timer down - the redundancy is deliberate, since a real socket closes asynchronously
+	// and could let one more beat through. This pins the observable contract the two add up to
+	it("leaves nothing armed after destroy()", async () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const heartbeatSpy = vi.fn();
+		socket.on(WSEvents.Heartbeat, heartbeatSpy);
+		socket.initialize();
+		const mockSocket = wsMockState.instances[0]!;
+
+		mockSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 100 }, s: null, t: null });
+		await vi.advanceTimersByTimeAsync(100);
+		mockSocket.emitMessage({ op: GatewayOpCodes.HeartbeatACK, d: null, s: null, t: null });
+
+		socket.destroy();
+
+		expect(vi.getTimerCount()).toBe(0);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(heartbeatSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("cancels a reconnect that is still waiting out its backoff on destroy()", () => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(1);
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+
+		// first drop reconnects immediately, the second has to wait a second - destroy() lands inside it
+		wsMockState.instances[0]!.close();
+		vi.advanceTimersByTime(0);
+		wsMockState.instances[1]!.close();
+		// the socket is already gone by now, so destroy() clearing this timer is the only thing that
+		// can - counting them is what distinguishes a cancelled reconnect from one that still fires
+		// and is merely ignored
+		expect(vi.getTimerCount()).toBe(1);
+
+		socket.destroy();
+
+		expect(vi.getTimerCount()).toBe(0);
+		vi.advanceTimersByTime(60_000);
+		expect(wsMockState.instances).toHaveLength(2);
+	});
+
+	it("supersedes a pending reconnect when initialize() is called directly", () => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(1);
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+
+		wsMockState.instances[0]!.close();
+		vi.advanceTimersByTime(0);
+		wsMockState.instances[1]!.close();
+
+		expect(vi.getTimerCount()).toBe(1);
+
+		// connecting now makes the queued attempt redundant, so it is disarmed rather than left to
+		// fire into an `initialize()` that would early-return on the socket it already has
+		socket.initialize();
+
+		expect(wsMockState.instances).toHaveLength(3);
+		expect(vi.getTimerCount()).toBe(0);
+
+		vi.advanceTimersByTime(60_000);
+		expect(wsMockState.instances).toHaveLength(3);
+	});
+
+	it("reconnects to the resume url the READY dispatch supplied", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
+		client.socket.initialize();
+		expect(wsMockState.instances[0]!.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
+
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: { ...createReadyPayload(createUser()), resume_gateway_url: "wss://resume.example.com" },
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+		vi.advanceTimersByTime(0);
+
+		// a resume has to go back to the url the session was handed, not the generic gateway
+		expect(wsMockState.instances[1]!.url).toBe("wss://resume.example.com?v=10&encoding=json");
+	});
+
+	it("drops the session on destroy() so the next connection identifies", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, ws: { jitterOverride: 1 } });
+		const socket = client.socket;
+		socket.initialize();
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: { ...createReadyPayload(createUser()), resume_gateway_url: "wss://resume.example.com" },
+			s: 7,
+			t: GatewayEvents.Ready
+		});
+
+		socket.destroy();
+		socket.initialize();
+
+		const secondSocket = wsMockState.instances[1]!;
+		expect(secondSocket.url).toBe("wss://gateway.discord.gg?v=10&encoding=json");
+
+		secondSocket.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+		const ops = secondSocket.sent.map((raw) => (JSON.parse(raw) as GatewayPayload).op);
+		expect(ops).toContain(GatewayOpCodes.Identify);
+		expect(ops).not.toContain(GatewayOpCodes.Resume);
+	});
 });
