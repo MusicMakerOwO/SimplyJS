@@ -32,3 +32,4 @@ export * from "./Sticker.js";
 export * from "./ThreadMember.js";
 export * from "./User.js";
 export * from "./Webhook.js";
+export * from "./WebhookMessage.js";
