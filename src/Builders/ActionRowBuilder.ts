@@ -1,6 +1,7 @@
 import { ActionRow, ActionRowChild, ComponentTypes } from "../Types/Components.js";
 import { ChannelSelectBuilder } from "./ChannelSelectBuilder.js";
 import { MentionableSelectBuilder } from "./MentionableSelectBuilder.js";
+import { ComponentBuilder, validateComponentId } from "./ComponentBuilder.js";
 import { ValidateButton } from "./ResolveButton.js";
 import { RoleSelectBuilder } from "./RoleSelectBuilder.js";
 import { StringSelectBuilder } from "./StringSelectBuilder.js";
@@ -34,7 +35,9 @@ function isSelectComponent(component: ActionRowChild): boolean {
 }
 
 /** Runtime checks shared by `ActionRowBuilder#validate` and the static `ActionRowBuilder.validate` */
-function validateActionRowShape(components: ActionRowChild[]): void {
+function validateActionRowShape(components: ActionRowChild[], id?: number): void {
+	validateComponentId({ id });
+
 	if (components.length === 0) throw new Error("Action row must have at least 1 component");
 
 	const selects = components.filter(isSelectComponent);
@@ -71,19 +74,28 @@ function validateActionRowShape(components: ActionRowChild[]): void {
  * Narrow the generic to restrict `addComponents` to one kind of component (e.g.
  * `new ActionRowBuilder<Button>()`); mixing is also rejected at runtime by `validate()`.
  */
-export class ActionRowBuilder<T extends ActionRowChild = ActionRowChild> implements ActionRow {
+export class ActionRowBuilder<T extends ActionRowChild = ActionRowChild>
+	extends ComponentBuilder<typeof ComponentTypes.ACTION_ROW>
+	implements ActionRow {
 	/**
-	 * Creates a builder from an existing list of components
+	 * Creates a builder from an existing action row, or from its list of components on its own -
+	 * only the full row carries an `id`, so prefer it when round-tripping a received component
 	 */
-	static from<T extends ActionRowChild = ActionRowChild>(components: T[]): ActionRowBuilder<T> {
-		return new ActionRowBuilder<T>().setComponents(components);
+	static from<T extends ActionRowChild = ActionRowChild>(row: ActionRow | T[]): ActionRowBuilder<T> {
+		if (Array.isArray(row)) return new ActionRowBuilder<T>().setComponents(row);
+
+		const builder = new ActionRowBuilder<T>().setComponents(row.components as T[]);
+		if (row.id !== undefined) builder.setId(row.id);
+
+		return builder;
 	}
 
 	/**
 	 * Validates an action row's components against Discord's constraints
 	 */
 	static validate(row: ActionRow | ActionRowChild[]): void {
-		validateActionRowShape(Array.isArray(row) ? row : row.components);
+		if (Array.isArray(row)) return validateActionRowShape(row);
+		return validateActionRowShape(row.components, row.id);
 	}
 
 	readonly type = ComponentTypes.ACTION_ROW;
@@ -110,6 +122,6 @@ export class ActionRowBuilder<T extends ActionRowChild = ActionRowChild> impleme
 	 * Validates this builder's current state against Discord's constraints
 	 */
 	validate(): void {
-		validateActionRowShape(this.components);
+		validateActionRowShape(this.components, this.id);
 	}
 }
