@@ -24,7 +24,9 @@ import { MessageInteraction, MessageInteractionMetadata } from "../Types/Interac
  * Normalizes user input into a valid message payload.
  * @param input Either plain text content or a full message payload.
  * @returns A payload that can be sent to the Discord messages endpoint.
- * @throws {Error} When no message content, embeds, components, attachments, or stickers are provided.
+ * @throws {Error} When the payload carries nothing to send - no content, embeds, components,
+ * stickers, poll, or `attachments` key. An *empty* `attachments` list counts as something to say,
+ * since it is how an edit clears every existing file.
  */
 export function CreateMessagePayload(input: string | MessagePayload): MessagePayload {
 	if (typeof input === "string") input = { content: input };
@@ -35,7 +37,9 @@ export function CreateMessagePayload(input: string | MessagePayload): MessagePay
 		(input.components?.length ?? 0) > 0 ||
 		(input.sticker_ids?.length ?? 0) > 0 ||
 		input.poll !== undefined ||
-		(input.attachments?.length ?? 0) > 0
+		// presence rather than length: an explicit empty list is an instruction to clear every
+		// attachment, which is a complete edit on its own
+		input.attachments !== undefined
 
 	if (!hasContent) throw new Error("Cannot send an empty message");
 
@@ -48,6 +52,57 @@ function isUpload(attachment: MessageAttachmentInput): attachment is FileAttachm
 }
 
 /**
+ * Maximum attachments Discord accepts on one message, counting uploads and retained entries together.
+ *
+ * Distinct from `MAX_FILES_PER_REQUEST` in {@link Rest}, which bounds the *form parts* of a single
+ * request and so only ever sees uploads. The two happen to share a value and do not share a meaning:
+ * an edit keeping eight existing files while adding three new ones sends three parts and eleven
+ * attachments.
+ */
+export const MAX_MESSAGE_ATTACHMENTS = 10;
+
+/**
+ * Checks a payload's attachment list as a whole, before it is split into a body and a file list.
+ *
+ * This has to happen here rather than in {@link Rest}, which receives only the uploads and so cannot
+ * see the retained half at all - it would pass an edit that keeps eight files and adds five, and it
+ * would pass a new `a.png` uploaded alongside a retained `a.png`, which is exactly the ambiguous
+ * `attachment://a.png` the uniqueness rule exists to prevent. `ValidateFiles` there still runs as the
+ * transport-level backstop for anything reaching `client.rest` directly.
+ *
+ * A retained attachment that keeps its current name has no `filename` to compare, so it contributes
+ * nothing to the name set and is passed over. That is a per-entry skip, unlike
+ * `validateAttachmentReferences`, which abandons its check entirely the moment any name is unknown -
+ * that one proves a *negative* ("no attachment is called this"), which a single unknown name
+ * invalidates, whereas two known names colliding is a definite error whatever the unknown ones are
+ * called. The cost is a false negative Discord will catch, which is the right way round: a missed
+ * error costs a round trip, a wrong one breaks working code.
+ * @param attachments The payload's attachment list.
+ * @throws {Error} When there are too many attachments, an upload has no name, or two names collide.
+ */
+function ValidateAttachments(attachments: MessageAttachmentInput[]): void {
+	if (attachments.length > MAX_MESSAGE_ATTACHMENTS) {
+		throw new Error(`Cannot send more than ${MAX_MESSAGE_ATTACHMENTS} attachments on one message, received ${attachments.length}`);
+	}
+
+	const seen = new Set<string>();
+	for (const attachment of attachments) {
+		let name: string;
+		if (isUpload(attachment)) {
+			if (!attachment.name || attachment.name.length === 0) throw new Error("Every attachment must have a name");
+			name = attachment.name;
+		} else {
+			if (!attachment.id) throw new Error("Every retained attachment must have an id");
+			if (!attachment.filename) continue; // keeping its current name, which is not knowable here
+			name = attachment.filename;
+		}
+
+		if (seen.has(name)) throw new Error(`Duplicate attachment name "${name}"`);
+		seen.add(name);
+	}
+}
+
+/**
  * Separates a payload's user-supplied files from the JSON that describes them.
  *
  * Discord pairs each `files[n]` form part with an entry in the JSON `attachments` array by that
@@ -57,17 +112,27 @@ function isUpload(attachment: MessageAttachmentInput): attachment is FileAttachm
  * {@link RetainedAttachment} entries pass through with their real ids, which are snowflakes and so
  * never collide with the small indices given to uploads.
  *
+ * Editing replaces a message's whole attachment list, so the three states are distinct and all
+ * reachable: omitting `attachments` leaves the existing files alone, listing some keeps exactly
+ * those, and an explicit `[]` removes every one. That last is Discord's only way to clear them, so
+ * an empty list is carried through to the body rather than treated as nothing to say.
+ *
  * Returns a shallow copy; callers such as {@link Message.reply} mutate the body afterwards and the
  * original payload belongs to the caller.
  * @param payload The normalized payload from {@link CreateMessagePayload}.
  * @returns The JSON body to send, and the files to upload alongside it.
+ * @throws {Error} When the attachment list breaks one of the {@link ValidateAttachments} rules.
  */
 export function SplitAttachments<T extends MessagePayload>(
 	payload: T
 ): { body: Omit<T, 'attachments'> & { attachments?: AttachmentDescriptor[] }; files: FileAttachment[] } {
 	const { attachments, ...rest } = payload;
 
-	if (!attachments || attachments.length === 0) return { body: rest, files: [] };
+	// only an absent list means "leave this message's files alone" - an empty one is Discord's sole
+	// way to say "remove them all", so it has to survive onto the wire as `attachments: []`
+	if (attachments === undefined) return { body: rest, files: [] };
+
+	ValidateAttachments(attachments);
 
 	const files: FileAttachment[] = [];
 	const descriptors = attachments.map((attachment): AttachmentDescriptor => {

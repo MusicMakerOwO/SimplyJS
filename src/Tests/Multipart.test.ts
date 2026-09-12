@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Rest } from "../Rest.js";
-import { CreateMessagePayload, SplitAttachments } from "../Structures/Message.js";
+import { CreateMessagePayload, PreparePayload, SplitAttachments } from "../Structures/Message.js";
 import { DetectMimeType, EncodeImage, ResolveUpload, ToDataURI } from "../Utils.js";
 import { StickerCache } from "../Managers/Stickers.js";
 import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
@@ -428,7 +428,99 @@ describe("SplitAttachments", () => {
 		expect(SplitAttachments(payload).files).toHaveLength(1);
 	});
 
+	it("accepts an empty attachment list, which is an instruction to clear rather than nothing to say", () => {
+		expect(() => CreateMessagePayload({ attachments: [] })).not.toThrow();
+	});
+
 	it("still rejects a fully empty message", () => {
-		expect(() => CreateMessagePayload({ attachments: [] })).toThrow("Cannot send an empty message");
+		expect(() => CreateMessagePayload({})).toThrow("Cannot send an empty message");
+		expect(() => CreateMessagePayload({ content: "" })).toThrow("Cannot send an empty message");
+	});
+
+	// -----------------------------------------------------------------------
+	// Clearing every attachment (an explicit empty list)
+	// -----------------------------------------------------------------------
+
+	it("emits an explicit empty attachments array so an edit can clear every file", () => {
+		const { body, files } = SplitAttachments({ content: "hi", attachments: [] });
+
+		// contrast with "leaves payloads without attachments untouched" above: an absent list drops
+		// the key entirely, an empty one has to reach the wire for Discord to act on it
+		expect(body).toHaveProperty("attachments");
+		expect(body.attachments).toEqual([]);
+		expect(files).toEqual([]);
+	});
+
+	// -----------------------------------------------------------------------
+	// Cross-list validation (retained entries counted alongside uploads)
+	// -----------------------------------------------------------------------
+
+	function upload(name: string) {
+		return { name, data: "x" };
+	}
+
+	function retained(id: string, filename?: string) {
+		return filename === undefined ? { id } : { id, filename };
+	}
+
+	it("rejects more uploads than Discord accepts", () => {
+		const attachments = Array.from({ length: 11 }, (_, i) => upload(`file-${i}.txt`));
+
+		expect(() => SplitAttachments({ attachments })).toThrow(/more than 10 attachments/);
+	});
+
+	it("counts retained attachments toward the limit, not just uploads", () => {
+		const attachments = [
+			...Array.from({ length: 8 }, (_, i) => retained(`${i}`, `kept-${i}.txt`)),
+			...Array.from({ length: 3 }, (_, i) => upload(`new-${i}.txt`))
+		];
+
+		// only 3 files are uploaded, so the transport-level check in Rest would wave this through
+		expect(() => SplitAttachments({ attachments })).toThrow(/received 11/);
+	});
+
+	it("accepts exactly the limit across both kinds", () => {
+		const attachments = [
+			...Array.from({ length: 5 }, (_, i) => retained(`${i}`, `kept-${i}.txt`)),
+			...Array.from({ length: 5 }, (_, i) => upload(`new-${i}.txt`))
+		];
+
+		expect(() => SplitAttachments({ attachments })).not.toThrow();
+	});
+
+	it("rejects an upload sharing a name with a retained attachment", () => {
+		const attachments = [ retained("111111111111111111", "a.png"), upload("a.png") ];
+
+		// `attachment://a.png` would be ambiguous between the two
+		expect(() => SplitAttachments({ attachments })).toThrow('Duplicate attachment name "a.png"');
+	});
+
+	it("rejects two retained attachments renamed to the same filename", () => {
+		const attachments = [ retained("111111111111111111", "a.png"), retained("222222222222222222", "a.png") ];
+
+		expect(() => SplitAttachments({ attachments })).toThrow('Duplicate attachment name "a.png"');
+	});
+
+	it("accepts an upload beside a retained attachment whose name is unknown", () => {
+		const attachments = [ retained("111111111111111111"), upload("a.png") ];
+
+		// a retained entry with no `filename` keeps whatever it is currently called, which is not
+		// knowable here - so it is skipped rather than guessed at. Deliberate: reporting a collision
+		// that cannot be proven would break working code, while missing one only costs a round trip
+		expect(() => SplitAttachments({ attachments })).not.toThrow();
+	});
+
+	it("rejects an upload with an empty name", () => {
+		expect(() => SplitAttachments({ attachments: [ upload("") ] })).toThrow("Every attachment must have a name");
+	});
+
+	it("rejects a retained attachment with no id", () => {
+		expect(() => SplitAttachments({ attachments: [ { id: "" } ] })).toThrow("Every retained attachment must have an id");
+	});
+
+	it("enforces the attachment rules on the send path, not only on a direct call", () => {
+		const attachments = Array.from({ length: 11 }, (_, i) => upload(`file-${i}.txt`));
+
+		expect(() => PreparePayload({ attachments })).toThrow(/more than 10 attachments/);
 	});
 });
