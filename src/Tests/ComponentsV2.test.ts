@@ -267,10 +267,20 @@ describe("SectionBuilder", () => {
 		expect(() => builder.validate()).toThrow(/between 1 and 3 text displays/);
 	});
 
-	it("throws from validate when a component is not a text display", () => {
-		const builder = new SectionBuilder().setComponents([new SeparatorBuilder() as never]).setAccessory(accessory());
+	it("throws when a component is not a text display", () => {
+		expect(() => new SectionBuilder().addComponents(new SeparatorBuilder() as never)).toThrow(/must all be text displays/);
+		expect(() => new SectionBuilder().setComponents([new SeparatorBuilder() as never])).toThrow(/must all be text displays/);
+	});
 
-		expect(() => builder.validate()).toThrow(/must all be text displays/);
+	it("names the offending component type when rejecting it", () => {
+		expect(() => new SectionBuilder().addComponents(new ThumbnailBuilder() as never)).toThrow(/component type 11/);
+	});
+
+	it("accepts a half-built text display, leaving completeness to validate", () => {
+		const builder = new SectionBuilder().addComponents(new TextDisplayBuilder()).setAccessory(accessory());
+
+		expect(builder.components).toHaveLength(1);
+		expect(() => builder.validate()).toThrow(/Text display must have content/);
 	});
 
 	it("throws from validate when the accessory was never set", () => {

@@ -26,6 +26,23 @@ function assertSectionAccessoryType(accessory: SectionAccessory): void {
 	throw new Error(`Section accessory must be a button or thumbnail - Received component type ${(accessory as { type: number })?.type}`);
 }
 
+/**
+ * Rejects a component a section cannot hold, by type alone.
+ *
+ * Kept separate from {@link validateSectionShape} so the component setters can catch the structural
+ * mistake immediately without demanding the text display be *finished* - an empty text display can
+ * still be added and filled in afterwards, as with every other collection builder.
+ */
+function assertSectionComponentType(component: TextDisplay): void {
+	// widened because `TextDisplay` already excludes the types this rejects, so the compiler
+	// considers them unreachable - untyped JavaScript callers can still get here with one
+	const type = (component as { type?: number } | undefined)?.type;
+
+	if (type === ComponentTypes.TEXT_DISPLAY) return;
+
+	throw new Error(`Section components must all be text displays - Received component type ${type}`);
+}
+
 /** Validates a raw {@link Section}'s `accessory` using the appropriate builder's static `validate` */
 function validateSectionAccessory(accessory: SectionAccessory): void {
 	assertSectionAccessoryType(accessory);
@@ -45,9 +62,7 @@ function validateSectionShape(section: { components?: TextDisplay[] | undefined;
 	}
 
 	for (const component of components) {
-		if (component.type !== ComponentTypes.TEXT_DISPLAY) {
-			throw new Error(`Section components must all be text displays - Received component type ${(component as { type: number }).type}`);
-		}
+		assertSectionComponentType(component);
 		TextDisplayBuilder.validate(component);
 	}
 
@@ -103,6 +118,7 @@ export class SectionBuilder extends ComponentBuilder<typeof ComponentTypes.SECTI
 	 * Appends text displays to the section
 	 */
 	addComponents(...components: TextDisplay[]): this {
+		for (const component of components) assertSectionComponentType(component);
 		this.components.push(...components);
 		return this;
 	}
@@ -111,6 +127,7 @@ export class SectionBuilder extends ComponentBuilder<typeof ComponentTypes.SECTI
 	 * Replaces the section's text displays
 	 */
 	setComponents(components: TextDisplay[]): this {
+		for (const component of components) assertSectionComponentType(component);
 		this.components = components;
 		return this;
 	}
