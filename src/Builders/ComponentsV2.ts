@@ -137,7 +137,7 @@ function validateAttachmentReferences(summary: ComponentSummary, attachments: Me
 }
 
 /** The shape of a payload the v2 rules care about, common to messages and interaction responses */
-type ComponentsV2Payload = {
+export type ComponentsV2Payload = {
 	components?: MessageComponent[];
 	attachments?: MessageAttachmentInput[];
 	flags?: number;

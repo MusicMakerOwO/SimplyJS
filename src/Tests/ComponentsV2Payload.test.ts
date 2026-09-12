@@ -283,3 +283,17 @@ describe("PreparePayload on an edit", () => {
 		expect(body.flags).toBeUndefined();
 	});
 });
+
+describe("ComponentsV2 public surface", () => {
+	// ComponentsV2.ts was the one file src/Builders/index.ts did not re-export, which left the v2
+	// limits and helpers invisible to consumers while their siblings were public. Importing from
+	// the package root rather than the module is the whole point of this test
+	it("is reachable from the package barrel", async () => {
+		const index = await import("../index.js");
+
+		expect(index.MAX_V2_COMPONENTS).toBe(MAX_V2_COMPONENTS);
+		expect(index.MAX_V2_CONTENT_LENGTH).toBe(MAX_V2_CONTENT_LENGTH);
+		expect(typeof index.SummarizeComponents).toBe("function");
+		expect(typeof index.ResolveComponentsV2Flags).toBe("function");
+	});
+});

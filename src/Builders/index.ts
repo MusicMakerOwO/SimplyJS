@@ -3,6 +3,7 @@ export * from "./BaseSelectBuilder.js";
 export * from "./ButtonBuilder.js";
 export * from "./ChannelSelectBuilder.js";
 export * from "./ComponentBuilder.js";
+export * from "./ComponentsV2.js";
 export * from "./ContainerBuilder.js";
 export * from "./EmbedBuilder.js";
 export * from "./EntitySelectBuilder.js";
