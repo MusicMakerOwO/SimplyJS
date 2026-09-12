@@ -1,7 +1,7 @@
 import { Awaitable, ObjectValues } from "./HelperTypes.js";
 import { GatewayEvents } from "./DiscordGateway.js";
 import { Client } from "../Client.js";
-import { AllowedMentions, Embed, MessageReference } from "./MessageComponents.js";
+import { AllowedMentions, Embed, MessageReference, PollCreateRequest } from "./MessageComponents.js";
 import { MessageComponent } from "./Components.js";
 
 /** Raw gateway event name, as sent in the `t` field of a dispatch payload */
@@ -117,6 +117,11 @@ export type MessagePayload = {
 	components?: MessageComponent[];
 	/** IDs of stickers to attach to the message */
 	sticker_ids?: string[];
+	/**
+	 * A poll to send with the message. Not accepted when editing, and cannot be combined with
+	 * Components V2 - see {@link ResolveComponentsV2Flags}
+	 */
+	poll?: PollCreateRequest;
 	/**
 	 * Files to upload with the message (sent as `multipart/form-data`), and, when editing,
 	 * {@link RetainedAttachment} entries naming the existing attachments to keep

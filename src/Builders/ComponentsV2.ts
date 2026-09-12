@@ -1,6 +1,7 @@
 import { AnyComponent, ComponentTypes, MessageComponent } from "../Types/Components.js";
 import { MessageFlags } from "../Types/DiscordAPITypes.js";
 import { MessageAttachmentInput } from "../Types/Internal.js";
+import { PollCreateRequest } from "../Types/MessageComponents.js";
 import { ATTACHMENT_PROTOCOL } from "./UnfurledMedia.js";
 
 /** Maximum number of components in a v2 message, counting nested children */
@@ -143,7 +144,7 @@ type ComponentsV2Payload = {
 	content?: string;
 	embeds?: unknown[];
 	sticker_ids?: string[];
-	poll?: unknown;
+	poll?: PollCreateRequest;
 };
 
 /**

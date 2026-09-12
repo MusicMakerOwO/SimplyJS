@@ -6,7 +6,7 @@ import {
 	InteractionContextType
 } from "./ApplicationCommand.js";
 import { DiscordChannel, DiscordGuild, DiscordMember, DiscordUser } from "./DiscordAPITypes.js";
-import { AllowedMentions, DiscordMessage, Embed, PollLayoutTypes, PollMedia, ResolvedData } from "./MessageComponents.js";
+import { AllowedMentions, DiscordMessage, Embed, PollCreateRequest, ResolvedData } from "./MessageComponents.js";
 import { ComponentType, Label, MessageComponent, ModalComponent } from "./Components.js";
 import { JSONObject, MessageAttachmentInput } from "./Internal.js";
 
@@ -277,23 +277,6 @@ export const InteractionCallbackTypes = {
 	LAUNCH_ACTIVITY: 12
 } as const;
 export type InteractionCallbackType = ObjectValues<typeof InteractionCallbackTypes>;
-
-/**
- * The poll to create when responding with a message, as opposed to the `Poll` shape returned by
- * the API once a poll exists.
- */
-export type PollCreateRequest = {
-	/** the question of the poll, only text is supported */
-	question: PollMedia;
-	/** each of the answers available in the poll, up to 10 */
-	answers: { poll_media: PollMedia }[];
-	/** number of hours the poll should be open for, up to 32 days, defaults to 24 */
-	duration?: number;
-	/** whether a user can select multiple answers */
-	allow_multiselect?: boolean;
-	/** the layout type of the poll */
-	layout_type?: ObjectValues<typeof PollLayoutTypes>;
-};
 
 /**
  * Message-shaped response data, used by {@link InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE}

@@ -580,9 +580,39 @@ export type PollAnswer = {
 	poll_media: PollMedia;
 };
 
+/**
+ * The text and emoji of a poll's question or of one of its answers.
+ *
+ * Called a "Poll Media Object" by Discord despite carrying no media, and used only by
+ * {@link Poll.question} and {@link PollAnswer.poll_media}.
+ *
+ * `text` is optional because the two directions disagree: it is required on the question and on
+ * every answer when *creating* a poll ({@link PollCreateRequest}), but Discord omits it from some
+ * responses, returning only the emoji.
+ */
 export type PollMedia = {
-	// Why does discord not give us the actual question? They only return the emoji for some strange reason
-	// Additionally, it is called a "Poll Media Object" but there is no media, and it is only ever used in Poll.question and PollAnswer.poll_media
-	// Terrible naming convention if you ask me >:/
+	/** the text of the question or answer - max 300 characters on a question, 55 on an answer */
+	text?: string;
+	/** the emoji shown beside it */
 	emoji?: Partial<DiscordEmoji>;
 }
+
+/**
+ * The poll to create when sending a message, as opposed to the {@link Poll} shape the API returns
+ * once a poll exists.
+ *
+ * Accepted on message sends ({@link MessagePayload.poll}) and on interaction responses. A message
+ * using Components V2 cannot also carry one.
+ */
+export type PollCreateRequest = {
+	/** the question of the poll, only text is supported */
+	question: PollMedia;
+	/** each of the answers available in the poll, up to 10 */
+	answers: { poll_media: PollMedia }[];
+	/** number of hours the poll should be open for, up to 32 days, defaults to 24 */
+	duration?: number;
+	/** whether a user can select multiple answers */
+	allow_multiselect?: boolean;
+	/** the layout type of the poll */
+	layout_type?: ObjectValues<typeof PollLayoutTypes>;
+};

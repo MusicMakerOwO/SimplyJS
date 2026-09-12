@@ -5,7 +5,7 @@ import { MediaGalleryBuilder } from "../Builders/MediaGalleryBuilder.js";
 import { SeparatorBuilder } from "../Builders/SeparatorBuilder.js";
 import { TextDisplayBuilder } from "../Builders/TextDisplayBuilder.js";
 import { MAX_V2_COMPONENTS, MAX_V2_CONTENT_LENGTH, SummarizeComponents } from "../Builders/ComponentsV2.js";
-import { PreparePayload } from "../Structures/Message.js";
+import { CreateMessagePayload, PreparePayload } from "../Structures/Message.js";
 import { ActionRow, ButtonStyles, ComponentTypes, MessageComponent } from "../Types/Components.js";
 import { MessageFlags } from "../Types/DiscordAPITypes.js";
 import { MessagePayload } from "../Types/Internal.js";
@@ -136,9 +136,23 @@ describe("PreparePayload", () => {
 	});
 
 	it("rejects a poll alongside v2 components", () => {
-		const payload = { components: [text()], poll: { question: { text: "?" } } } as unknown as MessagePayload;
+		// no cast: `poll` is a real field on MessagePayload, so this rule is live on every send
+		// path rather than only reachable by forcing a payload past the compiler
+		const payload: MessagePayload = {
+			components: [text()],
+			poll: { question: { text: "?" }, answers: [{ poll_media: { text: "yes" } }] }
+		};
 
 		expect(() => PreparePayload(payload)).toThrow(/cannot also set a poll/);
+	});
+
+	it("sends a poll when no v2 components are present", () => {
+		const payload: MessagePayload = {
+			poll: { question: { text: "?" }, answers: [{ poll_media: { text: "yes" } }] }
+		};
+
+		expect(() => CreateMessagePayload(payload)).not.toThrow();
+		expect(PreparePayload(payload).body.poll).toEqual(payload.poll);
 	});
 
 	it("allows an empty content string alongside v2 components", () => {

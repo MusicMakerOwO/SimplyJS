@@ -34,6 +34,7 @@ export function CreateMessagePayload(input: string | MessagePayload): MessagePay
 		(input.embeds?.length ?? 0) > 0 ||
 		(input.components?.length ?? 0) > 0 ||
 		(input.sticker_ids?.length ?? 0) > 0 ||
+		input.poll !== undefined ||
 		(input.attachments?.length ?? 0) > 0
 
 	if (!hasContent) throw new Error("Cannot send an empty message");
@@ -313,7 +314,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 	 * @returns The updated message.
 	 * @throws {Error} When attempting to edit a message not authored by the bot.
 	 */
-	async update(content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>): Promise<Message> {
+	async update(content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference' | 'poll'>): Promise<Message> {
 		if (this.user.id !== this.client.user!.id) throw new Error("Can only edit messages sent by the bot");
 		// this message's own flags, so editing a v2 message keeps it held to the v2 rules
 		const { body, files } = PreparePayload(CreateMessagePayload(content), this.flags);

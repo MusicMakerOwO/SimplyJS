@@ -71,7 +71,7 @@ export class WebhookMessage extends Message {
 	 * @see https://docs.discord.com/developers/resources/webhook#edit-webhook-message
 	 */
 	override async update(
-		content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>
+		content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference' | 'poll'>
 	): Promise<WebhookMessage> {
 		// this message's own flags, so editing a v2 message keeps it held to the v2 rules
 		const { body, files } = PreparePayload(CreateMessagePayload(content), this.flags);

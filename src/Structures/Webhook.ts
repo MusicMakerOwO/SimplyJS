@@ -228,7 +228,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 	 */
 	async editMessage(
 		messageId: string,
-		content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference'>,
+		content: string | Omit<MessagePayload, 'sticker_ids' | 'message_reference' | 'poll'>,
 		threadId?: string
 	): Promise<WebhookMessage> {
 		const context = this.#messageContext(threadId);
