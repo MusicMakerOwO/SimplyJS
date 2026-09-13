@@ -1,144 +1,6 @@
 # TODO
 
-## Pre-beta blockers
-
-Everything here adds *new public surface*. Landing it after the beta tag means either a semver
-break or living with the gap for a full major cycle, so it goes in first.
-
-- [x] Multipart / file upload support in `src/Rest.ts`
-  - `post()`/`patch()`/`put()` take an optional 4th `files: FileAttachment[]`; a non-empty list switches `#execute` to a `payload_json` + `FormData` body and drops the hardcoded `Content-Type` so `fetch` can set the boundary. The form is rebuilt per attempt so 429/5xx retries can replay it
-  - `MessagePayload.attachments` accepts `{ name, data: Buffer | Uint8Array | string, description? }`; `SplitAttachments()` in `src/Structures/Message.ts` splits it into the wire `attachments` descriptors (which is what makes `attachment://<name>` resolve) and the files to upload
-  - Wired into `channel.send()`, `message.reply()`, `message.update()`, `user.send()`, `webhook.send()`, and the interaction responses (`reply()`, `editReply()`, `followUp()`, `update()`)
-  - `guild.emojis.create({ name, image, roles? })` and `guild.stickers.create({ name, description, tags, file })` both take raw file data - the bytes of the file (`UploadInput`, `Buffer | Uint8Array`) with no filename - Discord ignores it on these endpoints and the name is already an argument. A Lottie sticker may also be passed as the animation object, which is stringified for you. `DetectMimeType()` in `src/Utils.ts` reads the type from magic bytes only, never an extension, since nothing here touches the disk and an extension is only a claim; `ToDataURI()` builds the emoji data URI from it (an already-encoded one still passes through) and `ResolveUpload()` supplies the filename the sticker form needs
-  - Sticker creation uses the `fields` multipart layout - flat form fields plus a single part named `file`, since that endpoint rejects `payload_json`. Pass `{ files, multipart: "fields" }` instead of a bare list to select it
-  - Every field Discord takes inline in the JSON body rather than as a multipart part now accepts `ImageInput` (`Buffer | Uint8Array | string`), encoded on the way out: `guild.modify()`'s icon/splash/discoverySplash/banner, `role.modify()`/`roles.create()`'s icon, scheduled event `image` on create and modify, webhook `avatar` on create and edit, and `soundboard.create({ sound })` - whose MP3/OGG signatures `DetectMimeType()` now knows. A `string` must still be a data URI (nothing reads from disk), so pre-encoded callers are unaffected. `EncodeImage()` is the nullable form used at edit sites, where absent leaves the image alone and `null` clears it
-- [x] Message fetching
-  - `MessageManager` (`src/Managers/Messages.ts`) on `channel.messages`, with `fetch(id)` for a single message and `fetch({ limit, before, after, around })` for a page of history. Created lazily by the `Messageable` mixin, so it is on `GuildTextChannel`, `GuildVoiceChannel`, and `GuildThreadChannel`
-  - Deliberately **not** a cache, unlike the other managers: message history is unbounded, so caching it would mean owning an eviction policy. Every call hits REST. Authors/mentions still populate the global user cache via `Message.patch()`
-  - `before`/`after`/`around` are mutually exclusive and the manager throws rather than letting Discord reject the request
-- [x] `REQUEST_GUILD_MEMBERS` over the gateway
-  - REST member listing is done: `MemberCache.fetch()` overloads single/bulk, plus `fetchAll()` and `search()`
-  - `WSClient.requestGuildMembers()` sends op 8; `GUILD_MEMBERS_CHUNK` is modeled in `GatewayEvents` and handled by `MembersChunk` (`src/Events/Members.ts`), which caches members/presences and emits `ClientEvents.GuildMembersChunk`
-  - `MemberCache.fetchGateway()` is the awaitable wrapper: it validates the request against the resolved intents, attaches a generated nonce, and reassembles the chunks with a `Collector` filtered on that nonce, resolving on `chunk_index === chunk_count - 1`
-
 ## Active backlog
-
-### Components v2
-
-All component types are modeled in `src/Types/Components.ts`, every builder is written and exported,
-and the send plumbing sets `MessageFlags.IS_COMPONENTS_V2` on its own. Nothing is left open here.
-`LabelBuilder` (type 18, modal-only) predates this work, so it is not listed below.
-
-Each builder follows the existing house pattern - a class implementing its own payload type, with
-`from()`, chainable setters, and a `validate()` that throws on Discord's constraints. Every builder
-also extends `ComponentBuilder` (`src/Builders/ComponentBuilder.ts`), which carries the optional `id`
-every component shares and validates it as a 32-bit integer - including the v1 buttons, selects, and
-modal components, which were backfilled onto it.
-
-#### Builders
-
-- [x] `TextDisplayBuilder` - `TEXT_DISPLAY` (10)
-  - Single `content` field, supports markdown/mentions/emoji
-  - `content` counts toward the message's 4000-character v2 budget, which is message-wide rather than per-component, so the builder only rejects empty content
-- [x] `ThumbnailBuilder` - `THUMBNAIL` (11)
-  - `media` (`UnfurledMediaItem`), optional `description` (max 1024) and `spoiler`
-  - Only valid as a `Section` accessory - `validate()` cannot catch misuse on its own, so `SectionBuilder.setAccessory()` rejects anything that is not a button or thumbnail
-  - Image, gif, and animated webp media only. Not validated: that is a property of the bytes behind the url, and an extension is only a claim - documented on the class instead
-- [x] `SectionBuilder` - `SECTION` (9)
-  - `components` must be 1-3 `TextDisplay`s, and `accessory` is required (a `Button` or `Thumbnail`)
-  - Both bounds and the missing accessory are `validate()` cases; a child's *type* is checked eagerly in the setters - `setAccessory()` for the accessory, `addComponents()` / `setComponents()` for the text displays - since that is a structural mistake rather than an unfinished one
-- [x] `MediaGalleryBuilder` - `MEDIA_GALLERY` (12)
-  - `items` must be 1-10 `MediaGalleryItem`s, each with `media` plus optional `description` (max 1024) and `spoiler`
-  - `addItems()` / `setItems()`, both accepting a bare url string as shorthand for an item with no alt text. Items are plain objects with no `type`, so there is no item builder
-- [x] `FileBuilder` - `FILE` (13)
-  - `file` (`UnfurledMediaItem`) plus optional `spoiler`
-  - `name` and `size` are declared `readonly` with no setter - Discord populates them and ignores anything sent, so a setter would only look like it did something. `from()` still carries them through a round-trip
-  - Only accepts `attachment://<filename>` references. Checked twice: `setFile()` rejects any other url, and the send path rejects a filename with no matching entry in `attachments`
-- [x] `SeparatorBuilder` - `SEPARATOR` (14)
-  - Optional `divider` (defaults true) and `spacing` (`SeparatorSpacingSizes`, defaults `SMALL`)
-  - Both fields are left unset unless explicitly set, so Discord applies its own defaults
-- [x] `ContainerBuilder` - `CONTAINER` (17)
-  - `components` accepts `ActionRow`, `TextDisplay`, `Section`, `MediaGallery`, `FileComponent`, `Separator` - but not another `Container`, which gets its own error message
-  - Optional `accent_color` (nullable - `setAccentColor(null)` clears it, distinct from leaving it unset) and `spoiler`
-  - `setAccentColor()` and `EmbedBuilder.setColor()` now share `ResolveColor()` in `src/Utils.ts`, so both take `number | "#RRGGBB"` and reject the same way
-
-Shared by the three media-bearing builders: `src/Builders/UnfurledMedia.ts` holds `ResolveMedia()`
-(normalizes a bare url into an `UnfurledMediaItem`), `ValidateMedia()`, and
-`ValidateMediaDescription()`.
-
-#### Plumbing
-
-- [x] Export the new builders from `src/Builders/index.ts`
-- [x] Backfill `ComponentBuilder` onto the remaining v1 builders
-  - `ActionRowBuilder`'s `from()` takes a full `ActionRow` as well as a bare components array, so a
-    container round-trip keeps the row's `id`
-  - The three button builders, the five selects (through `BaseSelectBuilder`), and the modal pair
-    (`TextInputBuilder`, `LabelBuilder`) now extend it too, each carrying `id` through `from()` and
-    checking it from `validate()`
-  - `BaseButton` and `PremiumButton` were built on neither `BaseComponent` nor each other, so the
-    buttons had `custom_id` but no `id` at the type level; both now derive from `BaseComponent`. The
-    two are not alternatives: `custom_id` routes the interaction back to you, `id` addresses the
-    component for editing and ordering
-- [x] Set `IS_COMPONENTS_V2` on the send path when a payload contains v2 components
-- [x] Reject the v1/v2 mixing cases Discord rejects (`content`/`embeds`/`sticker_ids`/`poll` alongside v2 components)
-- [x] Enforce the message-wide v2 limits (40 components total, 4000 characters across all `TextDisplay`s)
-- [x] Resolve `attachment://` references locally instead of letting Discord 400 on them
-
-`PreparePayload()` in `src/Structures/Message.ts` is where all of this happens. It runs
-`ResolveComponentsV2Flags()` (`src/Builders/ComponentsV2.ts`) and then delegates to
-`SplitAttachments()`, and every send path already funnels through it - `channel.send()`,
-`message.reply()`/`.update()`, `user.send()`, `webhook.send()`, thread creation, and the
-`Repliable`/`Updateable` interaction mixins - which is what makes the rules unskippable.
-
-A single recursive pass (`SummarizeComponents()`) collects everything the checks need: the component
-count including nested children, the total `TextDisplay` length, whether any v2-only type appeared,
-and every `attachment://` reference paired with the component that made it. An `ActionRow` is
-deliberately not a v2-only type, so an action-row-only payload stays a v1 message.
-
-The attachment cross-check matches a reference against an upload's `name` or a retained attachment's
-`filename`. A retained attachment that keeps its current name gives nothing to match against, so the
-check steps aside entirely rather than reporting a reference it cannot rule out.
-
-Edits pass the flags of the message being edited as `PreparePayload()`'s second argument -
-`message.update()` passes `this.flags` and `Updateable.update()` passes `this.message.flags` - so a
-message that is already v2 stays held to the v2 rules even when the edit alone would not look like one
-(an edit made of action rows only, say). `Repliable.editReply()` cannot do the same: it addresses the
-original response by token and never sees its flags.
-
-Note that the per-component `validate()` methods stay opt-in - nothing on the send path calls them.
-`PreparePayload()` only enforces the rules a single component cannot see for itself.
-
-That funnel is now pinned by `src/Tests/SendPaths.test.ts`, which walks all twelve call sites. The
-rules themselves were always covered, but only by calling `PreparePayload()` directly - a send path
-that quietly stopped calling it would have passed the whole suite.
-
-### 1.3-alpha readiness fixes
-
-A pre-release audit turned up six defects inside 1.3's own headline scope (events, components v2,
-file uploads). All are fixed; the two type changes were taken now rather than after the beta tag,
-when strict semver makes them expensive.
-
-- [x] `attachments: []` silently failed to clear attachments
-  - `SplitAttachments()` returned early on an empty list after destructuring the key out, so an
-    explicit `[]` was indistinguishable from omitting the field - and it is Discord's only way to
-    say "remove every attachment"
-- [x] Export `src/Builders/ComponentsV2.ts` from the builders barrel
-  - The one sibling `src/Builders/index.ts` missed, which left the v2 limits and helpers invisible
-    to consumers while `PreparePayload` / `SplitAttachments` were already public
-- [x] Count retained attachments toward the attachment limits
-  - `ValidateFiles()` in `src/Rest.ts` only ever sees the uploads, so 8 retained + 5 uploads passed
-    locally, and an upload could share a name with a retained attachment. New `ValidateAttachments()`
-    in `src/Structures/Message.ts`, the one layer that sees both halves
-- [x] Narrow `InteractionCallbackModal.components` to `Label[]`
-  - The type admitted an `ActionRow` that `ModalBuilder` threw on unconditionally. Inbound
-    (`ModalSubmitData`, `ModalInteraction.fields`) deliberately still accepts one - Discord does
-    return legacy rows on a submission
-- [x] Allow emoji-only buttons
-  - `label` is now optional on `InteractiveButton` / `LinkButton`, and `validateButtonLabel()` became
-    `validateButtonContent()`, which requires at least one of label and emoji
-- [x] Add `poll` to `MessagePayload`
-  - Polls could be received and sent on an interaction response, but not through `channel.send()`.
-    Also fixed `PollMedia.text`, whose absence made `PollCreateRequest` unconstructible
 
 ### Upload MIME handling
 
@@ -464,3 +326,80 @@ Legend:
      - BE SURE TO WARN THAT COLLECTORS DO NOT PERSIST AFTER RESTART. This is the #1 trouble point for beginners, they assume the button will always exist. This is the point of handlers and button args, they are permanant due to attached to the button directly
      - Pagination is a great example
      - `examples/14-collectors` covers this
+
+
+### Components v2
+
+#### Builders
+
+- [x] `TextDisplayBuilder` - `TEXT_DISPLAY` (10)
+	- Single `content` field, supports markdown/mentions/emoji
+	- `content` counts toward the message's 4000-character v2 budget, which is message-wide rather than per-component, so the builder only rejects empty content
+- [x] `ThumbnailBuilder` - `THUMBNAIL` (11)
+	- `media` (`UnfurledMediaItem`), optional `description` (max 1024) and `spoiler`
+	- Only valid as a `Section` accessory - `validate()` cannot catch misuse on its own, so `SectionBuilder.setAccessory()` rejects anything that is not a button or thumbnail
+	- Image, gif, and animated webp media only. Not validated: that is a property of the bytes behind the url, and an extension is only a claim - documented on the class instead
+- [x] `SectionBuilder` - `SECTION` (9)
+	- `components` must be 1-3 `TextDisplay`s, and `accessory` is required (a `Button` or `Thumbnail`)
+	- Both bounds and the missing accessory are `validate()` cases; a child's *type* is checked eagerly in the setters - `setAccessory()` for the accessory, `addComponents()` / `setComponents()` for the text displays - since that is a structural mistake rather than an unfinished one
+- [x] `MediaGalleryBuilder` - `MEDIA_GALLERY` (12)
+	- `items` must be 1-10 `MediaGalleryItem`s, each with `media` plus optional `description` (max 1024) and `spoiler`
+	- `addItems()` / `setItems()`, both accepting a bare url string as shorthand for an item with no alt text. Items are plain objects with no `type`, so there is no item builder
+- [x] `FileBuilder` - `FILE` (13)
+	- `file` (`UnfurledMediaItem`) plus optional `spoiler`
+	- `name` and `size` are declared `readonly` with no setter - Discord populates them and ignores anything sent, so a setter would only look like it did something. `from()` still carries them through a round-trip
+	- Only accepts `attachment://<filename>` references. Checked twice: `setFile()` rejects any other url, and the send path rejects a filename with no matching entry in `attachments`
+- [x] `SeparatorBuilder` - `SEPARATOR` (14)
+	- Optional `divider` (defaults true) and `spacing` (`SeparatorSpacingSizes`, defaults `SMALL`)
+	- Both fields are left unset unless explicitly set, so Discord applies its own defaults
+- [x] `ContainerBuilder` - `CONTAINER` (17)
+	- `components` accepts `ActionRow`, `TextDisplay`, `Section`, `MediaGallery`, `FileComponent`, `Separator` - but not another `Container`, which gets its own error message
+	- Optional `accent_color` (nullable - `setAccentColor(null)` clears it, distinct from leaving it unset) and `spoiler`
+	- `setAccentColor()` and `EmbedBuilder.setColor()` now share `ResolveColor()` in `src/Utils.ts`, so both take `number | "#RRGGBB"` and reject the same way
+
+#### Plumbing
+
+- [x] Export the new builders from `src/Builders/index.ts`
+- [x] Backfill `ComponentBuilder` onto the remaining v1 builders
+	- `ActionRowBuilder`'s `from()` takes a full `ActionRow` as well as a bare components array, so a
+	  container round-trip keeps the row's `id`
+	- The three button builders, the five selects (through `BaseSelectBuilder`), and the modal pair
+	  (`TextInputBuilder`, `LabelBuilder`) now extend it too, each carrying `id` through `from()` and
+	  checking it from `validate()`
+	- `BaseButton` and `PremiumButton` were built on neither `BaseComponent` nor each other, so the
+	  buttons had `custom_id` but no `id` at the type level; both now derive from `BaseComponent`. The
+	  two are not alternatives: `custom_id` routes the interaction back to you, `id` addresses the
+	  component for editing and ordering
+- [x] Set `IS_COMPONENTS_V2` on the send path when a payload contains v2 components
+- [x] Reject the v1/v2 mixing cases Discord rejects (`content`/`embeds`/`sticker_ids`/`poll` alongside v2 components)
+- [x] Enforce the message-wide v2 limits (40 components total, 4000 characters across all `TextDisplay`s)
+- [x] Resolve `attachment://` references locally instead of letting Discord 400 on them
+
+
+### 1.3-alpha audit follow-ups
+
+The findings the audit reported but had not re-verified in source, checked and fixed after the first
+round of readiness fixes.
+
+- [x] `ephemeral` only where it can take effect
+	- `reply()` set the `EPHEMERAL` flag but left the key in the body it sent, and `followUp()` never
+	  translated it at all, so a follow-up asked for ephemerally went out public. Discord has no
+	  `ephemeral` field and only `attachments` is stripped further down the send path
+	- `editReply()` and `Updateable.update()` no longer accept it - an edit cannot change the
+	  visibility of the message it edits, so the key was accepted and ignored. `InteractionReplyMessages`
+	  (`src/Types/Interactions.ts`) is the reply-only shape that splits the two apart
+	- Both mixins now share `src/Mixins/Interactions/ResolvePayload.ts` (`ResolveReplyPayload()` /
+	  `ResolveEditPayload()`), where each had its own copy of the same resolver
+- [x] Response-only fields on the inbound component types
+	- `UnfurledMediaItem` (`src/Types/Components.ts`) gained `proxy_url`, `height`, `width`,
+	  `content_type`, `attachment_id`, and `loading_state`, plus `UnfurledMediaItemLoadingStates`
+	- `BaseSelect.values` - the selections Discord populates on the component itself on a modal
+	  submission, as opposed to `MessageComponentData.values` for a message component
+- [x] Two handler defects
+	- `ReactionAdd` (`src/Events/Reactions.ts`) tested `'member' in data`, which is true for a key
+	  present as `undefined`, and would have upserted it
+	- `WebhooksUpdate` (`src/Events/Webhooks.ts`) cast a nullable guild to `Guild | { id }`; it now
+	  falls back to `{ id: data.guild_id }`
+- [x] Cover the five registered handlers that had no test
+	- `StickersUpdate`, `InviteCreate`, `InviteDelete`, `MessageDeleteBulk`, and `TypingStart`, in
+	  `src/Tests/GatewayEvents.test.ts`, along with a check that every `ClientEvents` value equals its key
