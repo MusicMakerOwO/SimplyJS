@@ -66,7 +66,34 @@ export type ComponentEmoji = {
 export type UnfurledMediaItem = {
 	/** supports arbitrary urls and `attachment://<filename>` references */
 	url: string;
+	/** proxied url of the media, populated by Discord in responses */
+	proxy_url?: string;
+	/** height of the media in pixels, populated by Discord in responses */
+	height?: number | null;
+	/** width of the media in pixels, populated by Discord in responses */
+	width?: number | null;
+	/** media type of the content, populated by Discord in responses */
+	content_type?: string;
+	/** id of the uploaded attachment this resolves to, populated by Discord in responses */
+	attachment_id?: string;
+	/** whether Discord has finished loading the media, populated by Discord in responses */
+	loading_state?: UnfurledMediaItemLoadingState;
 };
+
+/**
+ * How far Discord has got resolving an {@link UnfurledMediaItem}'s url. Response-only.
+ *
+ * @see https://docs.discord.com/developers/components/reference#unfurled-media-item-structure
+ */
+export const UnfurledMediaItemLoadingStates = {
+	UNKNOWN: 0,
+	LOADING: 1,
+	LOADED_SUCCESS: 2,
+	LOADED_NOT_FOUND: 3
+} as const;
+
+export type UnfurledMediaItemLoadingState =
+	typeof UnfurledMediaItemLoadingStates[keyof typeof UnfurledMediaItemLoadingStates];
 
 export const ButtonStyles = {
 	/** the most important or recommended action in a group of options */
@@ -170,6 +197,12 @@ type BaseSelect<TType extends ComponentType> = BaseComponent<TType> & {
 	required?: boolean;
 	/** whether the select is disabled, message-only, defaults to false */
 	disabled?: boolean;
+	/**
+	 * the values chosen by the user, populated by Discord only on a modal submission - a message
+	 * component's selections arrive on `MessageComponentData.values` instead, since those come back
+	 * as interaction data rather than as the component itself
+	 */
+	values?: string[];
 };
 
 /**
