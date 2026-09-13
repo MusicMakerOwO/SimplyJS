@@ -259,6 +259,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Client.destroy()` now clears the user cache in addition to the guild cache
 - Renamed the abstract per-guild cache base to `GuildScopedCache` to resolve a naming collision with the top-level `GuildCache`
 
+### Removed
+
+- `EventRequiredIntent` (`src/Intents.ts`) — the gateway event name → required intent table, deleted in `9ca6720` along with the `EventDispatcher` test that walked it. It was a public export with no internal consumer: nothing on the dispatch path consulted it, so it could only ever drift out of step with the handlers as events were added. `HasIntent()` remains the supported way to ask whether an intent is enabled, and `MemberCache.fetchGateway()` is the first caller to use it. Recorded here retroactively — the entry was missed when 1.2.0-alpha shipped
+
 ## [1.1.0-alpha] - 2026 July 31
 
 ### Added

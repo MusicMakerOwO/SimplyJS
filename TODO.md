@@ -57,6 +57,14 @@ for them.
 ### Quality of Life
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
+  - CI currently runs build + test on Node 20/22/24, Bun, and Deno, and nothing else - no publish
+    workflow, and `examples/` is neither linted nor typechecked by any script (`eslint.config.ts`
+    ignores it, and `npx tsc --noEmit -p examples/tsconfig.json` has to be run by hand)
+- [ ] Examples for Components v2 and file uploads
+  - The two headline features of 1.3 have no runnable sample - nothing under `examples/` touches a v2
+    builder or the `attachments` API, though the README covers both. Next free slots are
+    `examples/15-*` and `16-*`, and a new example also goes in the README's examples table
+  - Deliberately after the release: examples ship no published code, so they do not gate the tag
 
 ## Tests to add
 
