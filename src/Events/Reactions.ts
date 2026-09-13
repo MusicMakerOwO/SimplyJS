@@ -26,7 +26,7 @@ export const ReactionAdd = defineEvent({
 		const { guild, channel } = ResolveLocation(client, data.channel_id, data.guild_id);
 		const user = client.users.get(data.user_id) ?? { id: data.user_id };
 
-		const member = 'member' in data && guild instanceof Guild
+		const member = data.member && guild instanceof Guild
 			? guild.members.upsert(data.member)
 			: null;
 
