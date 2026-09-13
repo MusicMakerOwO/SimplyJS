@@ -1,7 +1,6 @@
 import { defineEvent } from "../Types/Internal.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
-import { Guild } from "../Structures/index.js";
 import { ResolveLocation } from "./ResolveLocation.js";
 
 /**
@@ -19,7 +18,9 @@ export const WebhooksUpdate = defineEvent({
 		const { guild, channel } = ResolveLocation(client, data.channel_id, data.guild_id);
 
 		client.emit(ClientEvents.WebhooksUpdate, {
-			guild: guild as Guild | { id: string },
+			// `ResolveLocation` only returns a null guild for a DM, which this event never fires in -
+			// falling back rather than asserting keeps that a degraded payload instead of a lie
+			guild: guild ?? { id: data.guild_id },
 			channel: channel
 		});
 	}
