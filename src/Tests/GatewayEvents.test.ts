@@ -85,6 +85,13 @@ import {
 } from "../Events/SoundboardSounds.js";
 import { DiscordGuildSoundboardSoundCreate } from "../Types/DiscordAPITypes.js";
 import { DiscordIntegrationCreate, DiscordIntegrationExpireBehaviors } from "../Types/DiscordAPITypes.js";
+import { StickersUpdate } from "../Events/Stickers.js";
+import { InviteCreate, InviteDelete } from "../Events/Invites.js";
+import { MessageDeleteBulk } from "../Events/Messages.js";
+import { TypingStart } from "../Events/Typing.js";
+import { Invite } from "../Structures/Invite.js";
+import { DiscordSticker, DiscordStickerFormatTypes, DiscordStickerTypes } from "../Types/DiscordAPITypes.js";
+import { GatewayInvite } from "../Types/DiscordGateway.js";
 
 /**
  * Pulls the payload of the first `emit` call for a given event off a spy, so a test can assert
@@ -2583,5 +2590,243 @@ describe("Update event old-value snapshots", () => {
 		await Resumed.handler(client, {});
 
 		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Handlers that were registered but never covered
+// ---------------------------------------------------------------------------
+
+describe("ClientEvents names", () => {
+	/**
+	 * Every entry is its own name. Listeners subscribe with the string (`client.on("StickerUpdate")`)
+	 * while handlers emit with the constant, so a value that disagrees with its key silently strands
+	 * the event: nothing throws, and any test using the constant on both sides passes.
+	 *
+	 * This is not hypothetical - `StickerUpdate` shipped as `"StickersUpdate"` (`c02f1d9`), which is
+	 * exactly the shape of bug a per-handler test cannot see.
+	 */
+	it("every ClientEvents value equals its key", () => {
+		const mismatched = Object.entries(ClientEvents).filter(([key, value]) => key !== value);
+
+		expect(mismatched).toEqual([]);
+	});
+});
+
+function createSticker(id = "sticker-1", overrides: Partial<DiscordSticker> = {}): DiscordSticker {
+	return {
+		id,
+		name: "blob",
+		tags: "blob",
+		description: "a blob",
+		type: DiscordStickerTypes.GUILD,
+		format_type: DiscordStickerFormatTypes.PNG,
+		available: true,
+		...overrides
+	};
+}
+
+describe("StickersUpdate", () => {
+	/**
+	 * `GUILD_STICKERS_UPDATE` carries the guild's whole sticker list rather than a delta, so the
+	 * handler derives the individual events by diffing. Mirrors the `EmojisUpdate` coverage above -
+	 * same shape, and the sticker half shipped a bug (`c02f1d9`) that no test would have caught.
+	 */
+	async function seedGuild() {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildExpressions });
+		const guildPayload = createGuild();
+		await GuildCreate.handler(client, guildPayload);
+		return { client, guildId: guildPayload.id };
+	}
+
+	it("emits StickerCreate and caches a sticker the guild has not seen", async () => {
+		const { client, guildId } = await seedGuild();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await StickersUpdate.handler(client, { guild_id: guildId, stickers: [createSticker()] });
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.StickerCreate);
+		expect(call).toBeDefined();
+		expect(call?.[1].id).toBe(guildId);
+		expect(call?.[2].id).toBe("sticker-1");
+		expect(client.guilds.get(guildId)?.stickers.has("sticker-1")).toBe(true);
+	});
+
+	it("emits StickerUpdate with an old snapshot that survives the in-place upsert", async () => {
+		const { client, guildId } = await seedGuild();
+		await StickersUpdate.handler(client, { guild_id: guildId, stickers: [createSticker()] });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await StickersUpdate.handler(client, {
+			guild_id: guildId,
+			stickers: [createSticker("sticker-1", { name: "renamed" })]
+		});
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.StickerUpdate);
+		expect(call).toBeDefined();
+		// the point of the clone() in the handler - upsert patches in place, so without it both
+		// arguments would be the same already-mutated object and listeners could not diff them
+		expect(call?.[2].name).toBe("blob");
+		expect(call?.[3].name).toBe("renamed");
+		expect(client.guilds.get(guildId)?.stickers.get("sticker-1")?.name).toBe("renamed");
+	});
+
+	it("emits StickerDelete and drops stickers missing from the incoming list", async () => {
+		const { client, guildId } = await seedGuild();
+		await StickersUpdate.handler(client, {
+			guild_id: guildId,
+			stickers: [createSticker("sticker-1"), createSticker("sticker-2")]
+		});
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await StickersUpdate.handler(client, { guild_id: guildId, stickers: [createSticker("sticker-1")] });
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.StickerDelete);
+		expect(call).toBeDefined();
+		expect(call?.[2].id).toBe("sticker-2");
+		expect(client.guilds.get(guildId)?.stickers.has("sticker-2")).toBe(false);
+		expect(client.guilds.get(guildId)?.stickers.has("sticker-1")).toBe(true);
+	});
+
+	it("emits nothing for an uncached guild", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await StickersUpdate.handler(client, { guild_id: "missing-guild", stickers: [createSticker()] });
+
+		expect(emitSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe("Invite handlers", () => {
+	function createGatewayInvite(overrides: Partial<GatewayInvite> = {}): GatewayInvite {
+		return {
+			channel_id: "channel-1",
+			code: "abc123",
+			created_at: "2026-01-01T00:00:00.000Z",
+			guild_id: "guild-1",
+			max_age: 86400,
+			max_uses: 0,
+			temporary: false,
+			uses: 0,
+			...overrides
+		};
+	}
+
+	it("InviteCreate emits an Invite instance built from the payload", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildInvites });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await InviteCreate.handler(client, createGatewayInvite());
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.InviteCreate);
+		expect(call?.[1]).toBeInstanceOf(Invite);
+		expect(call?.[1].code).toBe("abc123");
+		expect(call?.[1].channelId).toBe("channel-1");
+	});
+
+	it("InviteDelete emits the code and its location, with no Invite to build", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildInvites });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await InviteDelete.handler(client, { channel_id: "channel-1", guild_id: "guild-1", code: "abc123" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.InviteDelete, {
+			channelId: "channel-1",
+			guildId: "guild-1",
+			code: "abc123"
+		});
+	});
+
+	it("InviteDelete omits guildId entirely for a DM invite rather than sending undefined", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildInvites });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await InviteDelete.handler(client, { channel_id: "channel-1", code: "abc123" });
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.InviteDelete);
+		expect(call?.[1]).not.toHaveProperty("guildId");
+	});
+});
+
+describe("MessageDeleteBulk", () => {
+	it("emits the deleted ids and their location", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildMessages });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessageDeleteBulk.handler(client, {
+			ids: ["message-1", "message-2"],
+			channel_id: "channel-1",
+			guild_id: "guild-1"
+		});
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessageDeleteBulk, {
+			ids: ["message-1", "message-2"],
+			channelId: "channel-1",
+			guildId: "guild-1"
+		});
+	});
+
+	it("passes a null guildId through for a DM bulk delete", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.DirectMessages });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await MessageDeleteBulk.handler(client, { ids: ["message-1"], channel_id: "channel-1", guild_id: null });
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.MessageDeleteBulk);
+		expect(call?.[1].guildId).toBeNull();
+	});
+});
+
+describe("TypingStart", () => {
+	it("resolves the guild and channel from cache and upserts the member", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildMessageTyping });
+		const guildPayload = createGuild();
+		await GuildCreate.handler(client, guildPayload);
+		await ChannelCreate.handler(client, createChannel("channel-1", guildPayload.id));
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await TypingStart.handler(client, {
+			channel_id: "channel-1",
+			guild_id: guildPayload.id,
+			user_id: "user-1",
+			timestamp: 1767225600,
+			member: { user: createUser("user-1"), roles: [], joined_at: "2026-01-01T00:00:00.000Z", deaf: false, mute: false, flags: 0 }
+		});
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.TypingStart);
+		expect(call?.[1].guild).toBeInstanceOf(Guild);
+		expect(call?.[1].channel).toBeInstanceOf(GuildTextChannel);
+		expect(call?.[1].member).toBeInstanceOf(Member);
+		expect(call?.[1].timestamp).toEqual(new Date(1767225600 * 1000));
+	});
+
+	it("emits a null member when Discord sends none, rather than upserting undefined", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.GuildMessageTyping });
+		const guildPayload = createGuild();
+		await GuildCreate.handler(client, guildPayload);
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await TypingStart.handler(client, {
+			channel_id: "channel-1",
+			guild_id: guildPayload.id,
+			user_id: "user-1",
+			timestamp: 1767225600
+		});
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.TypingStart);
+		expect(call?.[1].member).toBeNull();
+	});
+
+	it("falls back to bare id objects for an uncached DM, where there is no guild at all", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.DirectMessageTyping });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await TypingStart.handler(client, { channel_id: "dm-1", user_id: "user-1", timestamp: 1767225600 });
+
+		const call = emitSpy.mock.calls.find(([event]) => event === ClientEvents.TypingStart);
+		expect(call?.[1].guild).toBeNull();
+		expect(call?.[1].channel).toEqual({ id: "dm-1" });
+		expect(call?.[1].user).toEqual({ id: "user-1" });
 	});
 });
