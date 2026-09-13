@@ -33,4 +33,5 @@ export * from "./Mixins/Channels/Threadable.js";
 export * from "./Mixins/Channels/PermissionOverwrites.js";
 export * from "./Mixins/Interactions/ModalShowable.js";
 export * from "./Mixins/Interactions/Repliable.js";
+export * from "./Mixins/Interactions/ResolvePayload.js";
 export * from "./Mixins/Interactions/Updateable.js";

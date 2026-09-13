@@ -2,16 +2,12 @@ import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.j
 import { Message, PreparePayload } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { InteractionCallbackTypes } from "../../Types/Interactions.js";
-import { InteractionReplyPayload } from "./Repliable.js";
+import { InteractionEditPayload, ResolveEditPayload } from "./ResolvePayload.js";
 
 type ComponentAcknowledgeableClass<T> = {
-	update(content: InteractionReplyPayload): Promise<void>;
+	update(content: InteractionEditPayload): Promise<void>;
 	deferUpdate(): Promise<void>;
 } & T;
-
-function resolveReplyPayload(input: InteractionReplyPayload) {
-	return typeof input === "string" ? { content: input } : input;
-}
 
 /**
  * Mixes methods for editing a component's originating message in-place into an interaction
@@ -27,14 +23,17 @@ export function Updateable<TBase extends Constructor<BaseInteraction>>(
 	return class extends Base {
 		/**
 		 * Edits the message this component is attached to, acknowledging the interaction.
-		 * @param content Plain text content, or a full reply payload.
+		 *
+		 * Takes no `ephemeral` - this edits an existing message, whose visibility was fixed when it
+		 * was first sent.
+		 * @param content Plain text content, or a full edit payload.
 		 */
-		async update(content: InteractionReplyPayload): Promise<void> {
+		async update(content: InteractionEditPayload): Promise<void> {
 			// `message` is declared by MessageComponentInteraction, the only class applying this
 			// mixin - the mixin's own base is BaseInteraction, which does not know about it
 			const { message } = this as Partial<{ message: Message }>;
 			// the attached message's flags, so editing a v2 message keeps it held to the v2 rules
-			const { body, files } = PreparePayload(resolveReplyPayload(content), message?.flags);
+			const { body, files } = PreparePayload(ResolveEditPayload(content), message?.flags);
 			// the callback route nests the message in `data`, but uploads stay top-level form parts
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.UPDATE_MESSAGE,

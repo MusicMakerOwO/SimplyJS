@@ -307,9 +307,23 @@ export type InteractionCallbackMessages = {
 	attachments?: MessageAttachmentInput[];
 	/** details about the poll to include with the message */
 	poll?: PollCreateRequest;
+};
+
+/**
+ * Message-shaped response data for the callbacks that send a *new* message - an initial reply or a
+ * follow-up. Adds `ephemeral` to {@link InteractionCallbackMessages}, which the edit-shaped callbacks
+ * deliberately do not accept: a response's visibility is fixed when the interaction is first
+ * answered, so neither editing the original response nor updating a component's message can change
+ * it.
+ */
+export type InteractionReplyMessages = InteractionCallbackMessages & {
 	/**
 	 * Only the invoking user can see this response.
 	 * The response will be automatically removed if the user resarts their client.
+	 *
+	 * Translated into the `EPHEMERAL` message flag on the way out rather than sent as-is - Discord
+	 * has no `ephemeral` field. To make a *deferred* response ephemeral, pass it to `deferReply()`
+	 * instead, since the flag has to be set on the deferral rather than on the later edit.
 	 */
 	ephemeral?: boolean;
 };

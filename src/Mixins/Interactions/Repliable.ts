@@ -2,20 +2,19 @@ import { BaseInteraction } from "../../Structures/Interactions/BaseInteraction.j
 import { Message, PreparePayload } from "../../Structures/Message.js";
 import { Constructor } from "../../Types/Internal.js";
 import { DiscordMessage } from "../../Types/MessageComponents.js";
-import { InteractionCallbackMessages, InteractionCallbackTypes } from "../../Types/Interactions.js";
+import { InteractionCallbackTypes } from "../../Types/Interactions.js";
 import { MessageFlags } from "../../Types/index.js";
-
-/** Full reply payload, or a plain string shorthand for `{ content }` */
-export type InteractionReplyPayload = InteractionCallbackMessages | string;
-
-function resolveReplyPayload(input: InteractionReplyPayload): InteractionCallbackMessages {
-	return typeof input === "string" ? { content: input } : input;
-}
+import {
+	InteractionEditPayload,
+	InteractionReplyPayload,
+	ResolveEditPayload,
+	ResolveReplyPayload
+} from "./ResolvePayload.js";
 
 type RepliableClass<T> = {
 	reply(content: InteractionReplyPayload): Promise<void>;
 	deferReply(ephemeral?: boolean): Promise<void>;
-	editReply(content: InteractionReplyPayload): Promise<Message>;
+	editReply(content: InteractionEditPayload): Promise<Message>;
 	followUp(content: InteractionReplyPayload): Promise<Message>;
 	deleteReply(): Promise<void>;
 } & T;
@@ -36,11 +35,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async reply(content: InteractionReplyPayload): Promise<void> {
-			const { body, files } = PreparePayload(resolveReplyPayload(content));
-			if (typeof content === 'object' && content.ephemeral) {
-				body.flags ??= 0;
-				body.flags |= MessageFlags.EPHEMERAL;
-			}
+			const { body, files } = PreparePayload(ResolveReplyPayload(content));
 			// the callback route nests the message in `data`, but uploads stay top-level form parts
 			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
 				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -67,10 +62,14 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * strength of what it is editing - the original response is addressed by token rather than
 		 * fetched, so its flags are never seen here. An edit that looks like v2 on its own is still
 		 * checked; one that does not is left to Discord.
-		 * @param content Plain text content, or a full reply payload.
+		 *
+		 * Takes no `ephemeral` - an edit cannot change whether the response it edits is private. Pass
+		 * it to {@link deferReply} instead, which is where the flag has to be set for a deferred
+		 * response.
+		 * @param content Plain text content, or a full edit payload.
 		 */
-		async editReply(content: InteractionReplyPayload): Promise<Message> {
-			const { body, files } = PreparePayload(resolveReplyPayload(content));
+		async editReply(content: InteractionEditPayload): Promise<Message> {
+			const { body, files } = PreparePayload(ResolveEditPayload(content));
 			const response = await this.client.rest.patch<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}/messages/@original`,
 				body,
@@ -86,7 +85,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async followUp(content: InteractionReplyPayload): Promise<Message> {
-			const { body, files } = PreparePayload(resolveReplyPayload(content));
+			const { body, files } = PreparePayload(ResolveReplyPayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}`,
 				body,
