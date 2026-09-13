@@ -26,7 +26,7 @@ A Discord.JS alternative focused on minimalism and developer experience.
 
 ## About
 
-SimplyJS is a TypeScript-first Discord library meant for bots that don't need every corner of the Discord API surface. It's currently alpha software at `1.2.0-alpha`, so the public API can still shift between releases.
+SimplyJS is a TypeScript-first Discord library meant for bots that don't need every corner of the Discord API surface. It's currently alpha software at `1.3.0-alpha`, so the public API can still shift between releases.
 
 ## Why SimplyJS
 
