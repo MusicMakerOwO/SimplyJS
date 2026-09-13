@@ -16,6 +16,7 @@ import { SelectMenuInteraction } from "../Structures/Interactions/SelectMenuInte
 import { AutocompleteInteraction } from "../Structures/Interactions/AutocompleteInteraction.js";
 import { ModalInteraction } from "../Structures/Interactions/ModalInteraction.js";
 import { ModalBuilder } from "../Builders/ModalBuilder.js";
+import { TextDisplayBuilder } from "../Builders/TextDisplayBuilder.js";
 import {
 	ApplicationCommandAutocompleteInteraction,
 	ApplicationCommandInteraction,
@@ -427,6 +428,48 @@ describe("Repliable mixin", () => {
 		const [, body, , files] = spy.mock.calls[0]! as [string, { data: { flags: number } }, undefined, unknown[]];
 		expect(body.data.flags! & 64).toBe(64);
 		expect(files).toHaveLength(1);
+	});
+
+	it("followUp() sets the ephemeral flag", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		await interaction.followUp({ content: "private", ephemeral: true });
+
+		const [, body] = spy.mock.calls[0]! as [string, { flags?: number }];
+		expect(body.flags! & 64).toBe(64);
+	});
+
+	it("neither reply() nor followUp() sends `ephemeral` as a field - Discord has no such key", async () => {
+		const post = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
+
+		await interaction.reply({ content: "private", ephemeral: true });
+		await interaction.followUp({ content: "also private", ephemeral: true });
+
+		const [, replyBody] = post.mock.calls[0]! as [string, { data: Record<string, unknown> }];
+		const [, followUpBody] = post.mock.calls[1]! as [string, Record<string, unknown>];
+		expect(replyBody.data).not.toHaveProperty("ephemeral");
+		expect(followUpBody).not.toHaveProperty("ephemeral");
+	});
+
+	it("an ephemeral reply keeps the Components V2 flag alongside it", async () => {
+		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+
+		await interaction.reply({
+			ephemeral: true,
+			components: [new TextDisplayBuilder().setContent("private and v2")]
+		});
+
+		const [, body] = spy.mock.calls[0]! as [string, { data: { flags: number } }];
+		// EPHEMERAL (64) is set before PreparePayload, IS_COMPONENTS_V2 (1 << 15) by it
+		expect(body.data.flags & 64).toBe(64);
+		expect(body.data.flags & (1 << 15)).toBe(1 << 15);
+	});
+
+	it("editReply() and update() reject `ephemeral` at compile time - an edit cannot change visibility", async () => {
+		vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
+
+		// @ts-expect-error visibility is fixed when the interaction is first answered
+		await interaction.editReply({ content: "edited", ephemeral: true });
 	});
 
 	it("editReply() uploads new files while retaining named existing attachments", async () => {
