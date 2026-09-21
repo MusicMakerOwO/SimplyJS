@@ -312,81 +312,85 @@ describe("EventDispatcher", () => {
 	});
 
 	describe("INTERACTION_CREATE", () => {
-		function dispatchInteraction(payload: JSONObject) {
+		// The handler awaits `client.collectors.offerInteraction` before emitting anything, so
+		// nothing has been emitted yet when `dispatch` returns - these have to let the
+		// microtask queue drain first.
+		async function dispatchInteraction(payload: JSONObject) {
 			const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 			const dispatch = CreateDispatch();
 			const emitSpy = vi.spyOn(client, "emit");
 
 			dispatch(client, GatewayEvents.InteractionCreate, payload);
+			await new Promise((resolve) => setImmediate(resolve));
 
 			return emitSpy;
 		}
 
-		it("always emits InteractionCreate regardless of interaction type", () => {
-			const emitSpy = dispatchInteraction(slashCommandPayload());
+		it("always emits InteractionCreate regardless of interaction type", async () => {
+			const emitSpy = await dispatchInteraction(slashCommandPayload());
 
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.InteractionCreate, expect.any(SlashCommandInteraction));
 		});
 
-		it("emits SlashCommandUsed alongside InteractionCreate for a CHAT_INPUT command", () => {
-			const emitSpy = dispatchInteraction(slashCommandPayload());
+		it("emits SlashCommandUsed alongside InteractionCreate for a CHAT_INPUT command", async () => {
+			const emitSpy = await dispatchInteraction(slashCommandPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SlashCommandUsed, expect.any(SlashCommandInteraction));
 		});
 
-		it("emits UserContextMenuUsed alongside InteractionCreate for a USER command", () => {
-			const emitSpy = dispatchInteraction(userContextPayload());
+		it("emits UserContextMenuUsed alongside InteractionCreate for a USER command", async () => {
+			const emitSpy = await dispatchInteraction(userContextPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.UserContextMenuUsed, expect.any(UserContextMenuInteraction));
 		});
 
-		it("emits MessageContextMenuUsed alongside InteractionCreate for a MESSAGE command", () => {
-			const emitSpy = dispatchInteraction(messageContextPayload());
+		it("emits MessageContextMenuUsed alongside InteractionCreate for a MESSAGE command", async () => {
+			const emitSpy = await dispatchInteraction(messageContextPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MessageContextMenuUsed, expect.any(MessageContextMenuInteraction));
 		});
 
-		it("emits AutocompleteUsed alongside InteractionCreate for an autocomplete request", () => {
-			const emitSpy = dispatchInteraction(autocompletePayload());
+		it("emits AutocompleteUsed alongside InteractionCreate for an autocomplete request", async () => {
+			const emitSpy = await dispatchInteraction(autocompletePayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutocompleteUsed, expect.any(AutocompleteInteraction));
 		});
 
-		it("emits ButtonUsed alongside InteractionCreate for a button component", () => {
-			const emitSpy = dispatchInteraction(buttonPayload());
+		it("emits ButtonUsed alongside InteractionCreate for a button component", async () => {
+			const emitSpy = await dispatchInteraction(buttonPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ButtonUsed, expect.any(ButtonInteraction));
 		});
 
-		it("emits SelectMenuUsed alongside InteractionCreate for a select menu component", () => {
-			const emitSpy = dispatchInteraction(selectMenuPayload());
+		it("emits SelectMenuUsed alongside InteractionCreate for a select menu component", async () => {
+			const emitSpy = await dispatchInteraction(selectMenuPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SelectMenuUsed, expect.any(SelectMenuInteraction));
 		});
 
-		it("emits ModalSubmitted alongside InteractionCreate for a modal submission", () => {
-			const emitSpy = dispatchInteraction(modalSubmitPayload());
+		it("emits ModalSubmitted alongside InteractionCreate for a modal submission", async () => {
+			const emitSpy = await dispatchInteraction(modalSubmitPayload());
 
 			expect(emitSpy).toHaveBeenCalledTimes(2);
 			expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ModalSubmitted, expect.any(ModalInteraction));
 		});
 
-		it("emits the same interaction instance for both InteractionCreate and the discriminated event", () => {
-			const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
-			const dispatch = CreateDispatch();
-			const emitSpy = vi.spyOn(client, "emit");
-
-			dispatch(client, GatewayEvents.InteractionCreate, buttonPayload());
+		it("emits the same interaction instance for both InteractionCreate and the discriminated event", async () => {
+			const emitSpy = await dispatchInteraction(buttonPayload());
 
 			const genericCall = emitSpy.mock.calls.find(([event]) => event === ClientEvents.InteractionCreate);
 			const specificCall = emitSpy.mock.calls.find(([event]) => event === ClientEvents.ButtonUsed);
 
+			// asserted before the identity check so that two missing emissions cannot pass it by
+			// both being `undefined`
+			expect(genericCall).toBeDefined();
+			expect(specificCall).toBeDefined();
 			expect(genericCall?.[1]).toBe(specificCall?.[1]);
 		});
 	});
