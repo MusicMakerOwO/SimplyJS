@@ -200,6 +200,22 @@ function uploadPayload(): MessagePayload {
 	};
 }
 
+/**
+ * Gives an interaction the initial response that `editReply`/`followUp` need, then clears the
+ * request it made so the path under test is still the first call the assertions see.
+ *
+ * Setting `interaction.acknowledged` by hand is not enough: whether an *editable* original
+ * response exists is private state, deliberately not set by acknowledgements that create no
+ * message (`showModal`), so only a real response establishes it. Assumes `client.rest.post` is
+ * already spied, which `spyRest` does before any path is invoked.
+ * @param client The client whose recorded POSTs to reset.
+ * @param interaction The interaction to acknowledge.
+ */
+async function acknowledge(client: Client, interaction: SlashCommandInteraction): Promise<void> {
+	await interaction.deferReply();
+	vi.mocked(client.rest.post).mockClear();
+}
+
 // ---------------------------------------------------------------------------
 // The send-path table
 // ---------------------------------------------------------------------------
@@ -305,6 +321,8 @@ const sendPaths: SendPath[] = [
 		bodyOf: topLevelBody,
 		invoke: async (client, payload) => {
 			const interaction = CreateInteraction(client, slashCommandData()) as SlashCommandInteraction;
+			// an edit needs an initial response to edit
+			await acknowledge(client, interaction);
 			return await interaction.editReply(payload);
 		}
 	},
@@ -314,6 +332,8 @@ const sendPaths: SendPath[] = [
 		bodyOf: topLevelBody,
 		invoke: async (client, payload) => {
 			const interaction = CreateInteraction(client, slashCommandData()) as SlashCommandInteraction;
+			// as above - a follow-up needs an initial response to follow up on
+			await acknowledge(client, interaction);
 			return await interaction.followUp(payload);
 		}
 	},
@@ -463,7 +483,11 @@ describe("existing flags on an edit", () => {
 
 	it("editReply cannot - it addresses the original response by token and never sees its flags", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData() as never);
+		vi.spyOn(client.rest, "post").mockResolvedValue(undefined as never);
 		const interaction = CreateInteraction(client, slashCommandData()) as SlashCommandInteraction;
+		// an edit needs an initial response to edit - a POST, so it lands in a different spy to the
+		// patch these assertions read
+		await acknowledge(client, interaction);
 
 		await expect(
 			interaction.editReply({ content: "plain text", ...actionRowPayload() })

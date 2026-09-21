@@ -234,6 +234,22 @@ function makeModal(): ModalBuilder {
 	return ModalBuilder.from(payload);
 }
 
+/**
+ * Acknowledges an interaction for real, against a throwaway `rest.post` spy that is restored
+ * afterwards - so a test can set up its own spy next and still assert on `mock.calls[0]`.
+ *
+ * Not `interaction.acknowledged = true`: whether an *editable* original response exists is
+ * private state that only an actual initial response sets, so faking the public flag leaves
+ * `editReply`/`deleteReply` throwing.
+ * @param client The client owning the rest instance to stub.
+ * @param respond Sends the initial response - `deferReply()` for commands, `deferUpdate()` for components.
+ */
+async function acknowledge(client: Client, respond: () => Promise<void>): Promise<void> {
+	const post = vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+	await respond();
+	post.mockRestore();
+}
+
 // ---------------------------------------------------------------------------
 // CreateInteraction factory dispatch
 // ---------------------------------------------------------------------------
@@ -431,6 +447,9 @@ describe("Repliable mixin", () => {
 	});
 
 	it("followUp() sets the ephemeral flag", async () => {
+		// follow-ups need an initial response to follow up on, acknowledged before the spy below
+		// is installed so the assertions still read `mock.calls[0]`
+		await acknowledge(client, () => interaction.deferReply());
 		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData());
 
 		await interaction.followUp({ content: "private", ephemeral: true });
@@ -468,12 +487,16 @@ describe("Repliable mixin", () => {
 	it("editReply() and update() reject `ephemeral` at compile time - an edit cannot change visibility", async () => {
 		vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
 
+		await acknowledge(client, () => interaction.deferReply());
+
 		// @ts-expect-error visibility is fixed when the interaction is first answered
 		await interaction.editReply({ content: "edited", ephemeral: true });
 	});
 
 	it("editReply() uploads new files while retaining named existing attachments", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
+
+		await acknowledge(client, () => interaction.deferReply());
 
 		await interaction.editReply({
 			content: "edited",
@@ -516,6 +539,8 @@ describe("Repliable mixin", () => {
 	it("editReply() patches the @original webhook message and returns a Message", async () => {
 		const spy = vi.spyOn(client.rest, "patch").mockResolvedValue(messageData());
 
+		await acknowledge(client, () => interaction.deferReply());
+
 		const result = await interaction.editReply("edited");
 
 		expect(spy).toHaveBeenCalledWith(
@@ -528,6 +553,7 @@ describe("Repliable mixin", () => {
 	});
 
 	it("followUp() posts to the webhook route and returns a Message", async () => {
+		await acknowledge(client, () => interaction.deferReply());
 		const spy = vi.spyOn(client.rest, "post").mockResolvedValue(messageData("msg-2"));
 
 		const result = await interaction.followUp("more info");
@@ -543,6 +569,8 @@ describe("Repliable mixin", () => {
 
 	it("deleteReply() deletes the @original webhook message", async () => {
 		const spy = vi.spyOn(client.rest, "delete").mockResolvedValue(undefined);
+
+		await acknowledge(client, () => interaction.deferReply());
 
 		await interaction.deleteReply();
 
