@@ -33,12 +33,19 @@ export function Updateable<TBase extends Constructor<BaseInteraction>>(
 			// mixin - the mixin's own base is BaseInteraction, which does not know about it
 			const { message } = this as Partial<{ message: Message }>;
 			// the attached message's flags, so editing a v2 message keeps it held to the v2 rules
+			// payload first: a rejected payload never reaches Discord, so the interaction is still
+			// unanswered and a corrected `update` has to be allowed through
 			const { body, files } = PreparePayload(ResolveEditPayload(content), message?.flags);
-			// the callback route nests the message in `data`, but uploads stay top-level form parts
-			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-				type: InteractionCallbackTypes.UPDATE_MESSAGE,
-				data: body,
-			}, undefined, files);
+
+			// ...but still before anything that can yield, so an overlapping responder cannot also see
+			// `false` - and taken back by `acknowledgeWith` if the request itself fails
+			await this.acknowledgeWith("update", () =>
+				// the callback route nests the message in `data`, but uploads stay top-level form parts
+				this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+					type: InteractionCallbackTypes.UPDATE_MESSAGE,
+					data: body,
+				}, undefined, files)
+			);
 		}
 
 		/**
@@ -46,9 +53,11 @@ export function Updateable<TBase extends Constructor<BaseInteraction>>(
 		 * attached message as-is until edited later via `editReply`.
 		 */
 		async deferUpdate(): Promise<void> {
-			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-				type: InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
-			});
+			await this.acknowledgeWith("deferUpdate", () =>
+				this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+					type: InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
+				})
+			);
 		}
 	} as unknown as Constructor<ComponentAcknowledgeableClass<InstanceType<TBase>>>;
 }

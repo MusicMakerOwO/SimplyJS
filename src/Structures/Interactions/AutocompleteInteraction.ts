@@ -52,9 +52,16 @@ export class AutocompleteInteraction extends BaseInteraction {
 	 * @param choices Suggested choices, up to 25.
 	 */
 	async respond(choices: ApplicationCommandOptionChoice[]): Promise<void> {
-		await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-			type: InteractionCallbackTypes.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
-			data: { choices },
-		});
+		// before anything that can yield, so an overlapping responder cannot also see `false` - and
+		// taken back by `acknowledgeWith` if the request itself fails. Not `editable`: suggestions
+		// are not a message, and an autocomplete interaction has no follow-up routes anyway
+		await this.acknowledgeWith(
+			"respond",
+			() => this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+				type: InteractionCallbackTypes.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+				data: { choices },
+			}),
+			false
+		);
 	}
 }

@@ -35,12 +35,19 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async reply(content: InteractionReplyPayload): Promise<void> {
+			// payload first: a rejected payload never reaches Discord, so the interaction is still
+			// unanswered and a corrected `reply` has to be allowed through
 			const { body, files } = PreparePayload(ResolveReplyPayload(content));
-			// the callback route nests the message in `data`, but uploads stay top-level form parts
-			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-				type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-				data: body,
-			}, undefined, files);
+
+			// ...but still before anything that can yield, so an overlapping responder cannot also see
+			// `false` - and taken back by `acknowledgeWith` if the request itself fails
+			await this.acknowledgeWith("reply", () =>
+				// the callback route nests the message in `data`, but uploads stay top-level form parts
+				this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+					type: InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+					data: body,
+				}, undefined, files)
+			);
 		}
 
 		/**
@@ -49,10 +56,12 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param ephemeral Whether the eventual response should only be visible to the invoking user.
 		 */
 		async deferReply(ephemeral = false): Promise<void> {
-			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-				type: InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-				...(ephemeral ? { data: { flags: MessageFlags.EPHEMERAL } } : {}),
-			});
+			await this.acknowledgeWith("deferReply", () =>
+				this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+					type: InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+					...(ephemeral ? { data: { flags: MessageFlags.EPHEMERAL } } : {}),
+				})
+			);
 		}
 
 		/**
@@ -69,6 +78,8 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full edit payload.
 		 */
 		async editReply(content: InteractionEditPayload): Promise<Message> {
+			this.assertEditable("editReply");
+
 			const { body, files } = PreparePayload(ResolveEditPayload(content));
 			const response = await this.client.rest.patch<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}/messages/@original`,
@@ -85,6 +96,8 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 		 * @param content Plain text content, or a full reply payload.
 		 */
 		async followUp(content: InteractionReplyPayload): Promise<Message> {
+			this.assertAcknowledged("followUp");
+
 			const { body, files } = PreparePayload(ResolveReplyPayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(
 				`/webhooks/${this.applicationId}/${this.token}`,
@@ -97,6 +110,8 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 
 		/** Deletes this interaction's original response. */
 		async deleteReply(): Promise<void> {
+			this.assertEditable("deleteReply");
+
 			await this.client.rest.delete(`/webhooks/${this.applicationId}/${this.token}/messages/@original`);
 		}
 	} as unknown as Constructor<RepliableClass<InstanceType<TBase>>>;

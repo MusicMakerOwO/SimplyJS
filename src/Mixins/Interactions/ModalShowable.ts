@@ -24,11 +24,21 @@ export function ModalShowable<TBase extends Constructor<BaseInteraction>>(
 		 * the same shape.
 		 */
 		async showModal(modal: InteractionCallbackModal): Promise<void> {
+			// validate before acknowledging: a rejected modal never reaches Discord, so the
+			// interaction is still unanswered and a corrected `showModal` has to be allowed through
 			ModalBuilder.validate(modal);
-			await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
-				type: InteractionCallbackTypes.MODAL,
-				data: modal,
-			});
+
+			// ...but still before anything that can yield, so an overlapping responder cannot also see
+			// `false` - and taken back by `acknowledgeWith` if the request itself fails.
+			// Not `editable`: a modal is not a message, so there is no `@original` to edit afterwards
+			await this.acknowledgeWith(
+				"showModal",
+				() => this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, {
+					type: InteractionCallbackTypes.MODAL,
+					data: modal,
+				}),
+				false
+			);
 		}
 	} as unknown as Constructor<ModalShowableClass<InstanceType<TBase>>>;
 }
