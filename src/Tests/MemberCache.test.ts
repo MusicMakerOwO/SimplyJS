@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { Client } from "../Client.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { Guild } from "../Structures/Guild.js";
@@ -224,5 +224,59 @@ describe("MemberCache.fetchGateway", () => {
 
 	it("rejects a presence fetch without the GuildPresences intent", async () => {
 		await expect(guild.members.fetchGateway({ presences: true })).rejects.toThrow(/GuildPresences/);
+	});
+
+	it("leaves no unhandled rejection when the socket send throws", async () => {
+		const unhandled = vi.fn();
+		process.on("unhandledRejection", unhandled);
+		onTestFinished(() => void process.off("unhandledRejection", unhandled));
+
+		vi.spyOn(client.socket, "requestGuildMembers").mockImplementation(() => {
+			throw new Error("Websocket client not initialized");
+		});
+
+		// stopping the collector rejects the chunk promise this path abandons, and nobody is left
+		// to await it - node exits the process over an unhandled rejection since v15
+		await expect(guild.members.fetchGateway()).rejects.toThrow(/not initialized/);
+		await new Promise((resolve) => setImmediate(resolve));
+
+		expect(unhandled).not.toHaveBeenCalled();
+	});
+
+	it("rejects rather than truncating when the client is destroyed mid-fetch", async () => {
+		const spy = vi.spyOn(client.socket, "requestGuildMembers").mockImplementation(() => {});
+
+		const pending = guild.members.fetchGateway();
+		const assertion = expect(pending).rejects.toThrow(/before all chunks arrived/);
+
+		// one chunk of two, then a shutdown - this used to resolve with the half it had
+		respond(spy.mock.calls[0]![0].nonce, [ memberData("user-1") ], 0, 2);
+		client.collectors.clear();
+
+		await assertion;
+	});
+
+	it("is not subject to the client's collectorDefaults", async () => {
+		// `max: 1` would stop the collector after the first chunk and resolve a two-chunk fetch
+		// with half its members; `idle` would end it between chunks
+		const bounded = new Client({
+			token: "test-token",
+			intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers,
+			collectorDefaults: { max: 1, idle: 1 }
+		});
+		const boundedGuild = bounded.guilds.upsert(guildData());
+		const spy = vi.spyOn(bounded.socket, "requestGuildMembers").mockImplementation(() => {});
+
+		const pending = boundedGuild.members.fetchGateway();
+		const nonce = spy.mock.calls[0]![0].nonce!;
+
+		void MembersChunk.handler(bounded, {
+			guild_id: boundedGuild.id, members: [ memberData("user-1") ], chunk_index: 0, chunk_count: 2, nonce
+		});
+		void MembersChunk.handler(bounded, {
+			guild_id: boundedGuild.id, members: [ memberData("user-2") ], chunk_index: 1, chunk_count: 2, nonce
+		});
+
+		await expect(pending).resolves.toHaveLength(2);
 	});
 });
