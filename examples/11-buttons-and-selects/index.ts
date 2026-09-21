@@ -48,6 +48,10 @@ client.on(ClientEvents.Ready, (user) => {
 // This also enables some other really nice features we will showcase.
 
 client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
+	// Commands are claimable in exactly the same way components are - a collector waiting on
+	// `SlashCommandUsed` takes the invocation before this handler sees it. See example 14.
+	if (interaction.claimed) return;
+
 	const command = client.commands.get(interaction.commandName);
 	if (!command) {
 		await interaction.reply(`Unknown command "${interaction.commandName}"`);
@@ -74,6 +78,12 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 // lose. The one real expiry is the interaction token, which is good for 15 minutes from the
 // click, so a reply has to happen inside that window.
 client.on(ClientEvents.ButtonUsed, async (interaction) => {
+	// A collector somewhere is already handling this click, so answering it here would be the
+	// second response to an interaction that only gets one - see example 14. Nothing in this
+	// example creates collectors, but the guard belongs in every registered handler: the day you
+	// add one, the "Unknown button" reply below would otherwise start racing it on every click.
+	if (interaction.claimed) return;
+
 	const button = client.buttons.get(interaction.customId);
 	if (!button) {
 		await interaction.reply(`Unknown button "${interaction.customId}"`);
@@ -89,6 +99,8 @@ client.on(ClientEvents.ButtonUsed, async (interaction) => {
 });
 
 client.on(ClientEvents.SelectMenuUsed, async (interaction) => {
+	if (interaction.claimed) return;
+
 	const select = client.selects.get(interaction.customId);
 	if (!select) {
 		await interaction.reply(`Unknown select menu "${interaction.customId}"`);

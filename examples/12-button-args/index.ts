@@ -34,6 +34,9 @@ client.on(ClientEvents.Ready, (user) => {
 });
 
 client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
+	// a collector is already answering this command - see example 14 and `interaction.claimed`
+	if (interaction.claimed) return;
+
 	const command = client.commands.get(interaction.commandName);
 	if (!command) {
 		await interaction.reply(`Unknown command "${interaction.commandName}"`);
@@ -60,6 +63,9 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 // And since `:` is the separator, no arg may contain one - anything user-supplied needs
 // escaping or a different delimiter, or it will split into the wrong number of pieces.
 client.on(ClientEvents.ButtonUsed, async (interaction) => {
+	// a collector is already answering this click - see example 14 and `interaction.claimed`
+	if (interaction.claimed) return;
+
 	const [id, ...args] = interaction.customId.split(':');
 
 	const button = client.buttons.get(id);

@@ -13,6 +13,11 @@ export default {
 	// The payload arrives as an array, so destructure the one interaction out of it.
 	// See the note in ../index.ts on why this differs from 8-event-handler.
 	async execute(client, [interaction]) {
+		// A collector is already handling this command, so replying here would be the second
+		// response to an interaction that only gets one - the same guard the component handlers
+		// in this folder open with, for the same reason.
+		if (interaction.claimed) return;
+
 		const command = client.commands.get(interaction.commandName);
 		if (!command) {
 			await interaction.reply(`Unknown command "${interaction.commandName}"`);
