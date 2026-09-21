@@ -1,6 +1,7 @@
 export * from "./AutoModeration.js";
 export * from "./ChannelPermissionManager.js";
 export * from "./Channels.js";
+export * from "./Collectors.js";
 export * from "./Emojis.js";
 export * from "./GuildBans.js";
 export * from "./Guilds.js";

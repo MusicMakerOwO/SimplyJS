@@ -8,9 +8,10 @@ import { EventEmitter } from "node:events";
 import { ClientEventMap } from "./Types/SimplyJSTypes.js";
 import { User } from "./Structures/User.js";
 import { UserCache } from "./Managers/Users.js";
+import { CollectorDefaults, CollectorManager } from "./Managers/Collectors.js";
 import { ActivityType, ClientActivity, PresenceStatus, Status } from "./Types/DiscordAPITypes.js";
 import { ApplicationCommand, JSONArray } from "./Types/index.js";
-import { awaitEvent } from "./Collector.js";
+import { awaitEventInternal } from "./Collector.js";
 
 type ClientOptions = {
 	/** Bot token used to authenticate both the REST client and the gateway websocket */
@@ -34,6 +35,21 @@ type ClientOptions = {
 
 	/** Options forwarded to the underlying {@link WSClient} (jitter, event overrides, etc) */
 	ws?: WSOptions
+
+	/**
+	 * Bounds applied to every collector created on this client, underneath whatever that
+	 * collector passes itself. Omitted entirely by default, so collectors are unbounded unless
+	 * they say otherwise.
+	 *
+	 * Useful as a single place to put a policy like "no collector on this bot should outlive
+	 * fifteen minutes" instead of repeating `time:` at every call site.
+	 *
+	 * @example
+	 * ```ts
+	 * collectorDefaults: { time: 15 * 60 * 1000 }
+	 * ```
+	 */
+	collectorDefaults?: CollectorDefaults
 }
 
 /**
@@ -53,6 +69,11 @@ export class Client extends EventEmitter<ClientEventMap> {
 	guilds: GuildCache;
 	/** Global user cache */
 	users: UserCache;
+	/**
+	 * Every live {@link Collector} on this client. Owns the shared per-event listeners collectors
+	 * run on, and decides which collector gets an interaction before handlers see it.
+	 */
+	collectors: CollectorManager;
 
 	/** The client's current status, this is only intended for internal use via state tracking */
 	status: ObjectValues<typeof PresenceStatus>;
@@ -78,6 +99,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 
 		this.guilds = new GuildCache(this);
 		this.users = new UserCache(this);
+		this.collectors = new CollectorManager(this, options.collectorDefaults);
 
 		this.status = Status.ONLINE;
 		this.activity = null;
@@ -90,14 +112,14 @@ export class Client extends EventEmitter<ClientEventMap> {
 		this.socket.initialize();
 
 		// pause execution until a ready event is recieved
-		const ready = awaitEvent(this.socket, WSEvents.Ready, { time: 10_000 })
+		const ready = awaitEventInternal(this.socket, WSEvents.Ready, { time: 10_000 })
 			.catch(() => {
 				throw new Error("No ready event recieved within 10 seconds - Discord may be having an outage");
 			});
 
 		// a rejected connection (bad token, disallowed intents) will never produce a ready event, so
 		// report what Discord actually said instead of blaming an outage ten seconds later
-		const rejected = awaitEvent(this.socket, WSEvents.Disconnect, { time: 10_000 })
+		const rejected = awaitEventInternal(this.socket, WSEvents.Disconnect, { time: 10_000 })
 			.then(
 				([reason]) => { throw new Error(`Failed to connect to the gateway - ${reason}`); },
 				() => new Promise<never>(() => {}) // timed out waiting for a rejection, let `ready` decide
@@ -111,6 +133,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 	async destroy(): Promise<void> {
 		this.guilds.clear();
 		this.users.clear();
+		this.collectors.clear();
 		this.socket.destroy();
 		while(true) {
 			if (!this.socket.ready) return;
