@@ -411,3 +411,47 @@ round of readiness fixes.
 - [x] Cover the five registered handlers that had no test
 	- `StickersUpdate`, `InviteCreate`, `InviteDelete`, `MessageDeleteBulk`, and `TypingStart`, in
 	  `src/Tests/GatewayEvents.test.ts`, along with a check that every `ClientEvents` value equals its key
+
+### Collectors and interaction ownership
+
+An interaction gets one response, so a collector waiting on a button and a registered handler for
+that same button could not both answer it - and collectors always lost, since they are created
+later than the startup handlers they compete with and `EventEmitter` runs listeners in
+registration order.
+
+- [x] Give collectors first refusal on an interaction, before anything is emitted
+	- `CollectorManager` (`src/Managers/Collectors.ts`) on `client.collectors` arbitrates:
+	  `InteractionCreate` collectors are offered first, then the concrete event's, and the first
+	  passing filter takes it. The result becomes `interaction.claimed`, which a registered
+	  handler checks to stand down (`if (interaction.claimed) return;`)
+	- `dispatchInteraction()` owns the emit as well, because a filter may suspend and the gateway
+	  does not await dispatches; interactions are ordered against each other only where one
+	  collector could claim both, and nothing leaves the dispatch when every filter is synchronous
+	- `InteractionEvents` (`src/Types/SimplyJSTypes.ts`) is the one list of claimable events, paired
+	  with `EventFor()` (`src/Events/Interactions.ts`) so the two halves cannot drift
+	- Examples 11-13 open their interaction handlers with the `claimed` guard
+- [x] Share one emitter listener across the collectors on an event
+	- A bot creating a collector per command invocation tripped node's `MaxListenersExceededWarning`
+	  at eleven. `CollectorHub` holds the single listener and fans out; it is released when its last
+	  collector stops, and `client.destroy()` stops every live collector
+	- `client.collectors.maxUnbounded` (default 10) warns when collectors with no `time`, `idle`, or
+	  `max` accumulate on one event, naming the event and the call site of the most recent one
+	- `ClientOptions.collectorDefaults` puts bounds on every collector from one place;
+	  `createInternalCollector()` / `awaitEventInternal()` keep the library's own collectors out of
+	  that policy, since a `max` would truncate `fetchGateway()` and an `idle` would fail `login()`
+- [x] Refuse a double response locally instead of sending one Discord will reject
+	- `interaction.acknowledged` is claimed synchronously by `acknowledgeWith()`, before the first
+	  `await`, so two overlapping responders cannot both see `false`; a second response throws
+	  naming the method that already answered, and says so when the interaction is also `claimed`
+	- `followUp()` requires an initial response, and `editReply()` / `deleteReply()` require one that
+	  left a message behind - `showModal()` and `respond()` acknowledge without creating one, so
+	  `@original` would have come back `10008`
+	- The acknowledgement is taken back when the request never reached Discord, so a transient
+	  failure no longer locks the interaction for the rest of its 15 minute token. `DiscordAPIError`
+	  (`src/Rest.ts`) is what makes that distinction readable: a `40060` means the response did land
+- [x] Stop `fetchGateway()` from handing back a partial guild
+	- It rejected only on a `time` end and resolved on every other reason, so an early stop - now
+	  including `client.destroy()` clearing the collectors - returned a half member list that looked
+	  complete. It resolves on having seen the last chunk and rejects otherwise
+	- The abandoned chunk promise is also caught before the collector is stopped on a send failure,
+	  which was an unhandled rejection and so a process exit since node v15

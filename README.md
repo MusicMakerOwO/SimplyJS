@@ -368,6 +368,74 @@ for (const event of Object.values(Events)) {
 }
 ```
 
+### Collectors and claimed interactions
+
+A collector is a temporary, filtered listener. It collects every event that passes its filter until `max`, `time`, or `idle` stops it - or until you call `.stop()` - and detaches itself when it ends, so the "nobody ever clicked" path doesn't leave a listener behind:
+
+```ts
+import { createCollector, awaitEvent, ClientEvents } from "simplyjs";
+
+client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
+	if (interaction.claimed) return;
+
+	// collect several
+	const collector = createCollector(client, ClientEvents.MessageCreate, {
+		filter: (message) => message.channelId === interaction.channelId && !message.user.bot,
+		max: 5,
+		time: 30_000
+	});
+
+	collector.on("collect", (message) => console.log(`collected: ${message.content}`));
+	// `collected` is an array of argument *tuples*, since a collector doesn't know that this
+	// event happens to carry exactly one argument
+	collector.on("end", (collected, reason) => console.log(`got ${collected.length} (${reason})`));
+
+	// or wait for exactly one thing - `awaitEvent` builds a `max: 1` collector, hands back the
+	// event's arguments, and stops the collector in a `finally`. It rejects if `time` runs out.
+	// `editReply` hands back the message it wrote, which the filter below needs the id of
+	await interaction.deferReply();
+	const prompt = await interaction.editReply({ content: "Still there?", components: [row] });
+	const [button] = await awaitEvent(client, ClientEvents.ButtonUsed, {
+		filter: (button) => button.user.id === interaction.user.id && button.message.id === prompt.id,
+		time: 15_000
+	});
+});
+```
+
+Collectors do **not** survive a restart - a prompt that has to keep working after one needs a registered handler instead (see [`examples/12-button-args`](./examples/12-button-args)).
+
+An interaction only gets one response, so when a collector *and* a registered handler both want the same click, exactly one of them has to answer it - otherwise the loser comes back `40060 Interaction has already been acknowledged`. Collectors are offered every interaction before it's emitted, and the one they take is marked `claimed`, which is what a registered handler checks to stand down:
+
+```ts
+client.on(ClientEvents.ButtonUsed, async (interaction) => {
+	if (interaction.claimed) return; // a collector is handling this one
+
+	const button = client.buttons.get(interaction.customId);
+	if (!button) return await interaction.reply(`Unknown button "${interaction.customId}"`);
+
+	await button.execute(client, interaction);
+});
+```
+
+Claimed or not, the interaction is still emitted, so logging and metrics listeners see every one - `claimed` tells a responder to stand down, it doesn't hide events. If two responders do collide anyway, the second one now throws locally (naming the method that already answered) instead of sending a request Discord will reject.
+
+Collectors on the client share one listener per event however many of them are alive, so a collector per command invocation is fine. Two knobs cover the rest:
+
+```ts
+const client = new Client({
+	token: process.env.TOKEN!,
+	intents: ["Guilds", "GuildMessages"],
+	// merged underneath every collector's own options - a policy like "nothing outlives
+	// fifteen minutes" in one place instead of a `time:` at every call site
+	collectorDefaults: { time: 15 * 60 * 1000 }
+});
+
+// how many collectors with no `time`, `idle` or `max` may pile up on one event before a
+// warning says they're accumulating, naming the event and where the last one was created.
+// Defaults to 10; set it to 0 to silence the warning
+client.collectors.maxUnbounded = 25;
+```
+
 ### Overriding gateway event handlers
 
 Every dispatch event (`GUILD_CREATE`, `MESSAGE_CREATE`, etc.) has a built-in handler that updates caches/structures before emitting the public client event. Pass an override through the `ws` option to replace that event's entry entirely:
@@ -389,7 +457,7 @@ const client = new Client({
 ```
 
 > **WARNING**\
-> This is a full replacement, not a "run before/after" hook - the built-in handler that upserts the message into cache and emits `ClientEvents.MessageCreate` never runs once you override it. `CreateDispatch()` builds one handler map at construction time and doesn't support layering.
+> This is a full replacement, not a "run before/after" hook - the built-in handler that upserts the message into cache and emits `ClientEvents.MessageCreate` never runs once you override it. `CreateDispatch()` builds one handler map at construction time and doesn't support layering. Overriding `INTERACTION_CREATE` has one extra obligation: hand the interaction to `client.collectors.dispatchInteraction(interaction, event, emit)` rather than emitting it yourself, or collectors never get their first refusal and `interaction.claimed` is never set.
 
 ### Rotating presence/status
 
@@ -431,11 +499,11 @@ Full end-to-end projects live in [`examples/`](./examples):
 | [`11-buttons-and-selects`](./examples/11-buttons-and-selects) | Responding to button and select menu interactions |
 | [`12-button-args`](./examples/12-button-args) | Encoding state in `customId` to avoid needing collectors |
 | [`13-all-handlers`](./examples/13-all-handlers) | Commands, buttons, selects, and event handlers wired together |
-| [`14-collectors`](./examples/14-collectors) | `createCollector`/`awaitEvent` for temporary, filtered event listeners |
+| [`14-collectors`](./examples/14-collectors) | `createCollector`/`awaitEvent` for temporary, filtered event listeners, and how they coexist with registered handlers |
 
 ## Advanced / Internals
 
-`Client` is the composition root - on construction it resolves your intents into a bitfield and starts the gateway (`WSClient`) and REST (`Rest`) clients, and owns the top-level guild/user caches.
+`Client` is the composition root - on construction it resolves your intents into a bitfield and starts the gateway (`WSClient`) and REST (`Rest`) clients, and owns the top-level guild/user caches plus the collector manager (`client.collectors`) that holds every live collector and decides which of them answers an interaction.
 
 Gateway messages flow through a fixed pipeline: `WSClient` (`src/WSClient.ts`) owns the raw socket, runs the `Hello` → `Identify` → heartbeat handshake, and hands every `DISPATCH` payload to a dispatcher built by `CreateDispatch()` (`src/EventDispatcher.ts`), which routes each gateway event to a handler in `src/Events/`. Handlers update the relevant cache/structure and then emit the public-facing event via `Client.emit(...)`. Structures (`Guild`, `Channel`, `Message`, etc.) are thin wrappers around the raw API objects that expose the methods you call, like `message.reply()` or `member.kick()`, all routed back through `client.rest` (`src/Rest.ts`), which authenticates every request, retries `429`s/transient `5xx`s, and tracks rate limits per route via a `TTLCache` (`src/DataStructures/TTLCache.ts`). Requests sharing a bucket are queued and sent one at a time, and an exhausted bucket (`X-RateLimit-Remaining: 0`) is waited out before sending rather than after being rejected, so a burst of concurrent calls paces itself instead of stampeding into a wall of `429`s.
 
@@ -485,7 +553,7 @@ The project is alpha software; gateway resiliency and Discord API coverage are s
 - `thread.members` is only ever complete for the current user without the **privileged** `GuildMembers` intent, and `ThreadMembersUpdate` caps its `added` list at 50 either way, so call `thread.members.fetchAll()` when you need the full membership of a busy thread. Threads themselves live in `guild.channels` alongside regular channels, not in a separate collection.
 - File uploads take raw bytes, never a path — this library never touches the disk, so you read the file and it identifies the type from the contents rather than trusting an extension. That covers `guild.emojis.create()`, `guild.stickers.create()`, and every inline image field (guild icon/splash/discovery splash/banner, role icons, scheduled event images, webhook avatars, and soundboard sounds); an already-encoded data URI is still accepted everywhere. Application-owned emojis have no create path at all.
 - `PresenceUpdate` and `guild.presences` require the **privileged** `GuildPresences` intent, which must also be enabled for the application in the Discord developer portal. Without it the event never fires and the cache stays empty. Offline users are not retained, so `member.presence` is `undefined` for anyone offline, unseen, or when the intent is off.
-- Interactions are supported — slash and context menu commands, autocomplete, buttons, select menus, and modals all have typed structures (`src/Structures/Interactions/`) and builders (`src/Builders/`), and commands are registered with `client.registerPublicCommands()` / `client.registerGuildCommands()`. `ephemeral` belongs only on the responses that send a new message — `reply()`, `deferReply()`, and `followUp()`; a response's visibility is fixed when the interaction is first answered, so `editReply()` and a component's `update()` reject the key rather than accepting and ignoring it. Components v2 is built out: `TextDisplay`, `Thumbnail`, `Section`, `MediaGallery`, `File`, `Separator`, and `Container` all have builders, and the send path sets `IS_COMPONENTS_V2` for you, rejects the v1/v2 combinations Discord refuses, enforces the message-wide limits, and resolves `attachment://` references against the payload's own attachments so a mismatched filename throws locally instead of coming back as a 400. One gap remains — monetization is unmodeled: `interaction.entitlements` is still a raw `JSONObject[]`, and while `SKUButtonBuilder` can render a purchase button, there is no entitlement or SKU API and no way to observe the result.
+- Interactions are supported — slash and context menu commands, autocomplete, buttons, select menus, and modals all have typed structures (`src/Structures/Interactions/`) and builders (`src/Builders/`), and commands are registered with `client.registerPublicCommands()` / `client.registerGuildCommands()`. An interaction gets exactly one initial response, which the library now tracks: collectors are offered every interaction before it is emitted and the ones they take are marked `interaction.claimed`, so a registered handler opens with `if (interaction.claimed) return;`, and a second response throws locally rather than coming back as a `40060`. `ephemeral` belongs only on the responses that send a new message — `reply()`, `deferReply()`, and `followUp()`; a response's visibility is fixed when the interaction is first answered, so `editReply()` and a component's `update()` reject the key rather than accepting and ignoring it. Components v2 is built out: `TextDisplay`, `Thumbnail`, `Section`, `MediaGallery`, `File`, `Separator`, and `Container` all have builders, and the send path sets `IS_COMPONENTS_V2` for you, rejects the v1/v2 combinations Discord refuses, enforces the message-wide limits, and resolves `attachment://` references against the payload's own attachments so a mismatched filename throws locally instead of coming back as a 400. One gap remains — monetization is unmodeled: `interaction.entitlements` is still a raw `JSONObject[]`, and while `SKUButtonBuilder` can render a purchase button, there is no entitlement or SKU API and no way to observe the result.
 - Large portions of `src/` still lack JSDoc coverage (tracked file-by-file in `docs.md`).
 
 ## Contributing
