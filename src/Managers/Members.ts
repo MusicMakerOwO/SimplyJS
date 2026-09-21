@@ -6,7 +6,7 @@ import { DiscordMember } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { GatewayIntents } from "../Types/DiscordGateway.js";
 import { HasIntent } from "../Intents.js";
-import { createCollector } from "../Collector.js";
+import { createInternalCollector } from "../Collector.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
 /** Pagination options for a bulk {@link MemberCache.fetch} call. */
@@ -144,23 +144,34 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 		// characters, which a UUID fits once its dashes are stripped.
 		const nonce = randomUUID().replaceAll("-", "");
 
-		const collector = createCollector(this.client, ClientEvents.GuildMembersChunk, {
+		const collector = createInternalCollector(this.client, ClientEvents.GuildMembersChunk, {
 			filter: (payload) => payload.nonce === nonce && payload.guild.id === this.guild.id,
 			time: options.time ?? 30_000
 		});
 
 		const members: Member[] = [];
+		// `end` alone cannot tell "all the chunks arrived" from "something stopped us early" - the
+		// collector is stopped by this handler in the first case and by a timeout, or by
+		// `client.destroy()` clearing every collector, in the others. Resolving on the difference
+		// rather than on the end reason is what keeps a shutdown from returning a partial guild.
+		let complete = false;
 		const completed = new Promise<Member[]>((resolve, reject) => {
 			collector.on("collect", (payload) => {
 				members.push(...payload.members);
-				if (payload.chunkIndex >= payload.chunkCount - 1) collector.stop();
+				if (payload.chunkIndex >= payload.chunkCount - 1) {
+					complete = true;
+					collector.stop();
+				}
 			});
 			collector.on("end", (_collected, reason) => {
-				if (reason === "time") {
-					reject(new Error(`Timed out waiting for guild member chunks for guild ${this.guild.id}`));
+				if (complete) {
+					resolve(members);
 					return;
 				}
-				resolve(members);
+				reject(new Error(reason === "time"
+					? `Timed out waiting for guild member chunks for guild ${this.guild.id}`
+					: `Stopped waiting for guild member chunks for guild ${this.guild.id} before all ` +
+						`chunks arrived (${reason}) - received ${members.length} so far`));
 			});
 		});
 
@@ -174,6 +185,11 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 				nonce
 			});
 		} catch (error) {
+			// `completed` is about to be abandoned, and stopping the collector rejects it through the
+			// `end` handler above. Nobody is left to await it, which node counts as an unhandled
+			// rejection and, since v15, exits the process over.
+			completed.catch(() => undefined);
+
 			collector.stop();
 			throw error;
 		}
