@@ -146,6 +146,34 @@ type DiscordErrorResponse = {
 	global?: boolean;
 };
 
+/**
+ * An error *response* from Discord, as opposed to a request that never got one.
+ *
+ * The distinction is the point of the class: a rejected `fetch`, a local validation failure, or a
+ * timeout all mean the request may never have been processed, while this means Discord received it
+ * and refused it - and said why. Callers that have to tell those apart (an interaction deciding
+ * whether its acknowledgement actually landed, say) check `instanceof` and read {@link code}.
+ */
+export class DiscordAPIError extends Error {
+	override readonly name = "DiscordAPIError";
+	/** HTTP status of the response */
+	readonly status: number;
+	/**
+	 * Discord's own error code, which is more specific than the status - `40060` (already
+	 * acknowledged) and `10062` (unknown interaction) are both `400`s.
+	 *
+	 * Falls back to the HTTP status when the response body carried no code.
+	 * @see https://docs.discord.com/developers/topics/opcodes-and-status-codes#json
+	 */
+	readonly code: number;
+
+	constructor(message: string, status: number, code: number) {
+		super(message);
+		this.status = status;
+		this.code = code;
+	}
+}
+
 export type RestOptions = {
 	/**
 	 * If `false`, errors on rate limit instead of waiting
@@ -343,15 +371,15 @@ export class Rest {
 		return 1000;
 	}
 
-	/** Builds an `Error` describing a failed request, preferring the parsed Discord error message and code */
-	#createApiError(response: Response, rawBody: string, parsedBody: DiscordErrorResponse | null): Error {
+	/** Builds a {@link DiscordAPIError} for a failed request, preferring the parsed Discord message and code */
+	#createApiError(response: Response, rawBody: string, parsedBody: DiscordErrorResponse | null): DiscordAPIError {
 		const message =
 			parsedBody?.message && parsedBody.message.length > 0
 				? parsedBody.message
 				: (response.statusText || rawBody || "Unknown error");
 
 		const code = parsedBody?.code ?? response.status;
-		return new Error(`Discord API Error: ${message} (${code})`);
+		return new DiscordAPIError(`Discord API Error: ${message} (${code})`, response.status, code);
 	}
 
 	/**
