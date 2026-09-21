@@ -636,6 +636,28 @@ export const ClientEvents = {
 
 } as const;
 
+/**
+ * The client events that carry exactly one interaction, each emitted alongside `InteractionCreate`.
+ *
+ * The single source of truth for "which events are about one interaction": `EventFor` in
+ * `src/Events/Interactions.ts` pairs each of these with the class it belongs to, and
+ * `CollectorManager` treats exactly these (plus `InteractionCreate`) as claimable, since an
+ * interaction gets one response and so one claimer. Adding an interaction type means adding it
+ * here, which the compiler then makes you account for on the `EventFor` side.
+ */
+export const InteractionEvents = [
+	ClientEvents.SlashCommandUsed,
+	ClientEvents.UserContextMenuUsed,
+	ClientEvents.MessageContextMenuUsed,
+	ClientEvents.ButtonUsed,
+	ClientEvents.SelectMenuUsed,
+	ClientEvents.AutocompleteUsed,
+	ClientEvents.ModalSubmitted,
+] as const;
+
+/** One of the {@link InteractionEvents} */
+export type InteractionEvent = (typeof InteractionEvents)[number];
+
 export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
 	[ClientEvents.Resumed]: [];
