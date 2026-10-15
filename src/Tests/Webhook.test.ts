@@ -583,6 +583,28 @@ describe("WebhookCache", () => {
 		expect(guild.webhooks.get("webhook-1")).toBeInstanceOf(Webhook);
 	});
 
+	it("fetchAll removes cached webhooks the listing no longer contains", async () => {
+		guild.webhooks.upsert(webhookData());
+		guild.webhooks.upsert(webhookData({ id: "webhook-2", channel_id: "channel-2" }));
+		vi.spyOn(client.rest, "get").mockResolvedValue([ webhookData() ]);
+
+		await guild.webhooks.fetchAll();
+
+		expect([ ...guild.webhooks.keys() ]).toEqual([ "webhook-1" ]);
+	});
+
+	it("fetchChannel removes only that channel's unlisted webhooks", async () => {
+		guild.webhooks.upsert(webhookData());
+		guild.webhooks.upsert(webhookData({ id: "webhook-2" }));
+		guild.webhooks.upsert(webhookData({ id: "webhook-3", channel_id: "channel-2" }));
+		vi.spyOn(client.rest, "get").mockResolvedValue([ webhookData({ id: "webhook-2" }) ]);
+
+		const fetched = await guild.webhooks.fetchChannel("channel-1");
+
+		expect(fetched.map(webhook => webhook.id)).toEqual([ "webhook-2" ]);
+		expect([ ...guild.webhooks.keys() ].sort()).toEqual([ "webhook-2", "webhook-3" ]);
+	});
+
 	it("fetch caches a single webhook by id", async () => {
 		vi.spyOn(client.rest, "get").mockResolvedValue(webhookData());
 
