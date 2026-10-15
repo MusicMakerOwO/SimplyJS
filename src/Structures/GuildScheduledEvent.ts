@@ -19,8 +19,6 @@ import { EncodeImage } from "../Utils.js";
  */
 export class GuildScheduledEvent extends APIGuildStructure<DiscordGuildScheduledEvent> {
 	id!: string
-	/** Id of the guild this event belongs to */
-	guildId!: string
 	/** Channel the event will be hosted in, `null` when `entityType` is `EXTERNAL` */
 	channelId!: string | null
 	/** The event name */
@@ -59,7 +57,6 @@ export class GuildScheduledEvent extends APIGuildStructure<DiscordGuildScheduled
 
 	patch(data: DiscordGuildScheduledEvent): void {
 		this.id = data.id;
-		this.guildId = data.guild_id;
 		this.channelId = data.channel_id;
 		this.name = data.name;
 		this.scheduledStartTime = data.scheduled_start_time;

@@ -27,8 +27,6 @@ import { ObjectValues } from "../Types/HelperTypes.js";
  */
 export class Integration extends APIGuildStructure<DiscordIntegration> {
 	id!: string;
-	/** Id of the guild this integration belongs to */
-	guildId!: string;
 	/** The integration name */
 	name!: string;
 	/** The service this integration syncs with */
@@ -62,7 +60,6 @@ export class Integration extends APIGuildStructure<DiscordIntegration> {
 
 	constructor(client: Client, guild: Guild, data: DiscordIntegration) {
 		super(client, guild);
-		this.guildId = guild.id;
 		this.patch(data);
 	}
 

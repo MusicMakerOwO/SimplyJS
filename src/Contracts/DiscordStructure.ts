@@ -69,10 +69,20 @@ export abstract class APIClientStructure<T extends object> {
 export abstract class APIGuildStructure<T extends object> {
 	protected readonly client: Client;
 	protected readonly guild: Guild;
+	/**
+	 * Id of the guild that owns this structure. Taken from the owning guild rather than the
+	 * payload, since Discord omits `guild_id` on objects nested inside a guild (every channel in a
+	 * `GUILD_CREATE`, every role, every member).
+	 *
+	 * Subclasses must not redeclare this field: under `useDefineForClassFields` a redeclaration
+	 * re-initializes it to `undefined` after this constructor has run.
+	 */
+	readonly guildId: string;
 
 	protected constructor(client: Client, guild: Guild) {
 		this.client = client;
 		this.guild = guild;
+		this.guildId = guild.id;
 	}
 
 	/**

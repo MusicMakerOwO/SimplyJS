@@ -30,14 +30,11 @@ export class SoundboardSound extends APIGuildStructure<DiscordSoundboardSound> {
 	emojiName!: string | null;
 	/** Whether this sound can be used, may be false after a loss of Server Boosts */
 	available!: boolean;
-	/** Id of the guild this sound belongs to */
-	guildId!: string;
 	/** The user who created this sound, only sent with the `MANAGE_GUILD_EXPRESSIONS` permission */
 	user?: User;
 
 	constructor(client: Client, guild: Guild, data: DiscordSoundboardSound) {
 		super(client, guild);
-		this.guildId = guild.id;
 		this.patch(data);
 	}
 

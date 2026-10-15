@@ -145,8 +145,6 @@ export function ToActivity(data: DiscordActivity): Activity {
  * full {@link User} from the client cache on access rather than trusting the payload.
  */
 export class Presence extends APIGuildStructure<DiscordPresence> {
-	/** Id of the guild this presence was reported in */
-	guildId!: string
 	/** Id of the user this presence belongs to */
 	userId!: string
 	/** Overall status across every device */
@@ -162,8 +160,6 @@ export class Presence extends APIGuildStructure<DiscordPresence> {
 	}
 
 	patch(data: DiscordPresence): void {
-		// `guild_id` is omitted on the presences embedded in GUILD_CREATE, where the parent guild is implied
-		this.guildId = data.guild_id ?? this.guild.id;
 		this.userId = data.user.id;
 		this.status = data.status;
 		this.activities = (data.activities ?? []).map(ToActivity);

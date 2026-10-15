@@ -26,8 +26,6 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 	formatType!: ObjectValues<typeof DiscordStickerFormatTypes>
 	/** Whether this sticker is currently available for use */
 	available?: boolean
-	/** Guild id that owns this sticker */
-	guildId?: string
 	/** User who uploaded the sticker, when included by the API */
 	user?: User
 	/** Sorting hint value used by Discord clients */
@@ -74,10 +72,6 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 
 		if ('available' in data && data.available !== undefined) {
 			this.available = data.available;
-		}
-
-		if ('guild_id' in data && data.guild_id !== undefined) {
-			this.guildId = data.guild_id;
 		}
 
 		if ('user' in data && data.user !== undefined) {

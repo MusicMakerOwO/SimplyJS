@@ -17,8 +17,6 @@ import { JSONObject } from "../Types/index.js";
  */
 export class AutoModerationRule extends APIGuildStructure<DiscordAutoModerationRule> {
 	id!: string
-	/** Id of the guild this rule belongs to */
-	guildId!: string
 	/** The rule name */
 	name!: string
 	/** Id of the user who first created this rule */
@@ -45,7 +43,6 @@ export class AutoModerationRule extends APIGuildStructure<DiscordAutoModerationR
 
 	patch(data: DiscordAutoModerationRule): void {
 		this.id = data.id;
-		this.guildId = data.guild_id;
 		this.name = data.name;
 		this.creatorId = data.creator_id;
 		this.eventType = data.event_type;
