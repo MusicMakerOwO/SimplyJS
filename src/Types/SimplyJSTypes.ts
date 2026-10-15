@@ -210,10 +210,13 @@ export const ClientEvents = {
 	Resumed: "Resumed",
 
 	/**
-	 * Fired when a cached user's profile changes.
+	 * Fired when the bot's own account changes (username, avatar, banner, ...), after
+	 * `client.user` has been updated. Discord's `USER_UPDATE` is only ever sent for the current
+	 * user; other users' profile changes arrive through {@link ClientEvents.MemberUpdate}, once per
+	 * shared guild.
 	 * Listener arguments: `oldUser` ({@link User} | `undefined`), `newUser` ({@link User}).
 	 */
-	UserUpdate: "UserUpdate",
+	ClientUserUpdate: "ClientUserUpdate",
 
 	/**
 	 * Fired when a guild becomes available to the client.
@@ -746,7 +749,7 @@ export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
 	[ClientEvents.Resumed]: [];
 
-	[ClientEvents.UserUpdate]: [oldUser: User | undefined, newUser: User];
+	[ClientEvents.ClientUserUpdate]: [oldUser: User | undefined, newUser: User];
 
 	[ClientEvents.GuildCreate]: [guild: Guild];
 	[ClientEvents.GuildUpdate]: [oldGuild: Guild | undefined, newGuild: Guild];

@@ -725,7 +725,8 @@ export const GatewayEvents = {
 	 */
 	TypingStart: "TYPING_START",
 	/**
-	 * Properties of a user the bot shares a guild with changed (username, avatar, banner, ...).
+	 * Properties of the current user (the bot itself) changed (username, avatar, banner, ...).
+	 * Other users' profile changes arrive as `GUILD_MEMBER_UPDATE` instead, once per shared guild.
 	 *
 	 * Required intent: none (sent regardless of intents)
 	 */

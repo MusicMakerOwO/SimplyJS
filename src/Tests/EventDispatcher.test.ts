@@ -174,7 +174,7 @@ describe("EventDispatcher", () => {
 		expect(warnSpy).not.toHaveBeenCalled();
 		expect(client.users.get("user-1")?.username).toBe("renamed");
 		expect(emitSpy).toHaveBeenCalledWith(
-			ClientEvents.UserUpdate,
+			ClientEvents.ClientUserUpdate,
 			undefined,
 			expect.objectContaining({ id: "user-1", username: "renamed" })
 		);

@@ -2550,7 +2550,7 @@ describe("Update event old-value snapshots", () => {
 
 		const cached = client.users.get("user-1");
 		expect(cached?.username).toBe("tester");
-		expect(emitted(emitSpy, ClientEvents.UserUpdate)).toEqual([undefined, cached]);
+		expect(emitted(emitSpy, ClientEvents.ClientUserUpdate)).toEqual([undefined, cached]);
 	});
 
 	it("UserUpdate patches the cached user in place and emits a snapshot of the old one", async () => {
@@ -2561,7 +2561,7 @@ describe("Update event old-value snapshots", () => {
 
 		await UserUpdate.handler(client, { ...createUser(), username: "renamed", avatar: "avatar-hash" });
 
-		const [oldUser, newUser] = emitted(emitSpy, ClientEvents.UserUpdate) as [User, User];
+		const [oldUser, newUser] = emitted(emitSpy, ClientEvents.ClientUserUpdate) as [User, User];
 		expect(newUser).toBe(cached);
 		expect(oldUser).not.toBe(cached);
 		expect(oldUser.username).toBe("tester");
