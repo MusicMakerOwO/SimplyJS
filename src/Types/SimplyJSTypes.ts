@@ -255,7 +255,10 @@ export const ClientEvents = {
 
 	/**
 	 * Fired when a thread is created, or when the client is added to a thread it could not previously see.
-	 * Listener arguments: `guild` ({@link Guild}), `thread` ({@link Channel}).
+	 * Listener arguments: `guild` ({@link Guild}), `thread` ({@link Channel}), `newlyCreated` (`boolean`).
+	 *
+	 * `newlyCreated` is `true` only for a thread that was just created. It is `false` when the event
+	 * is the client being added to an existing private thread, which is otherwise indistinguishable.
 	 */
 	ThreadCreate: "ThreadCreate",
 	/**
@@ -807,7 +810,7 @@ export type ClientEventMap = {
 		lastPinTimestamp: string | null
 	}];
 
-	[ClientEvents.ThreadCreate]: [guild: Guild, thread: Channel];
+	[ClientEvents.ThreadCreate]: [guild: Guild, thread: Channel, newlyCreated: boolean];
 	[ClientEvents.ThreadUpdate]: [guild: Guild, oldThread: Channel | undefined, newThread: Channel];
 	[ClientEvents.ThreadDelete]: [guild: Guild, thread: Channel | DiscordChannel];
 	[ClientEvents.ThreadMemberUpdate]: [guild: Guild, member: ThreadMember];

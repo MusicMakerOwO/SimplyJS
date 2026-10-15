@@ -970,6 +970,8 @@ export type DiscordChannel = {
 	thread_metadata?: DiscordThreadMetadata;
 	/** thread member object for the current user, if they have joined the thread, only included on certain API endpoints */
 	member?: DiscordThreadMember;
+	/** `THREAD_CREATE` only: `true` when the thread was just created, absent when the current user was added to an existing private thread */
+	newly_created?: boolean;
 	/** default duration, copied onto newly created threads, in minutes, threads will stop showing in the channel list after the specified period of inactivity, can be set to: 60, 1440, 4320, 10080 */
 	default_auto_archive_duration?: number;
 	/** computed permissions for the invoking user in the channel, including overwrites, only included when part of the resolved data received on an interaction. This does not include implicit permissions, which may need to be checked separately */

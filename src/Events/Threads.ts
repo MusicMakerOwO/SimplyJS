@@ -5,13 +5,18 @@ import { ClientEvents } from "../Types/SimplyJSTypes.js";
 import { GuildThreadChannel } from "../Structures/Channels/GuildThreadChannel.js";
 import { ThreadMember } from "../Structures/ThreadMember.js";
 
+/**
+ * Fires when a thread is created or the client is added to an existing private thread. Discord
+ * sets `newly_created` only in the first case, and it is passed through as the third listener
+ * argument rather than stored on the thread, since it describes this event and not the thread.
+ */
 export const ThreadCreate = defineEvent({
 	name: GatewayEvents.ThreadCreate,
 	handler: (client, data: DiscordChannel): void => {
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const thread = guild.channels.upsert(data);
-		client.emit(ClientEvents.ThreadCreate, guild, thread);
+		client.emit(ClientEvents.ThreadCreate, guild, thread, data.newly_created === true);
 	}
 });
 
