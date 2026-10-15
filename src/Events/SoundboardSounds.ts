@@ -23,9 +23,8 @@ export const SoundboardSoundCreate = defineEvent({
 });
 
 /**
- * Fires when a guild soundboard sound is changed. The cached structure is patched in place, so
- * `oldSound` and `newSound` are the same object when the sound was already cached - snapshot any
- * fields you need to compare before the listener returns.
+ * Fires when a guild soundboard sound is changed. `oldSound` is a snapshot taken before the patch,
+ * or `undefined` when the sound was not cached.
  */
 export const SoundboardSoundUpdate = defineEvent({
 	name: GatewayEvents.GuildSoundboardSoundUpdate,
