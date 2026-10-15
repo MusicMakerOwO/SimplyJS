@@ -83,6 +83,20 @@ export class Sticker extends APIGuildStructure<DiscordSticker> {
 		}
 	}
 
+	/**
+	 * Builds the CDN URL for this sticker's image, or `null` for a Lottie sticker, which is a JSON
+	 * animation rather than an image. GIF stickers are served from `media.discordapp.net`, since
+	 * the main CDN does not serve them.
+	 * @returns The sticker image URL, or `null` when it has none.
+	 */
+	imageURL(): string | null {
+		switch (this.formatType) {
+			case DiscordStickerFormatTypes.LOTTIE: return null;
+			case DiscordStickerFormatTypes.GIF: return `https://media.discordapp.net/stickers/${this.id}.gif`;
+			default: return `https://cdn.discordapp.com/stickers/${this.id}.png`;
+		}
+	}
+
 	/** Attempt to delete the sticker, might fail due to permissions */
 	async delete(): Promise<void> {
 		await this.client.rest.delete(`/guilds/${this.guild.id}/stickers/${this.id}`);

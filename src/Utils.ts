@@ -177,6 +177,24 @@ export function EncodeImage<T extends ImageInput | null | undefined>(
 	if (file === null || file === undefined) return file as Result;
 	return ToDataURI(file) as Result;
 }
+
+/**
+ * Builds a CDN URL for a hashed image (an avatar, banner, icon, or splash).
+ *
+ * Shared by every structure's `*URL()` method so the animated rule lives in one place: Discord
+ * prefixes an animated image's hash with `a_`, and only those have a `.gif` variant.
+ *
+ * @param path The CDN path up to the hash, e.g. `avatars/{userId}` or `icons/{guildId}`.
+ * @param hash The image hash.
+ * @param animated Whether to request the animated `.gif` variant when the hash supports it.
+ * @default true
+ * @returns The image URL.
+ */
+export function CDNImageURL(path: string, hash: string, animated?: boolean): string {
+	const isAnimated = (animated ?? true) && hash.startsWith("a_"); // nullish collation, only overrides `undefined`
+	return `https://cdn.discordapp.com/${path}/${hash}.${isAnimated ? "gif" : "png"}?size=1024`;
+}
+
 /**
  * Normalizes a color into the decimal integer Discord expects.
  *

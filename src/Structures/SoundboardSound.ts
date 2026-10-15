@@ -52,6 +52,14 @@ export class SoundboardSound extends APIGuildStructure<DiscordSoundboardSound> {
 	}
 
 	/**
+	 * Builds the CDN URL for this sound's audio file.
+	 * @returns The sound file URL.
+	 */
+	soundURL(): string {
+		return `https://cdn.discordapp.com/soundboard-sounds/${this.soundId}`;
+	}
+
+	/**
 	 * This sound's custom emoji, `undefined` when the sound uses a standard unicode emoji (read
 	 * {@link SoundboardSound.emojiName} instead), has no emoji at all, or the emoji is not cached.
 	 */

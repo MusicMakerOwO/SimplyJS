@@ -8,6 +8,7 @@ import { BitField } from "../DataStructures/BitField.js";
 import { DiscordPermissions } from "../Constants.js";
 import type { Channel } from "../Types/index.js";
 import type { Presence } from "./Presence.js";
+import { CDNImageURL } from "../Utils.js";
 
 export class Member extends APIGuildStructure<DiscordMember> {
 	/** Backing user for this guild member */
@@ -112,10 +113,39 @@ export class Member extends APIGuildStructure<DiscordMember> {
 	 * `user` points at the shared cached {@link User}, which `patch()` updates in place, and
 	 * `roles` is handed straight out of the payload - both need detaching so a snapshot can still
 	 * show the username, avatar, and roles the member had when it was cloned.
+	 *
+	 * The detached copy is only as old as the shared `User` was at clone time. An account change
+	 * reaches every guild the user is in, and the first guild's update patches the shared `User`,
+	 * so later guilds' snapshots already carry the new username and avatar.
 	 */
 	protected override detach(source: this): void {
 		this.user = source.user.clone();
 		this.roles = [...source.roles];
+	}
+
+	/**
+	 * Builds the URL for this member's guild-specific avatar, falling back to
+	 * {@link User.avatarURL} (and from there the default avatar) when none is set. This is the
+	 * avatar Discord shows for the member inside this guild.
+	 * @param animated Whether to request the animated `.gif` variant when the avatar supports it.
+	 * @default true
+	 * @returns The avatar image URL.
+	 */
+	avatarURL(animated?: boolean): string {
+		if (!this.avatar) return this.user.avatarURL(animated);
+		return CDNImageURL(`guilds/${this.guildId}/users/${this.user.id}/avatars`, this.avatar, animated);
+	}
+
+	/**
+	 * Builds the URL for this member's guild-specific banner, falling back to
+	 * {@link User.bannerURL} when none is set.
+	 * @param animated Whether to request the animated `.gif` variant when the banner supports it.
+	 * @default true
+	 * @returns The banner image URL, or `null` when neither the member nor the user has one.
+	 */
+	bannerURL(animated?: boolean): string | null {
+		if (!this.banner) return this.user.bannerURL(animated);
+		return CDNImageURL(`guilds/${this.guildId}/users/${this.user.id}/banners`, this.banner, animated);
 	}
 
 	/** The member's user id, proxied from {@link Member.user} for convenience */

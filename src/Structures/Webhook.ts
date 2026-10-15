@@ -10,7 +10,7 @@ import {
 import { Client } from "../Client.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { ImageInput, MessagePayload } from "../Types/Internal.js";
-import { EncodeImage } from "../Utils.js";
+import { CDNImageURL, EncodeImage } from "../Utils.js";
 import { CreateMessagePayload, PreparePayload } from "./Message.js";
 import { WebhookMessage, WebhookMessageContext, WebhookMessageRoute } from "./WebhookMessage.js";
 import { Guild } from "./Guild.js";
@@ -126,10 +126,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 	/** The webhook's default avatar as a CDN url, or `null` when it has never had one set */
 	avatarURL(animated?: boolean): string | null {
 		if (!this.avatar) return null;
-		const isAnimated = (animated ?? true) && this.avatar.startsWith("a_"); // nullish collation, only overrides `undefined`
-		return isAnimated
-			? `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.gif?size=1024`
-			: `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.png?size=1024`
+		return CDNImageURL(`avatars/${this.id}`, this.avatar, animated);
 	}
 
 	/**

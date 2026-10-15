@@ -8,6 +8,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { MessagePayload } from "../Types/Internal.js";
+import { CDNImageURL } from "../Utils.js";
 import { CreateMessagePayload, Message, PreparePayload } from "./Message.js";
 import { DiscordMessage } from "../Types/MessageComponents.js";
 
@@ -179,10 +180,21 @@ export class User extends APIClientStructure<DiscordUser> {
 	 */
 	avatarURL(animated?: boolean): string {
 		if (!this.avatar) return this.defaultAvatarURL();
-		const isAnimated = (animated ?? true) && this.avatar.startsWith("a_"); // nullish collation, only overrides `undefined`
-		return isAnimated
-			? `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.gif?size=1024`
-			: `https://cdn.discordapp.com/avatars/${this.id}/${this.avatar}.png?size=1024`
+		return CDNImageURL(`avatars/${this.id}`, this.avatar, animated);
+	}
+
+	/**
+	 * Builds the URL for this user's profile banner, or `null` when none is set.
+	 *
+	 * Discord leaves `banner` out of the user objects nested in gateway events, so it is usually
+	 * only known after a `client.users.fetch(id)`. `null` here can mean "not fetched" as well as
+	 * "no banner".
+	 * @param animated Whether to request the animated `.gif` variant when the banner supports it.
+	 * @default true
+	 * @returns The banner image URL, or `null`.
+	 */
+	bannerURL(animated?: boolean): string | null {
+		return this.banner ? CDNImageURL(`banners/${this.id}`, this.banner, animated) : null;
 	}
 
 	/** Send a direct message to the user, might fail if they have DMs closed or have blocked the bot */

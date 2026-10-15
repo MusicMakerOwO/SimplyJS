@@ -66,6 +66,17 @@ export class Emoji extends APIGuildStructure<DiscordEmoji> {
 	}
 
 	/**
+	 * Builds the CDN URL for this emoji's image.
+	 * @param animated Whether to request the animated `.gif` variant when the emoji is animated.
+	 * @default true
+	 * @returns The emoji image URL.
+	 */
+	imageURL(animated?: boolean): string {
+		const isAnimated = (animated ?? true) && this.animated;
+		return `https://cdn.discordapp.com/emojis/${this.id}.${isAnimated ? "gif" : "png"}`;
+	}
+
+	/**
 	 * Deletes the emoji
 	 */
 	async delete(): Promise<void> {

@@ -5,7 +5,7 @@ import { Guild } from "./Guild.js";
 import { BitField, BitFieldValue } from "../DataStructures/BitField.js";
 import { DiscordPermissions } from "../Constants.js";
 import { ImageInput, JSONObject } from "../Types/index.js";
-import { EncodeImage, SerializeBitFieldValue } from "../Utils.js";
+import { CDNImageURL, EncodeImage, SerializeBitFieldValue } from "../Utils.js";
 
 /**
  * A guild role, granting permissions and cosmetic styling (color, icon, hoisting) to its members.
@@ -104,6 +104,15 @@ export class Role extends APIGuildStructure<DiscordRole> {
 	 */
 	protected override detach(source: this): void {
 		this.permissions = new BitField(DiscordPermissions, source.permissions.value);
+	}
+
+	/**
+	 * Builds the CDN URL for this role's custom icon, or `null` when it has none. A role showing a
+	 * standard emoji instead has no image to link to; read {@link Role.unicodeEmoji} for that.
+	 * @returns The role icon URL, or `null`.
+	 */
+	iconURL(): string | null {
+		return this.icon ? CDNImageURL(`role-icons/${this.id}`, this.icon, false) : null;
 	}
 
 	/** Asks the API to delete the current role, might fail due to permissions or role order (can't delete roles above your own) */

@@ -17,7 +17,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { ImageInput, JSONObject } from "../Types/Internal.js";
-import { EncodeImage } from "../Utils.js";
+import { CDNImageURL, EncodeImage } from "../Utils.js";
 import { APIClientStructure } from "../Contracts/DiscordStructure.js";
 import { RoleCache } from "../Managers/Roles.js";
 import { StickerCache } from "../Managers/Stickers.js";
@@ -287,6 +287,43 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 				this.presences.upsert(apiPresence);
 			}
 		}
+	}
+
+	/**
+	 * Builds the CDN URL for this guild's icon, or `null` when it has none.
+	 * @param animated Whether to request the animated `.gif` variant when the icon supports it.
+	 * @default true
+	 * @returns The icon image URL, or `null`.
+	 */
+	iconURL(animated?: boolean): string | null {
+		return this.icon ? CDNImageURL(`icons/${this.id}`, this.icon, animated) : null;
+	}
+
+	/**
+	 * Builds the CDN URL for this guild's banner, or `null` when it has none.
+	 * @param animated Whether to request the animated `.gif` variant when the banner supports it.
+	 * @default true
+	 * @returns The banner image URL, or `null`.
+	 */
+	bannerURL(animated?: boolean): string | null {
+		return this.banner ? CDNImageURL(`banners/${this.id}`, this.banner, animated) : null;
+	}
+
+	/**
+	 * Builds the CDN URL for this guild's invite splash background, or `null` when it has none.
+	 * @returns The splash image URL, or `null`.
+	 */
+	splashURL(): string | null {
+		return this.splash ? CDNImageURL(`splashes/${this.id}`, this.splash, false) : null;
+	}
+
+	/**
+	 * Builds the CDN URL for this guild's discovery splash, or `null` when it has none. Only guilds
+	 * with the `DISCOVERABLE` feature can set one.
+	 * @returns The discovery splash image URL, or `null`.
+	 */
+	discoverySplashURL(): string | null {
+		return this.discoverySplash ? CDNImageURL(`discovery-splashes/${this.id}`, this.discoverySplash, false) : null;
 	}
 
 	/**
