@@ -10,6 +10,7 @@ import type {
 	DiscordRole,
 	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
+import { DiscordAuditLogEvent } from "./DiscordAPITypes.js";
 import type { ObjectValues } from "./HelperTypes.js";
 import type { AutoModerationRule } from "../Structures/AutoModerationRule.js";
 import type { Guild } from "../Structures/Guild.js";
@@ -635,6 +636,89 @@ export const ClientEvents = {
 	ModalSubmitted: "ModalSubmitted",
 
 } as const;
+
+/**
+ * Audit log action types under library-style names, for `Guild.fetchAuditLogs({ actionType })`.
+ *
+ * The values are {@link DiscordAuditLogEvent}'s, so either map can be used; this one reads in the
+ * same vocabulary as {@link ClientEvents}. Where an action and a client event describe the same
+ * thing they share a name (`MessageDelete`, `MessageDeleteBulk`, `GuildBanAdd`, `RoleUpdate`, ...),
+ * but the two sets are not 1:1: some actions have no gateway event (`MemberKick`, `MemberPrune`),
+ * and some events never produce an entry (a user deleting their own message fires `MessageDelete`
+ * but is not audited).
+ */
+export const AuditLogEvents = {
+	GuildUpdate: DiscordAuditLogEvent.GUILD_UPDATE,
+	ChannelCreate: DiscordAuditLogEvent.CHANNEL_CREATE,
+	ChannelUpdate: DiscordAuditLogEvent.CHANNEL_UPDATE,
+	ChannelDelete: DiscordAuditLogEvent.CHANNEL_DELETE,
+	ChannelOverwriteCreate: DiscordAuditLogEvent.CHANNEL_OVERWRITE_CREATE,
+	ChannelOverwriteUpdate: DiscordAuditLogEvent.CHANNEL_OVERWRITE_UPDATE,
+	ChannelOverwriteDelete: DiscordAuditLogEvent.CHANNEL_OVERWRITE_DELETE,
+	MemberKick: DiscordAuditLogEvent.MEMBER_KICK,
+	MemberPrune: DiscordAuditLogEvent.MEMBER_PRUNE,
+	GuildBanAdd: DiscordAuditLogEvent.MEMBER_BAN_ADD,
+	GuildBanRemove: DiscordAuditLogEvent.MEMBER_BAN_REMOVE,
+	MemberUpdate: DiscordAuditLogEvent.MEMBER_UPDATE,
+	MemberRoleUpdate: DiscordAuditLogEvent.MEMBER_ROLE_UPDATE,
+	MemberMove: DiscordAuditLogEvent.MEMBER_MOVE,
+	MemberDisconnect: DiscordAuditLogEvent.MEMBER_DISCONNECT,
+	BotAdd: DiscordAuditLogEvent.BOT_ADD,
+	RoleCreate: DiscordAuditLogEvent.ROLE_CREATE,
+	RoleUpdate: DiscordAuditLogEvent.ROLE_UPDATE,
+	RoleDelete: DiscordAuditLogEvent.ROLE_DELETE,
+	InviteCreate: DiscordAuditLogEvent.INVITE_CREATE,
+	InviteUpdate: DiscordAuditLogEvent.INVITE_UPDATE,
+	InviteDelete: DiscordAuditLogEvent.INVITE_DELETE,
+	WebhookCreate: DiscordAuditLogEvent.WEBHOOK_CREATE,
+	WebhookUpdate: DiscordAuditLogEvent.WEBHOOK_UPDATE,
+	WebhookDelete: DiscordAuditLogEvent.WEBHOOK_DELETE,
+	EmojiCreate: DiscordAuditLogEvent.EMOJI_CREATE,
+	EmojiUpdate: DiscordAuditLogEvent.EMOJI_UPDATE,
+	EmojiDelete: DiscordAuditLogEvent.EMOJI_DELETE,
+	MessageDelete: DiscordAuditLogEvent.MESSAGE_DELETE,
+	MessageDeleteBulk: DiscordAuditLogEvent.MESSAGE_BULK_DELETE,
+	MessagePin: DiscordAuditLogEvent.MESSAGE_PIN,
+	MessageUnpin: DiscordAuditLogEvent.MESSAGE_UNPIN,
+	IntegrationCreate: DiscordAuditLogEvent.INTEGRATION_CREATE,
+	IntegrationUpdate: DiscordAuditLogEvent.INTEGRATION_UPDATE,
+	IntegrationDelete: DiscordAuditLogEvent.INTEGRATION_DELETE,
+	StageInstanceCreate: DiscordAuditLogEvent.STAGE_INSTANCE_CREATE,
+	StageInstanceUpdate: DiscordAuditLogEvent.STAGE_INSTANCE_UPDATE,
+	StageInstanceDelete: DiscordAuditLogEvent.STAGE_INSTANCE_DELETE,
+	StickerCreate: DiscordAuditLogEvent.STICKER_CREATE,
+	StickerUpdate: DiscordAuditLogEvent.STICKER_UPDATE,
+	StickerDelete: DiscordAuditLogEvent.STICKER_DELETE,
+	GuildScheduledEventCreate: DiscordAuditLogEvent.GUILD_SCHEDULED_EVENT_CREATE,
+	GuildScheduledEventUpdate: DiscordAuditLogEvent.GUILD_SCHEDULED_EVENT_UPDATE,
+	GuildScheduledEventDelete: DiscordAuditLogEvent.GUILD_SCHEDULED_EVENT_DELETE,
+	ThreadCreate: DiscordAuditLogEvent.THREAD_CREATE,
+	ThreadUpdate: DiscordAuditLogEvent.THREAD_UPDATE,
+	ThreadDelete: DiscordAuditLogEvent.THREAD_DELETE,
+	ApplicationCommandPermissionUpdate: DiscordAuditLogEvent.APPLICATION_COMMAND_PERMISSION_UPDATE,
+	SoundboardSoundCreate: DiscordAuditLogEvent.SOUNDBOARD_SOUND_CREATE,
+	SoundboardSoundUpdate: DiscordAuditLogEvent.SOUNDBOARD_SOUND_UPDATE,
+	SoundboardSoundDelete: DiscordAuditLogEvent.SOUNDBOARD_SOUND_DELETE,
+	AutoModerationRuleCreate: DiscordAuditLogEvent.AUTO_MODERATION_RULE_CREATE,
+	AutoModerationRuleUpdate: DiscordAuditLogEvent.AUTO_MODERATION_RULE_UPDATE,
+	AutoModerationRuleDelete: DiscordAuditLogEvent.AUTO_MODERATION_RULE_DELETE,
+	AutoModerationBlockMessage: DiscordAuditLogEvent.AUTO_MODERATION_BLOCK_MESSAGE,
+	AutoModerationFlagToChannel: DiscordAuditLogEvent.AUTO_MODERATION_FLAG_TO_CHANNEL,
+	AutoModerationUserCommunicationDisabled: DiscordAuditLogEvent.AUTO_MODERATION_USER_COMMUNICATION_DISABLED,
+	AutoModerationQuarantineUser: DiscordAuditLogEvent.AUTO_MODERATION_QUARANTINE_USER,
+	CreatorMonetizationRequestCreated: DiscordAuditLogEvent.CREATOR_MONETIZATION_REQUEST_CREATED,
+	CreatorMonetizationTermsAccepted: DiscordAuditLogEvent.CREATOR_MONETIZATION_TERMS_ACCEPTED,
+	OnboardingPromptCreate: DiscordAuditLogEvent.ONBOARDING_PROMPT_CREATE,
+	OnboardingPromptUpdate: DiscordAuditLogEvent.ONBOARDING_PROMPT_UPDATE,
+	OnboardingPromptDelete: DiscordAuditLogEvent.ONBOARDING_PROMPT_DELETE,
+	OnboardingCreate: DiscordAuditLogEvent.ONBOARDING_CREATE,
+	OnboardingUpdate: DiscordAuditLogEvent.ONBOARDING_UPDATE,
+	HomeSettingsCreate: DiscordAuditLogEvent.HOME_SETTINGS_CREATE,
+	HomeSettingsUpdate: DiscordAuditLogEvent.HOME_SETTINGS_UPDATE,
+	VoiceChannelStatusCreate: DiscordAuditLogEvent.VOICE_CHANNEL_STATUS_CREATE,
+	VoiceChannelStatusDelete: DiscordAuditLogEvent.VOICE_CHANNEL_STATUS_DELETE
+} as const satisfies Record<string, ObjectValues<typeof DiscordAuditLogEvent>>;
+
 
 /**
  * The client events that carry exactly one interaction, each emitted alongside `InteractionCreate`.

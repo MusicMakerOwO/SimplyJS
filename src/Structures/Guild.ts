@@ -352,7 +352,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	async fetchAuditLogs(options: {
 		/** Entries from a specific user ID */
 		userId?: string;
-		/** Entries for a specific audit log event */
+		/** Entries for a specific audit log event, from {@link AuditLogEvents} or {@link DiscordAuditLogEvent} */
 		actionType?: ObjectValues<typeof DiscordAuditLogEvent>;
 		/** Entries with ID less than a specific audit log entry ID */
 		before?: string;
