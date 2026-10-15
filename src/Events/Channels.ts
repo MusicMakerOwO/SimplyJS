@@ -10,7 +10,7 @@ export const ChannelCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const channel = guild.channels.upsert(data);
-		client.emit(ClientEvents.ChannelCreate, channel);
+		client.emit(ClientEvents.ChannelCreate, guild, channel);
 	}
 });
 
@@ -20,7 +20,7 @@ export const ChannelDelete = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const saved = guild.channels.get(data.id);
-		client.emit(ClientEvents.ChannelDelete, saved ?? data);
+		client.emit(ClientEvents.ChannelDelete, guild, saved ?? data);
 		guild.channels.delete(data.id);
 	}
 });
@@ -32,7 +32,7 @@ export const ChannelUpdate = defineEvent({
 		if (!guild) return;
 		const oldChannel = guild.channels.get(data.id)?.clone();
 		const newChannel = guild.channels.upsert(data);
-		client.emit(ClientEvents.ChannelUpdate, oldChannel, newChannel);
+		client.emit(ClientEvents.ChannelUpdate, guild, oldChannel, newChannel);
 	}
 });
 /**

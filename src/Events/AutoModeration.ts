@@ -9,7 +9,7 @@ export const AutoModerationRuleCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
 		const rule = guild.autoModerationRules.upsert(data);
-		client.emit(ClientEvents.AutoModerationRuleCreate, rule);
+		client.emit(ClientEvents.AutoModerationRuleCreate, guild, rule);
 	}
 });
 
@@ -20,7 +20,7 @@ export const AutoModerationRuleUpdate = defineEvent({
 		if (!guild) return;
 		const oldRule = guild.autoModerationRules.get(data.id)?.clone();
 		const newRule = guild.autoModerationRules.upsert(data);
-		client.emit(ClientEvents.AutoModerationRuleUpdate, oldRule, newRule);
+		client.emit(ClientEvents.AutoModerationRuleUpdate, guild, oldRule, newRule);
 	}
 });
 
@@ -31,7 +31,7 @@ export const AutoModerationRuleDelete = defineEvent({
 		if (!guild) return;
 		// Rules are only cached lazily, so a miss here is expected - fall back to the raw payload
 		const saved = guild.autoModerationRules.get(data.id);
-		client.emit(ClientEvents.AutoModerationRuleDelete, saved ?? data);
+		client.emit(ClientEvents.AutoModerationRuleDelete, guild, saved ?? data);
 		guild.autoModerationRules.delete(data.id);
 	}
 });

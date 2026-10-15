@@ -19,7 +19,7 @@ export const PresenceUpdate = defineEvent({
 
 		const oldPresence = guild.presences.get(data.user.id)?.clone();
 		const newPresence = guild.presences.upsert(data);
-		client.emit(ClientEvents.PresenceUpdate, oldPresence, newPresence);
+		client.emit(ClientEvents.PresenceUpdate, guild, oldPresence, newPresence);
 
 		if (data.status === Status.OFFLINE) guild.presences.delete(data.user.id);
 	}

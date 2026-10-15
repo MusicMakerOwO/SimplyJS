@@ -7,8 +7,6 @@ import type {
 	DiscordEmoji,
 	DiscordGuild,
 	DiscordGuildScheduledEvent,
-	DiscordRole,
-	DiscordSticker, DiscordUser
 } from "./DiscordAPITypes.js";
 import { DiscordAuditLogEvent } from "./DiscordAPITypes.js";
 import type { ObjectValues } from "./HelperTypes.js";
@@ -236,17 +234,17 @@ export const ClientEvents = {
 
 	/**
 	 * Fired when a guild channel is created.
-	 * Listener arguments: `channel` ({@link Channel}).
+	 * Listener arguments: `guild` ({@link Guild}), `channel` ({@link Channel}).
 	 */
 	ChannelCreate: "ChannelCreate",
 	/**
 	 * Fired when a guild channel changes.
-	 * Listener arguments: `oldChannel` ({@link Channel} | `undefined`), `newChannel` ({@link Channel}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldChannel` ({@link Channel} | `undefined`), `newChannel` ({@link Channel}).
 	 */
 	ChannelUpdate: "ChannelUpdate",
 	/**
 	 * Fired when a guild channel is deleted.
-	 * Listener arguments: `channel` ({@link Channel} | {@link DiscordChannel}).
+	 * Listener arguments: `guild` ({@link Guild}), `channel` ({@link Channel} | {@link DiscordChannel}).
 	 */
 	ChannelDelete: "ChannelDelete",
 	/**
@@ -257,24 +255,24 @@ export const ClientEvents = {
 
 	/**
 	 * Fired when a thread is created, or when the client is added to a thread it could not previously see.
-	 * Listener arguments: `thread` ({@link Channel}).
+	 * Listener arguments: `guild` ({@link Guild}), `thread` ({@link Channel}).
 	 */
 	ThreadCreate: "ThreadCreate",
 	/**
 	 * Fired when a thread changes, such as being archived, locked, or renamed.
-	 * Listener arguments: `oldThread` ({@link Channel} | `undefined`), `newThread` ({@link Channel}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldThread` ({@link Channel} | `undefined`), `newThread` ({@link Channel}).
 	 */
 	ThreadUpdate: "ThreadUpdate",
 	/**
 	 * Fired when a thread is deleted. The gateway only sends a partial channel here, so uncached
 	 * threads are emitted as raw data.
-	 * Listener arguments: `thread` ({@link Channel} | {@link DiscordChannel}).
+	 * Listener arguments: `guild` ({@link Guild}), `thread` ({@link Channel} | {@link DiscordChannel}).
 	 */
 	ThreadDelete: "ThreadDelete",
 	/**
 	 * Fired when the current user's own thread membership changes, such as after joining a thread
 	 * or changing its notification settings. Only ever fires for the current user.
-	 * Listener arguments: `member` ({@link ThreadMember}).
+	 * Listener arguments: `guild` ({@link Guild}), `member` ({@link ThreadMember}).
 	 */
 	ThreadMemberUpdate: "ThreadMemberUpdate",
 	/**
@@ -293,17 +291,25 @@ export const ClientEvents = {
 
 	/**
 	 * Fired when a member joins a guild.
-	 * Listener arguments: `member` ({@link Member}).
+	 * Listener arguments: `guild` ({@link Guild}), `member` ({@link Member}).
 	 */
 	MemberCreate: "MemberCreate",
 	/**
 	 * Fired when guild member data changes.
-	 * Listener arguments: `oldMember` ({@link Member} | `undefined`), `newMember` ({@link Member}).
+	 *
+	 * Meant for the guild profile: nickname, roles, server avatar, timeout. Account changes
+	 * (username, global avatar) arrive here too, once per guild the user shares with the bot, but
+	 * all of those guilds' members share one cached {@link User}. The first guild's update patches
+	 * it, so only that dispatch's `oldMember.user` shows the old account; later guilds see the new
+	 * values on both sides.
+	 * Listener arguments: `guild` ({@link Guild}), `oldMember` ({@link Member} | `undefined`), `newMember` ({@link Member}).
 	 */
 	MemberUpdate: "MemberUpdate",
 	/**
 	 * Fired when a member leaves or is removed from a guild.
-	 * Listener arguments: `member` ({@link Member} | {@link DiscordUser}).
+	 * Listener arguments: `guild` ({@link Guild}), `member` ({@link Member} | {@link UncachedMember}).
+	 *
+	 * The cached member is emitted when there is one, and an {@link UncachedMember} otherwise.
 	 */
 	MemberDelete: "MemberDelete",
 	/**
@@ -325,7 +331,10 @@ export const ClientEvents = {
 	EmojiUpdate: "EmojiUpdate",
 	/**
 	 * Fired when a guild emoji sync removes emojis.
-	 * Listener arguments: `guild` ({@link Guild}), `emoji` ({@link Emoji} | {@link DiscordEmoji}).
+	 * Listener arguments: `guild` ({@link Guild}), `emoji` ({@link Emoji}).
+	 *
+	 * Deletions are derived by diffing Discord's full emoji list against the cache, so only cached
+	 * emojis can be reported as deleted.
 	 */
 	EmojiDelete: "EmojiDelete",
 
@@ -341,7 +350,10 @@ export const ClientEvents = {
 	StickerUpdate: "StickerUpdate",
 	/**
 	 * Fired when a guild sticker sync removes stickers.
-	 * Listener arguments: `guild` ({@link Guild}), `sticker` ({@link Sticker} | {@link DiscordSticker}).
+	 * Listener arguments: `guild` ({@link Guild}), `sticker` ({@link Sticker}).
+	 *
+	 * Deletions are derived by diffing Discord's full sticker list against the cache, so only cached
+	 * stickers can be reported as deleted.
 	 */
 	StickerDelete: "StickerDelete",
 
@@ -364,7 +376,7 @@ export const ClientEvents = {
 	 * The gateway payload carries ids only, so `sound` falls back to a bare `{ soundId }` object
 	 * when it was not cached.
 	 * Requires the `GuildExpressions` intent.
-	 * Listener arguments: `guild` ({@link Guild}), `sound` ({@link SoundboardSound} | `{ soundId: string }`).
+	 * Listener arguments: `guild` ({@link Guild}), `sound` ({@link SoundboardSound} | {@link UncachedSoundboardSound}).
 	 */
 	SoundboardSoundDelete: "SoundboardSoundDelete",
 	/**
@@ -379,35 +391,38 @@ export const ClientEvents = {
 
 	/**
 	 * Fired when a role is created in a guild.
-	 * Listener arguments: `role` ({@link Role}).
+	 * Listener arguments: `guild` ({@link Guild}), `role` ({@link Role}).
 	 */
 	RoleCreate: "RoleCreate",
 	/**
 	 * Fired when role data changes.
-	 * Listener arguments: `oldRole` ({@link Role} | `undefined`), `newRole` ({@link Role}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldRole` ({@link Role} | `undefined`), `newRole` ({@link Role}).
 	 */
 	RoleUpdate: "RoleUpdate",
 	/**
 	 * Fired when a role is deleted from a guild.
-	 * Listener arguments: `role` ({@link Role} | {@link DiscordRole}).
+	 * Listener arguments: `guild` ({@link Guild}), `role` ({@link Role} | {@link UncachedRole}).
+	 *
+	 * The cached role is emitted when there is one, and an {@link UncachedRole} otherwise, since
+	 * `GUILD_ROLE_DELETE` carries only ids.
 	 */
 	RoleDelete: "RoleDelete",
 
 	/**
 	 * Fired when an auto moderation rule is created in a guild.
-	 * Listener arguments: `rule` ({@link AutoModerationRule}).
+	 * Listener arguments: `guild` ({@link Guild}), `rule` ({@link AutoModerationRule}).
 	 */
 	AutoModerationRuleCreate: "AutoModerationRuleCreate",
 	/**
 	 * Fired when an auto moderation rule is updated.
 	 * `oldRule` is `undefined` when the rule was not already cached.
-	 * Listener arguments: `oldRule` ({@link AutoModerationRule} | `undefined`), `newRule` ({@link AutoModerationRule}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldRule` ({@link AutoModerationRule} | `undefined`), `newRule` ({@link AutoModerationRule}).
 	 */
 	AutoModerationRuleUpdate: "AutoModerationRuleUpdate",
 	/**
 	 * Fired when an auto moderation rule is deleted from a guild.
 	 * Falls back to the raw gateway payload when the rule was not cached.
-	 * Listener arguments: `rule` ({@link AutoModerationRule} | {@link DiscordAutoModerationRule}).
+	 * Listener arguments: `guild` ({@link Guild}), `rule` ({@link AutoModerationRule} | {@link DiscordAutoModerationRule}).
 	 */
 	AutoModerationRuleDelete: "AutoModerationRuleDelete",
 	/**
@@ -420,35 +435,35 @@ export const ClientEvents = {
 	/**
 	 * Fired when a scheduled event is created in a guild.
 	 * Requires the `GuildScheduledEvents` intent.
-	 * Listener arguments: `event` ({@link GuildScheduledEvent}).
+	 * Listener arguments: `guild` ({@link Guild}), `event` ({@link GuildScheduledEvent}).
 	 */
 	GuildScheduledEventCreate: "GuildScheduledEventCreate",
 	/**
 	 * Fired when a scheduled event is updated, including when it starts, ends, or is cancelled.
 	 * `oldEvent` is `undefined` when the event was not already cached.
 	 * Requires the `GuildScheduledEvents` intent.
-	 * Listener arguments: `oldEvent` ({@link GuildScheduledEvent} | `undefined`), `newEvent` ({@link GuildScheduledEvent}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldEvent` ({@link GuildScheduledEvent} | `undefined`), `newEvent` ({@link GuildScheduledEvent}).
 	 */
 	GuildScheduledEventUpdate: "GuildScheduledEventUpdate",
 	/**
 	 * Fired when a scheduled event is deleted from a guild.
 	 * Falls back to the raw gateway payload when the event was not cached.
 	 * Requires the `GuildScheduledEvents` intent.
-	 * Listener arguments: `event` ({@link GuildScheduledEvent} | {@link DiscordGuildScheduledEvent}).
+	 * Listener arguments: `guild` ({@link Guild}), `event` ({@link GuildScheduledEvent} | {@link DiscordGuildScheduledEvent}).
 	 */
 	GuildScheduledEventDelete: "GuildScheduledEventDelete",
 	/**
 	 * Fired when a user subscribes to a scheduled event.
 	 * `event` and `user` fall back to a bare `{ id }` object when not present in the local cache.
 	 * Requires the `GuildScheduledEvents` intent.
-	 * Listener arguments: `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`), `guild` ({@link Guild}).
+	 * Listener arguments: `guild` ({@link Guild}), `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`).
 	 */
 	GuildScheduledEventUserAdd: "GuildScheduledEventUserAdd",
 	/**
 	 * Fired when a user unsubscribes from a scheduled event.
 	 * `event` and `user` fall back to a bare `{ id }` object when not present in the local cache.
 	 * Requires the `GuildScheduledEvents` intent.
-	 * Listener arguments: `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`), `guild` ({@link Guild}).
+	 * Listener arguments: `guild` ({@link Guild}), `event` ({@link GuildScheduledEvent} | `{ id: string }`), `user` ({@link User} | `{ id: string }`).
 	 */
 	GuildScheduledEventUserRemove: "GuildScheduledEventUserRemove",
 
@@ -456,7 +471,7 @@ export const ClientEvents = {
 	 * Fired when an integration is added to a guild, such as a Twitch or YouTube subscriber sync
 	 * or a newly installed bot.
 	 * Requires the `GuildIntegrations` intent.
-	 * Listener arguments: `integration` ({@link Integration}).
+	 * Listener arguments: `guild` ({@link Guild}), `integration` ({@link Integration}).
 	 */
 	IntegrationCreate: "IntegrationCreate",
 	/**
@@ -464,7 +479,7 @@ export const ClientEvents = {
 	 * `oldIntegration` is `undefined` when the integration was not already cached, which is common
 	 * because integrations are never seeded from `GUILD_CREATE`.
 	 * Requires the `GuildIntegrations` intent.
-	 * Listener arguments: `oldIntegration` ({@link Integration} | `undefined`), `newIntegration` ({@link Integration}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldIntegration` ({@link Integration} | `undefined`), `newIntegration` ({@link Integration}).
 	 */
 	IntegrationUpdate: "IntegrationUpdate",
 	/**
@@ -472,7 +487,7 @@ export const ClientEvents = {
 	 * The gateway payload carries ids only, so `integration` falls back to a bare `{ id }` object
 	 * when it was not cached. `applicationId` is only present for `discord` integrations.
 	 * Requires the `GuildIntegrations` intent.
-	 * Listener arguments: `integration` ({@link Integration} | `{ id: string }`), `guild` ({@link Guild}), `applicationId` (`string` | `undefined`).
+	 * Listener arguments: `guild` ({@link Guild}), `integration` ({@link Integration} | `{ id: string }`), `applicationId` (`string` | `undefined`).
 	 */
 	IntegrationDelete: "IntegrationDelete",
 	/**
@@ -546,7 +561,7 @@ export const ClientEvents = {
 	 * `oldPresence` is a detached snapshot taken before the update, not a live cache entry, so it
 	 * can be diffed against `newPresence`. It is `undefined` the first time a user is seen. A
 	 * presence that goes offline is emitted and then dropped from the cache.
-	 * Listener arguments: `oldPresence` ({@link Presence} | `undefined`), `newPresence` ({@link Presence}).
+	 * Listener arguments: `guild` ({@link Guild}), `oldPresence` ({@link Presence} | `undefined`), `newPresence` ({@link Presence}).
 	 */
 	PresenceUpdate: "PresenceUpdate",
 
@@ -745,6 +760,34 @@ export const InteractionEvents = [
 /** One of the {@link InteractionEvents} */
 export type InteractionEvent = (typeof InteractionEvents)[number];
 
+/**
+ * A deleted role that was not cached. `GUILD_ROLE_DELETE` carries only ids, so this is all that
+ * is known about it.
+ */
+export type UncachedRole = {
+	id: string;
+	guildId: string;
+};
+
+/**
+ * A departed member who was not cached. `GUILD_MEMBER_REMOVE` carries the user but no member
+ * data; the user is cached on `client.users`.
+ */
+export type UncachedMember = {
+	id: string;
+	guildId: string;
+	user: User;
+};
+
+/**
+ * A deleted soundboard sound that was not cached. `GUILD_SOUNDBOARD_SOUND_DELETE` carries only
+ * ids, so this is all that is known about it.
+ */
+export type UncachedSoundboardSound = {
+	soundId: string;
+	guildId: string;
+};
+
 export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
 	[ClientEvents.Resumed]: [];
@@ -755,58 +798,58 @@ export type ClientEventMap = {
 	[ClientEvents.GuildUpdate]: [oldGuild: Guild | undefined, newGuild: Guild];
 	[ClientEvents.GuildDelete]: [guild: Guild | DiscordGuild];
 
-	[ClientEvents.ChannelCreate]: [channel: Channel];
-	[ClientEvents.ChannelUpdate]: [oldChannel: Channel | undefined, newChannel: Channel];
-	[ClientEvents.ChannelDelete]: [channel: Channel | DiscordChannel];
+	[ClientEvents.ChannelCreate]: [guild: Guild, channel: Channel];
+	[ClientEvents.ChannelUpdate]: [guild: Guild, oldChannel: Channel | undefined, newChannel: Channel];
+	[ClientEvents.ChannelDelete]: [guild: Guild, channel: Channel | DiscordChannel];
 	[ClientEvents.ChannelPinsUpdate]: [payload: {
 		guild: Guild | { id: string } | null,
 		channel: Channel | { id: string },
 		lastPinTimestamp: string | null
 	}];
 
-	[ClientEvents.ThreadCreate]: [thread: Channel];
-	[ClientEvents.ThreadUpdate]: [oldThread: Channel | undefined, newThread: Channel];
-	[ClientEvents.ThreadDelete]: [thread: Channel | DiscordChannel];
-	[ClientEvents.ThreadMemberUpdate]: [member: ThreadMember];
+	[ClientEvents.ThreadCreate]: [guild: Guild, thread: Channel];
+	[ClientEvents.ThreadUpdate]: [guild: Guild, oldThread: Channel | undefined, newThread: Channel];
+	[ClientEvents.ThreadDelete]: [guild: Guild, thread: Channel | DiscordChannel];
+	[ClientEvents.ThreadMemberUpdate]: [guild: Guild, member: ThreadMember];
 	[ClientEvents.ThreadMembersUpdate]: [payload: ThreadMembersUpdatePayload];
 	[ClientEvents.ThreadListSync]: [payload: ThreadListSyncPayload];
 
-	[ClientEvents.MemberCreate]: [member: Member];
-	[ClientEvents.MemberUpdate]: [oldMember: Member | undefined, newMember: Member];
-	[ClientEvents.MemberDelete]: [member: Member | DiscordUser];
+	[ClientEvents.MemberCreate]: [guild: Guild, member: Member];
+	[ClientEvents.MemberUpdate]: [guild: Guild, oldMember: Member | undefined, newMember: Member];
+	[ClientEvents.MemberDelete]: [guild: Guild, member: Member | UncachedMember];
 	[ClientEvents.GuildMembersChunk]: [payload: GuildMembersChunkPayload];
 
 	[ClientEvents.EmojiCreate]: [guild: Guild, emoji: Emoji];
 	[ClientEvents.EmojiUpdate]: [guild: Guild, oldEmoji: Emoji | undefined, newEmoji: Emoji];
-	[ClientEvents.EmojiDelete]: [guild: Guild, emoji: Emoji | DiscordEmoji];
+	[ClientEvents.EmojiDelete]: [guild: Guild, emoji: Emoji];
 
 	[ClientEvents.StickerCreate]: [guild: Guild, sticker: Sticker];
 	[ClientEvents.StickerUpdate]: [guild: Guild, oldSticker: Sticker | undefined, newSticker: Sticker];
-	[ClientEvents.StickerDelete]: [guild: Guild, sticker: Sticker | DiscordSticker];
+	[ClientEvents.StickerDelete]: [guild: Guild, sticker: Sticker];
 
 	[ClientEvents.SoundboardSoundCreate]: [guild: Guild, sound: SoundboardSound];
 	[ClientEvents.SoundboardSoundUpdate]: [guild: Guild, oldSound: SoundboardSound | undefined, newSound: SoundboardSound];
-	[ClientEvents.SoundboardSoundDelete]: [guild: Guild, sound: SoundboardSound | { soundId: string }];
+	[ClientEvents.SoundboardSoundDelete]: [guild: Guild, sound: SoundboardSound | UncachedSoundboardSound];
 	[ClientEvents.SoundboardSoundsUpdate]: [guild: Guild, sounds: SoundboardSound[]];
 
-	[ClientEvents.RoleCreate]: [role: Role];
-	[ClientEvents.RoleUpdate]: [oldRole: Role | undefined, newRole: Role];
-	[ClientEvents.RoleDelete]: [role: Role | DiscordRole];
+	[ClientEvents.RoleCreate]: [guild: Guild, role: Role];
+	[ClientEvents.RoleUpdate]: [guild: Guild, oldRole: Role | undefined, newRole: Role];
+	[ClientEvents.RoleDelete]: [guild: Guild, role: Role | UncachedRole];
 
-	[ClientEvents.AutoModerationRuleCreate]: [rule: AutoModerationRule];
-	[ClientEvents.AutoModerationRuleUpdate]: [oldRule: AutoModerationRule | undefined, newRule: AutoModerationRule];
-	[ClientEvents.AutoModerationRuleDelete]: [rule: AutoModerationRule | DiscordAutoModerationRule];
+	[ClientEvents.AutoModerationRuleCreate]: [guild: Guild, rule: AutoModerationRule];
+	[ClientEvents.AutoModerationRuleUpdate]: [guild: Guild, oldRule: AutoModerationRule | undefined, newRule: AutoModerationRule];
+	[ClientEvents.AutoModerationRuleDelete]: [guild: Guild, rule: AutoModerationRule | DiscordAutoModerationRule];
 
-	[ClientEvents.GuildScheduledEventCreate]: [event: GuildScheduledEvent];
-	[ClientEvents.GuildScheduledEventUpdate]: [oldEvent: GuildScheduledEvent | undefined, newEvent: GuildScheduledEvent];
-	[ClientEvents.GuildScheduledEventDelete]: [event: GuildScheduledEvent | DiscordGuildScheduledEvent];
-	[ClientEvents.GuildScheduledEventUserAdd]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
-	[ClientEvents.GuildScheduledEventUserRemove]: [event: GuildScheduledEvent | { id: string }, user: User | { id: string }, guild: Guild];
+	[ClientEvents.GuildScheduledEventCreate]: [guild: Guild, event: GuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventUpdate]: [guild: Guild, oldEvent: GuildScheduledEvent | undefined, newEvent: GuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventDelete]: [guild: Guild, event: GuildScheduledEvent | DiscordGuildScheduledEvent];
+	[ClientEvents.GuildScheduledEventUserAdd]: [guild: Guild, event: GuildScheduledEvent | { id: string }, user: User | { id: string }];
+	[ClientEvents.GuildScheduledEventUserRemove]: [guild: Guild, event: GuildScheduledEvent | { id: string }, user: User | { id: string }];
 	[ClientEvents.AutoModerationActionExecution]: [payload: AutoModerationActionExecutionPayload];
 
-	[ClientEvents.IntegrationCreate]: [integration: Integration];
-	[ClientEvents.IntegrationUpdate]: [oldIntegration: Integration | undefined, newIntegration: Integration];
-	[ClientEvents.IntegrationDelete]: [integration: Integration | { id: string }, guild: Guild, applicationId?: string];
+	[ClientEvents.IntegrationCreate]: [guild: Guild, integration: Integration];
+	[ClientEvents.IntegrationUpdate]: [guild: Guild, oldIntegration: Integration | undefined, newIntegration: Integration];
+	[ClientEvents.IntegrationDelete]: [guild: Guild, integration: Integration | { id: string }, applicationId?: string];
 	[ClientEvents.GuildIntegrationsUpdate]: [guild: Guild];
 
 	[ClientEvents.MessageCreate]: [message: Message];
@@ -867,7 +910,7 @@ export type ClientEventMap = {
 		answerId: number
 	}];
 
-	[ClientEvents.PresenceUpdate]: [oldPresence: Presence | undefined, newPresence: Presence];
+	[ClientEvents.PresenceUpdate]: [guild: Guild, oldPresence: Presence | undefined, newPresence: Presence];
 
 	[ClientEvents.WebhooksUpdate]: [payload: {
 		guild: Guild | { id: string },

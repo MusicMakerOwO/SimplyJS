@@ -11,7 +11,7 @@ export const ThreadCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const thread = guild.channels.upsert(data);
-		client.emit(ClientEvents.ThreadCreate, thread);
+		client.emit(ClientEvents.ThreadCreate, guild, thread);
 	}
 });
 
@@ -22,7 +22,7 @@ export const ThreadUpdate = defineEvent({
 		if (!guild) return;
 		const oldThread = guild.channels.get(data.id)?.clone();
 		const newThread = guild.channels.upsert(data);
-		client.emit(ClientEvents.ThreadUpdate, oldThread, newThread);
+		client.emit(ClientEvents.ThreadUpdate, guild, oldThread, newThread);
 	}
 });
 
@@ -32,7 +32,7 @@ export const ThreadDelete = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const saved = guild.channels.get(data.id);
-		client.emit(ClientEvents.ThreadDelete, saved ?? data);
+		client.emit(ClientEvents.ThreadDelete, guild, saved ?? data);
 		guild.channels.delete(data.id);
 	}
 });
@@ -52,7 +52,7 @@ export const ThreadMemberUpdate = defineEvent({
 		if (!(thread instanceof GuildThreadChannel)) return;
 
 		thread.member = data;
-		client.emit(ClientEvents.ThreadMemberUpdate, thread.members.upsert(data));
+		client.emit(ClientEvents.ThreadMemberUpdate, guild, thread.members.upsert(data));
 	}
 });
 

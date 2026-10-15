@@ -9,7 +9,7 @@ export const GuildScheduledEventCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
 		const scheduledEvent = guild.scheduledEvents.upsert(data);
-		client.emit(ClientEvents.GuildScheduledEventCreate, scheduledEvent);
+		client.emit(ClientEvents.GuildScheduledEventCreate, guild, scheduledEvent);
 	}
 });
 
@@ -21,7 +21,7 @@ export const GuildScheduledEventUpdate = defineEvent({
 		if (!guild) return;
 		const oldEvent = guild.scheduledEvents.get(data.id)?.clone();
 		const newEvent = guild.scheduledEvents.upsert(data);
-		client.emit(ClientEvents.GuildScheduledEventUpdate, oldEvent, newEvent);
+		client.emit(ClientEvents.GuildScheduledEventUpdate, guild, oldEvent, newEvent);
 	}
 });
 
@@ -32,7 +32,7 @@ export const GuildScheduledEventDelete = defineEvent({
 		if (!guild) return;
 		// The event may never have been cached if it was created while disconnected - fall back to the raw payload
 		const saved = guild.scheduledEvents.get(data.id);
-		client.emit(ClientEvents.GuildScheduledEventDelete, saved ?? data);
+		client.emit(ClientEvents.GuildScheduledEventDelete, guild, saved ?? data);
 		guild.scheduledEvents.delete(data.id);
 	}
 });
@@ -53,7 +53,7 @@ export const GuildScheduledEventUserAdd = defineEvent({
 		// rather than inventing a count that started from zero
 		if (scheduledEvent?.userCount !== undefined) scheduledEvent.userCount++;
 
-		client.emit(ClientEvents.GuildScheduledEventUserAdd, scheduledEvent ?? { id: data.guild_scheduled_event_id }, user, guild);
+		client.emit(ClientEvents.GuildScheduledEventUserAdd, guild, scheduledEvent ?? { id: data.guild_scheduled_event_id }, user);
 	}
 });
 
@@ -71,6 +71,6 @@ export const GuildScheduledEventUserRemove = defineEvent({
 
 		if (scheduledEvent?.userCount !== undefined) scheduledEvent.userCount = Math.max(0, scheduledEvent.userCount - 1);
 
-		client.emit(ClientEvents.GuildScheduledEventUserRemove, scheduledEvent ?? { id: data.guild_scheduled_event_id }, user, guild);
+		client.emit(ClientEvents.GuildScheduledEventUserRemove, guild, scheduledEvent ?? { id: data.guild_scheduled_event_id }, user);
 	}
 });

@@ -14,7 +14,7 @@ export const IntegrationCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
 		const integration = guild.integrations.upsert(data);
-		client.emit(ClientEvents.IntegrationCreate, integration);
+		client.emit(ClientEvents.IntegrationCreate, guild, integration);
 	}
 });
 
@@ -25,7 +25,7 @@ export const IntegrationUpdate = defineEvent({
 		if (!guild) return;
 		const oldIntegration = guild.integrations.get(data.id)?.clone();
 		const newIntegration = guild.integrations.upsert(data);
-		client.emit(ClientEvents.IntegrationUpdate, oldIntegration, newIntegration);
+		client.emit(ClientEvents.IntegrationUpdate, guild, oldIntegration, newIntegration);
 	}
 });
 
@@ -40,7 +40,7 @@ export const IntegrationDelete = defineEvent({
 		const guild = client.guilds.get(data.guild_id);
 		if (!guild) return;
 		const saved = guild.integrations.get(data.id);
-		client.emit(ClientEvents.IntegrationDelete, saved ?? { id: data.id }, guild, data.application_id);
+		client.emit(ClientEvents.IntegrationDelete, guild, saved ?? { id: data.id }, data.application_id);
 		guild.integrations.delete(data.id);
 	}
 });

@@ -12,7 +12,7 @@ export const MemberCreate = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const member = guild.members.upsert(data);
-		client.emit(ClientEvents.MemberCreate, member);
+		client.emit(ClientEvents.MemberCreate, guild, member);
 	}
 });
 
@@ -23,7 +23,11 @@ export const MemberDelete = defineEvent({
 		const guild = client.guilds.get(data.guild_id!);
 		if (!guild) return;
 		const saved = guild.members.get(data.user.id);
-		client.emit(ClientEvents.MemberDelete, saved ?? data.user);
+		client.emit(ClientEvents.MemberDelete, guild, saved ?? {
+			id: data.user.id,
+			guildId: guild.id,
+			user: client.users.upsert(data.user)
+		});
 		guild.members.delete(data.user.id);
 	}
 });
@@ -36,7 +40,7 @@ export const MemberUpdate = defineEvent({
 		if (!guild) return;
 		const oldMember = guild.members.get(data.user.id)?.clone();
 		const newMember = guild.members.upsert(data);
-		client.emit(ClientEvents.MemberUpdate, oldMember, newMember);
+		client.emit(ClientEvents.MemberUpdate, guild, oldMember, newMember);
 	}
 });
 

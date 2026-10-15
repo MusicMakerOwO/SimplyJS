@@ -42,7 +42,7 @@ export const SoundboardSoundUpdate = defineEvent({
  * Fires when a soundboard sound is removed from a guild.
  *
  * The payload carries ids only, so the cached structure is emitted when there is one and a bare
- * `{ soundId }` object otherwise. The event is emitted before the cache eviction so listeners can
+ * `{ soundId, guildId }` object otherwise. The event is emitted before the cache eviction so listeners can
  * still resolve the sound.
  */
 export const SoundboardSoundDelete = defineEvent({
@@ -52,7 +52,7 @@ export const SoundboardSoundDelete = defineEvent({
 		if (!guild) return;
 
 		const saved = guild.soundboardSounds.get(data.sound_id);
-		client.emit(ClientEvents.SoundboardSoundDelete, guild, saved ?? { soundId: data.sound_id });
+		client.emit(ClientEvents.SoundboardSoundDelete, guild, saved ?? { soundId: data.sound_id, guildId: guild.id });
 		guild.soundboardSounds.delete(data.sound_id);
 	}
 });
