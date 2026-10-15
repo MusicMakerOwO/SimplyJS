@@ -15,7 +15,13 @@ import { ObjectValues } from "../Types/HelperTypes.js";
 import { Channel, JSONObject } from "../Types/index.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
 
-/** Cache of a single guild's {@link Channel}s, including threads. */
+/**
+ * Cache of a single guild's {@link Channel}s, including threads.
+ *
+ * Seeded from the `GUILD_CREATE` payload and kept current by the `Channel*` and `Thread*` gateway
+ * events, so iterating it is the normal way to enumerate a guild's channels.
+ * {@link ChannelCache.fetchAll} asks Discord directly, for a check or a recovery path.
+ */
 export class ChannelCache extends GuildScopedCache<string, Channel, DiscordChannel> {
 	constructor(client: Client, guild: Guild) {
 		super(client, guild);
@@ -33,6 +39,16 @@ export class ChannelCache extends GuildScopedCache<string, Channel, DiscordChann
 	async fetch(id: string): Promise<Channel> {
 		const fetched = await this.client.rest.get<DiscordChannel>(`/channels/${id}`);
 		return this.upsert(fetched);
+	}
+
+	/**
+	 * Fetches every channel in this guild and caches them. Threads are not included - see
+	 * `ThreadManager.fetchActive()` - and channels missing from the response are not evicted.
+	 * @see https://docs.discord.com/developers/resources/guild#get-guild-channels
+	 */
+	async fetchAll(): Promise<Channel[]> {
+		const fetched = await this.client.rest.get<DiscordChannel[]>(`/guilds/${this.guild.id}/channels`);
+		return fetched.map(channel => this.upsert(channel));
 	}
 
 	/**
