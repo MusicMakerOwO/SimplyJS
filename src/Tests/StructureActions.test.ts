@@ -18,6 +18,7 @@ import {
 	DiscordChannelTypes,
 	DiscordEmoji,
 	DiscordGuild,
+	DiscordIntegration,
 	DiscordInvite, DiscordInviteTypes,
 	DiscordMember,
 	DiscordOverwrite,
@@ -29,6 +30,7 @@ import {
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
+import { AuditLogEvents } from "../Types/SimplyJSTypes.js";
 import { DiscordMessage, MessageTypes } from "../Types/MessageComponents.js";
 import { CreateChannel } from "../Factory/CreateChannel.js";
 import { ChannelPermissionManager } from "../Managers/ChannelPermissionManager.js";
@@ -2354,5 +2356,205 @@ describe("SoundboardSound action methods", () => {
 
 		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/soundboard-sounds/sound-3`);
 		expect(guild.soundboardSounds.get("sound-3")).toBe(fetched);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// CDN URLs
+// ---------------------------------------------------------------------------
+
+describe("expression CDN URLs", () => {
+	let client: Client;
+	let guild: Guild;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+	});
+
+	it("Emoji.imageURL() serves a gif for an animated emoji unless asked not to", () => {
+		const emoji = new Emoji(client, guild, { ...emojiData("emoji-7"), animated: true });
+
+		expect(emoji.imageURL()).toBe("https://cdn.discordapp.com/emojis/emoji-7.gif");
+		expect(emoji.imageURL(false)).toBe("https://cdn.discordapp.com/emojis/emoji-7.png");
+	});
+
+	it("Emoji.imageURL() serves a png for a static emoji", () => {
+		const emoji = new Emoji(client, guild, { ...emojiData("emoji-8"), animated: false });
+
+		expect(emoji.imageURL()).toBe("https://cdn.discordapp.com/emojis/emoji-8.png");
+	});
+
+	it("Sticker.imageURL() picks the host and extension from the format, and has none for Lottie", () => {
+		const sticker = (format: ObjectValues<typeof DiscordStickerFormatTypes>) =>
+			new Sticker(client, guild, { ...stickerData("sticker-9"), format_type: format });
+
+		expect(sticker(DiscordStickerFormatTypes.PNG).imageURL()).toBe("https://cdn.discordapp.com/stickers/sticker-9.png");
+		expect(sticker(DiscordStickerFormatTypes.APNG).imageURL()).toBe("https://cdn.discordapp.com/stickers/sticker-9.png");
+		expect(sticker(DiscordStickerFormatTypes.GIF).imageURL()).toBe("https://media.discordapp.net/stickers/sticker-9.gif");
+		expect(sticker(DiscordStickerFormatTypes.LOTTIE).imageURL()).toBeNull();
+	});
+
+	it("SoundboardSound.soundURL() addresses the sound by its id", () => {
+		expect(makeSoundboardSound(client, guild, "sound-4").soundURL()).toBe("https://cdn.discordapp.com/soundboard-sounds/sound-4");
+	});
+});
+
+describe("profile and guild CDN URLs", () => {
+	let client: Client;
+	let guild: Guild;
+
+	beforeEach(() => {
+		client = makeClient();
+		guild = makeGuildStructure(client);
+	});
+
+	it("Role.iconURL() serves the custom icon as a png, and has none for an emoji or iconless role", () => {
+		expect(new Role(client, { ...roleData("role-5"), icon: "icon-hash" }, guild).iconURL())
+			.toBe("https://cdn.discordapp.com/role-icons/role-5/icon-hash.png?size=1024");
+		expect(new Role(client, { ...roleData(), icon: null, unicode_emoji: "🔥" }, guild).iconURL()).toBeNull();
+		expect(makeRole(client, guild).iconURL()).toBeNull();
+	});
+
+	it("Member.avatarURL() serves the guild avatar, animated unless asked not to", () => {
+		const member = new Member(client, guild, { ...memberData("user-3"), avatar: "a_guild-avatar" });
+
+		expect(member.avatarURL()).toBe("https://cdn.discordapp.com/guilds/guild-1/users/user-3/avatars/a_guild-avatar.gif?size=1024");
+		expect(member.avatarURL(false)).toBe("https://cdn.discordapp.com/guilds/guild-1/users/user-3/avatars/a_guild-avatar.png?size=1024");
+	});
+
+	it("Member.avatarURL() falls back to the user's avatar when there is no guild avatar", () => {
+		const member = new Member(client, guild, { ...memberData("123456789012345678"), avatar: null });
+		expect(member.avatarURL()).toBe(member.user.defaultAvatarURL());
+
+		member.user.avatar = "user-avatar";
+		expect(member.avatarURL()).toBe("https://cdn.discordapp.com/avatars/123456789012345678/user-avatar.png?size=1024");
+	});
+
+	it("Member.bannerURL() serves the guild banner, falls back to the user's, and is otherwise null", () => {
+		const member = new Member(client, guild, { ...memberData("user-3"), banner: "guild-banner" });
+		expect(member.bannerURL()).toBe("https://cdn.discordapp.com/guilds/guild-1/users/user-3/banners/guild-banner.png?size=1024");
+
+		member.banner = null;
+		expect(member.bannerURL()).toBeNull();
+
+		member.user.banner = "a_user-banner";
+		expect(member.bannerURL()).toBe("https://cdn.discordapp.com/banners/user-3/a_user-banner.gif?size=1024");
+	});
+
+	it("User.bannerURL() is null without a banner", () => {
+		const user = new User(client, userData("user-4"));
+		expect(user.bannerURL()).toBeNull();
+
+		user.banner = "a_banner";
+		expect(user.bannerURL(false)).toBe("https://cdn.discordapp.com/banners/user-4/a_banner.png?size=1024");
+	});
+
+	it("Guild URL methods return null for unset images", () => {
+		expect(guild.iconURL()).toBeNull();
+		expect(guild.bannerURL()).toBeNull();
+		expect(guild.splashURL()).toBeNull();
+		expect(guild.discoverySplashURL()).toBeNull();
+	});
+
+	it("Guild URL methods build each image's CDN path, animating only the icon and banner", () => {
+		guild.patch({ ...guildData(), icon: "a_icon", banner: "a_banner", splash: "a_splash", discovery_splash: "discovery" });
+
+		expect(guild.iconURL()).toBe("https://cdn.discordapp.com/icons/guild-1/a_icon.gif?size=1024");
+		expect(guild.iconURL(false)).toBe("https://cdn.discordapp.com/icons/guild-1/a_icon.png?size=1024");
+		expect(guild.bannerURL()).toBe("https://cdn.discordapp.com/banners/guild-1/a_banner.gif?size=1024");
+		expect(guild.splashURL()).toBe("https://cdn.discordapp.com/splashes/guild-1/a_splash.png?size=1024");
+		expect(guild.discoverySplashURL()).toBe("https://cdn.discordapp.com/discovery-splashes/guild-1/discovery.png?size=1024");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// ChannelCache.fetchAll()
+// ---------------------------------------------------------------------------
+
+describe("ChannelCache.fetchAll()", () => {
+	it("calls GET /guilds/:id/channels and upserts every channel, patching cached ones in place", async () => {
+		const client = makeClient();
+		const guild = makeGuildStructure(client);
+		const existing = makeTextChannel(client, guild, "channel-1");
+		guild.channels.set("channel-1", existing);
+
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue([
+			{ id: "channel-1", type: DiscordChannelTypes.GUILD_TEXT, name: "renamed", position: 0, permission_overwrites: [] },
+			{ id: "channel-2", type: DiscordChannelTypes.GUILD_CATEGORY, name: "category", position: 1, permission_overwrites: [] }
+		]);
+
+		const channels = await guild.channels.fetchAll();
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/channels`);
+		expect(channels.map(channel => channel.id)).toEqual([ "channel-1", "channel-2" ]);
+		expect(channels[0]).toBe(existing);
+		expect(existing.name).toBe("renamed");
+		expect(guild.channels.get("channel-2")).toBeInstanceOf(GuildCategoryChannel);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// IntegrationCache.fetchAll()
+// ---------------------------------------------------------------------------
+
+describe("IntegrationCache.fetchAll()", () => {
+	const integrationData = (id: string): DiscordIntegration => ({
+		id, name: "integration", type: "discord", enabled: true, account: { id: "account-1", name: "account" }
+	});
+
+	it("removes cached integrations the listing no longer contains", async () => {
+		const client = makeClient();
+		const guild = makeGuildStructure(client);
+		guild.integrations.upsert(integrationData("integration-1"));
+		guild.integrations.upsert(integrationData("integration-2"));
+		vi.spyOn(client.rest, "get").mockResolvedValue([ integrationData("integration-1") ]);
+
+		await guild.integrations.fetchAll();
+
+		expect([ ...guild.integrations.keys() ]).toEqual([ "integration-1" ]);
+	});
+
+	it("keeps unlisted integrations when the listing is a full, possibly truncated, page of 50", async () => {
+		const client = makeClient();
+		const guild = makeGuildStructure(client);
+		guild.integrations.upsert(integrationData("integration-old"));
+		const page = Array.from({ length: 50 }, (_, index) => integrationData(`integration-${index}`));
+		vi.spyOn(client.rest, "get").mockResolvedValue(page);
+
+		await guild.integrations.fetchAll();
+
+		expect(guild.integrations.has("integration-old")).toBe(true);
+		expect(guild.integrations.size).toBe(51);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AuditLogEvents
+// ---------------------------------------------------------------------------
+
+describe("AuditLogEvents", () => {
+	it("holds exactly the values of DiscordAuditLogEvent", () => {
+		const sorted = (values: number[]) => [ ...values ].sort((a, b) => a - b);
+		expect(sorted(Object.values(AuditLogEvents))).toEqual(sorted(Object.values(DiscordAuditLogEvent)));
+	});
+
+	it("shares names with ClientEvents where the concepts coincide", () => {
+		expect(AuditLogEvents.MessageDelete).toBe(DiscordAuditLogEvent.MESSAGE_DELETE);
+		expect(AuditLogEvents.MessageDeleteBulk).toBe(DiscordAuditLogEvent.MESSAGE_BULK_DELETE);
+		expect(AuditLogEvents.GuildBanAdd).toBe(DiscordAuditLogEvent.MEMBER_BAN_ADD);
+	});
+
+	it("is accepted by fetchAuditLogs()", async () => {
+		const client = makeClient();
+		const guild = makeGuildStructure(client);
+		const spy = vi.spyOn(client.rest, "get").mockResolvedValue({
+			audit_log_entries: [], users: [], integrations: [], threads: [], webhooks: [],
+			application_commands: [], auto_moderation_rules: [], guild_scheduled_events: []
+		} satisfies DiscordAuditLog);
+
+		await guild.fetchAuditLogs({ actionType: AuditLogEvents.MessageDelete });
+
+		expect(spy).toHaveBeenCalledWith(`/guilds/${guild.id}/audit-logs?action_type=72`);
 	});
 });
