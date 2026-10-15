@@ -18,7 +18,11 @@ export abstract class GlobalCache<K, V, API> extends Map<K, V> {
 	abstract upsert(data: API): V;
 
 	/**
-	 * Fetches the key from discord API, may incur rate limits
+	 * Fetches the key from the Discord API, which may incur rate limits, and upserts the result
+	 * into this cache, so a later `get(key)` is served locally. An entry that was already cached is
+	 * patched in place, keeping earlier references to it current.
+	 *
+	 * Every cache follows this unless its own `fetch` documents otherwise.
 	 */
 	abstract fetch(key: K): Promise<V>;
 }
@@ -41,7 +45,11 @@ export abstract class GuildScopedCache<K, V, API> extends Map<K, V> {
 	abstract upsert(data: API): V;
 
 	/**
-	 * Fetches the key from discord API, may incur rate limits
+	 * Fetches the key from the Discord API, which may incur rate limits, and upserts the result
+	 * into this cache, so a later `get(key)` is served locally. An entry that was already cached is
+	 * patched in place, keeping earlier references to it current.
+	 *
+	 * Every cache follows this unless its own `fetch` documents otherwise.
 	 */
 	abstract fetch(key: K): Promise<V>;
 }
