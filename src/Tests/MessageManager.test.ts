@@ -156,4 +156,35 @@ describe("MessageManager", () => {
 		expect(Object.keys(channel.messages)).not.toContain("cache");
 		expect(channel.messages).not.toBeInstanceOf(Map);
 	});
+
+	it("knows the channel's guild even though the payload was built without a guild_id", () => {
+		// `GUILD_CREATE` omits `guild_id` on its channels; the id comes from the owning guild
+		expect(channel.guildId).toBe("guild-1");
+	});
+
+	it("fills guildId on fetched messages, which Discord only sends over the gateway", async () => {
+		const restMessage: DiscordMessage = messageData("msg-1");
+		delete (restMessage as { guild_id?: string }).guild_id;
+		vi.spyOn(client.rest, "get")
+			.mockResolvedValueOnce(restMessage)
+			.mockResolvedValueOnce([ restMessage ]);
+
+		const single = await channel.messages.fetch("msg-1");
+		const [ listed ] = await channel.messages.fetch({ limit: 1 });
+
+		expect(single.guildId).toBe("guild-1");
+		expect(listed!.guildId).toBe("guild-1");
+	});
+
+	it("fills guildId on sent messages and their replies", async () => {
+		const restMessage: DiscordMessage = messageData("msg-1", "bot-1");
+		delete (restMessage as { guild_id?: string }).guild_id;
+		vi.spyOn(client.rest, "post").mockResolvedValue(restMessage);
+
+		const sent = await channel.send("hello");
+		const reply = await sent.reply("again");
+
+		expect(sent.guildId).toBe("guild-1");
+		expect(reply.guildId).toBe("guild-1");
+	});
 });
