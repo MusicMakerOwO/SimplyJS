@@ -54,6 +54,32 @@ for them.
 - [ ] Sticker packs endpoint (`/sticker-packs`)
 - [ ] Application command permission endpoints
 
+### Dossier findings follow-ups
+
+Raised by the Dossier log bot's findings against 1.4.0-alpha. The rest of those findings shipped in
+`[unreleased]`.
+
+- [ ] Tell a guild join apart from a guild becoming available
+  - `ClientEvents.GuildCreate` fires for every guild on every connect, on a guild coming back
+    after an outage, and on a real join, and nothing on the `Guild` tells them apart. A bot that
+    does work on join (a welcome message, a backfill) does it for every guild on every restart.
+    `Ready` (`src/Events/Ready.ts`) counts `GuildCreate` to know when startup is done, so a fix has
+    to keep that working. The library already has what it needs: the ids in `READY`, plus ids
+    seen with `unavailable: true`. `Guild.joinedAt` is the workaround for now
+  - Related bug: `GuildDelete` (`src/Events/Guilds.ts`) handles `GUILD_DELETE` with
+    `unavailable: true` (an outage) exactly like a removal. It evicts the guild and emits the same
+    event, so an outage looks like the bot being kicked
+- [ ] `GuildThreadChannel.member` is still the raw snake_case `DiscordThreadMember`, even though
+  `thread.members` already holds a `ThreadMember` for the same data
+- [ ] `fetchAll()` for `RoleCache`, `EmojiCache`, and `StickerCache`, to match
+  `ChannelCache.fetchAll()` (`GET /guilds/{id}/roles`, `/emojis`, `/stickers`)
+- [ ] A public event for other users' account changes (username, global name, avatar)
+  - Discord sends these as one `GUILD_MEMBER_UPDATE` per shared guild, and the cached `User` is
+    shared, so only the first guild's `MemberUpdate` shows a before/after for the account. The
+    `MemberUpdate` handler could compare the payload's `user` against the cached one before
+    upserting and emit a single event when it differs, as discord.js does. Renaming
+    `ClientUserUpdate` freed the `UserUpdate` name for it
+
 ### Quality of Life
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish

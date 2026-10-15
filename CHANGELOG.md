@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### Added
+
+- `guildId` on every guild-scoped structure. `APIGuildStructure` (`src/Contracts/DiscordStructure.ts`) now exposes a public `readonly guildId`, taken from the owning guild. `Role`, `Member`, `Emoji`, and `ThreadMember` had no public way to say which guild they came from, so a `RoleCreate` or `MemberUpdate` listener could not route on the guild without scanning `client.guilds`. `Sticker.guildId` is no longer optional
+- `Guild.joinedAt`: when the bot joined the guild. `DiscordGuildCreate` now declares `joined_at`, which Discord sends only on `GUILD_CREATE`
+- `ChannelCache.fetchAll()` (`src/Managers/Channels.ts`): `GET /guilds/{id}/channels`, which upserts every channel. It gives a way to check the cache or recover it when the `GUILD_CREATE` seed might be stale. Threads are not included, and nothing is evicted
+- `AuditLogEvents` (`src/Types/SimplyJSTypes.ts`): the audit log action types under library-style names, so `fetchAuditLogs({ actionType: AuditLogEvents.MessageDelete })` uses the same vocabulary as `ClientEvents.MessageDelete`. Names are shared with `ClientEvents` wherever the two describe the same thing (`MessageDeleteBulk`, `GuildBanAdd`, ...). The values are `DiscordAuditLogEvent`'s, so both maps work
+- `Emoji.imageURL()`, `Sticker.imageURL()`, and `SoundboardSound.soundURL()`, the CDN counterparts of `User.avatarURL()`. `Sticker.imageURL()` serves GIF stickers from `media.discordapp.net` and returns `null` for a Lottie sticker, which has no image
+- A second `newlyCreated` argument on `ThreadCreate`. It is `true` for a thread that was just created and `false` when the client was added to an existing private thread; before this, the two cases looked identical. `DiscordChannel` now declares `newly_created`
+- `UncachedRole`, `UncachedMember`, and `UncachedSoundboardSound`: the shapes the delete events hand over for something that was not cached
+- CDN URL methods for every remaining image hash: `Role.iconURL()`, `Member.avatarURL()` / `bannerURL()`, `User.bannerURL()`, and `Guild.iconURL()` / `bannerURL()` / `splashURL()` / `discoverySplashURL()`. `Member.avatarURL()` serves the guild-specific avatar and falls back to `user.avatarURL()`, so it always returns the avatar Discord shows for the member in that guild; `Member.bannerURL()` falls back to `user.bannerURL()` the same way. `Role.iconURL()` is `null` for a role showing a unicode emoji. They share a new `CDNImageURL()` helper (`src/Utils.ts`), which `User.avatarURL()` and `Webhook.avatarURL()` now use too
+
+### Changed
+
+- **Breaking.** `ThreadMember.joinedAt` is now the ISO8601 string Discord sent rather than a `Date`, matching `Member.joinedAt` and `Guild.joinedAt`. Wrap it in `new Date(...)` where a `Date` is needed
+- **Breaking.** Every guild-scoped event now passes the cached `Guild` as its **first** listener argument, the shape the emoji, sticker, soundboard, ban, and audit log events already had. Before, some events passed the guild first, some last, and some not at all, so a listener that needed to know its guild had to learn each event's shape separately. The handlers already resolve the guild before they emit, so this costs nothing. Affected events:
+  - `ChannelCreate` / `ChannelUpdate` / `ChannelDelete`
+  - `ThreadCreate` / `ThreadUpdate` / `ThreadDelete` / `ThreadMemberUpdate`
+  - `MemberCreate` / `MemberUpdate` / `MemberDelete`
+  - `RoleCreate` / `RoleUpdate` / `RoleDelete`
+  - `AutoModerationRuleCreate` / `AutoModerationRuleUpdate` / `AutoModerationRuleDelete`
+  - `GuildScheduledEventCreate` / `GuildScheduledEventUpdate` / `GuildScheduledEventDelete`
+  - `IntegrationCreate` / `IntegrationUpdate`
+  - `PresenceUpdate`
+  - `GuildScheduledEventUserAdd` / `GuildScheduledEventUserRemove` and `IntegrationDelete`, which moved their trailing `guild` to the front
+
+  Two groups are unchanged. Events whose single argument is a payload object (reactions, typing, polls, pins, `WebhooksUpdate`, `MessageDelete`/`MessageDeleteBulk`, `ThreadMembersUpdate`, `ThreadListSync`, `GuildMembersChunk`, `AutoModerationActionExecution`, `InviteDelete`) already carry `payload.guild`. `MessageCreate`, `MessageUpdate`, and `InviteCreate` can arrive from a DM or an uncached guild, so they keep `message.guild` / `invite.guild`
+- **Breaking.** Uncached guild-scoped deletes now emit id objects that carry `guildId`:
+  - `RoleDelete` emits `Role | UncachedRole` (`{ id, guildId }`)
+  - `MemberDelete` emits `Member | UncachedMember` (`{ id, guildId, user }`, where `user` is a cached `User`) instead of a bare `DiscordUser` with no guild context
+  - `SoundboardSoundDelete`'s fallback gains `guildId`
+  - `EmojiDelete` and `StickerDelete` are narrowed to `Emoji` and `Sticker`. Their deletions come from diffing Discord's full list against the cache, so the `DiscordEmoji` / `DiscordSticker` branch could never fire
+- **Breaking.** `GuildThreadChannel.threadMetadata` is now a camelCase `ThreadMetadata` (`autoArchiveDuration`, `archiveTimestamp`, `createTimestamp`, ...) rather than the raw snake_case `DiscordThreadMetadata`
+- A `Message` returned from REST now has `guildId` filled in from the channel, interaction, or webhook it went through. This covers `channel.messages.fetch()`, `channel.send()`, `message.reply()`/`update()`, `crosspost()`, the interaction reply routes, the webhook message routes, and the messages an interaction carries (a component interaction's `message`, a message context menu's `targetMessage`). Discord only sends `guild_id` on gateway payloads, so the same message used to know its guild when it arrived via `MESSAGE_CREATE` and not when it was fetched. Messages from `user.send()` get `null`. `undefined` now only means the source did not know its guild either
+- The cache `fetch()` docs (`src/Contracts/CacheStructure.ts`) now say that the result is upserted into the cache
+- **Breaking.** `ClientEvents.UserUpdate` is renamed to `ClientEvents.ClientUserUpdate`. Discord only sends `USER_UPDATE` for the bot's own account, not, as the 1.1.0-alpha entry said, for every user the bot shares a guild with, so the event only ever fired for `client.user`. The new name says so. Other users' profile changes arrive through `MemberUpdate`, whose doc now explains that only the first guild's dispatch shows the account change in `oldMember.user`
+- `WebhookCache.fetchAll()` / `fetchChannel()` and `IntegrationCache.fetchAll()` now remove cached entries the listing no longer contains, so a resync after `WebhooksUpdate` or `GuildIntegrationsUpdate` picks up deletions. Before, nothing but `Webhook.delete()` ever took a webhook out of `guild.webhooks`. `fetchChannel()` only removes webhooks of the listed channel, which includes one moved to another channel until that channel is listed too. `IntegrationCache.fetchAll()` removes nothing when Discord returns its full page of 50, since the listing may be truncated
+
+### Fixed
+
+- `guildId` was `undefined` on every channel seeded from `GUILD_CREATE`. Discord omits `guild_id` on the channels nested in that payload, and `BaseChannel` only read it from the payload. It now comes from the owning guild
+- `RoleDelete` was silently dropped for a role that was not cached, even though its type promised a fallback
+- The `GatewayEvents.UserUpdate` doc said `USER_UPDATE` covers every user the bot shares a guild with. It is only sent for the current user
+- The `SoundboardSoundUpdate` handler's doc said `oldSound` and `newSound` were the same object. They are not: `oldSound` is a snapshot taken before the patch, like every other `*Update` event
+
+### Removed
+
+- `ClientEvents.UserUpdate`, replaced by `ClientEvents.ClientUserUpdate` (see Changed). The gateway handler export keeps its `UserUpdate` name, after `USER_UPDATE`
+
 ## [1.4.0-alpha] 2026 September 21
 
 ### Added
