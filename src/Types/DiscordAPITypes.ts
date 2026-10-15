@@ -562,6 +562,8 @@ export type DiscordGuildCreate = DiscordGuild & {
 	guild_scheduled_events?: DiscordGuildScheduledEvent[];
 	presences?: DiscordPresence[];
 	soundboard_sounds?: DiscordSoundboardSound[];
+	/** When the current user joined this guild; only sent on `GUILD_CREATE`, never on the REST guild object */
+	joined_at?: string;
 };
 
 /**

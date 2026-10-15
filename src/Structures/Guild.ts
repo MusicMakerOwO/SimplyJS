@@ -110,6 +110,11 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 	safetyAlertsChannelId?: string | null;
 	/** Active incident/moderation lockdown state (e.g. invites-disabled/DMs-disabled windows) for this guild */
 	incidentsData?: DiscordIncidentsData;
+	/**
+	 * ISO8601 timestamp of when the current user joined this guild. Only `GUILD_CREATE` carries
+	 * it, so a guild fetched over REST and never seen on the gateway has none.
+	 */
+	joinedAt?: string;
 
 	channels: ChannelCache;
 	roles: RoleCache;
@@ -227,6 +232,7 @@ export class Guild extends APIClientStructure<DiscordGuild> {
 		if ("welcome_screen" in data && data.welcome_screen !== undefined) this.welcomeScreen = data.welcome_screen;
 		if ("safety_alerts_channel_id" in data && data.safety_alerts_channel_id !== undefined) this.safetyAlertsChannelId = data.safety_alerts_channel_id;
 		if ("incidents_data" in data && data.incidents_data !== undefined) this.incidentsData = data.incidents_data;
+		if ("joined_at" in data && data.joined_at !== undefined) this.joinedAt = data.joined_at;
 
 		if ("channels" in data && data.channels !== undefined) {
 			for (const apiChannel of data.channels) {
