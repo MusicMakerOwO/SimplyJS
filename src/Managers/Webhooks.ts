@@ -21,6 +21,10 @@ export type WebhookCreateOptions = {
  * filled by an explicit {@link WebhookCache.fetchAll} call. A `WebhooksUpdate` event is Discord's
  * hint that something changed in a channel without saying what, so
  * {@link WebhookCache.fetchChannel} is the way to resync after one.
+ *
+ * Both listings are authoritative for what they cover: a cached webhook they do not return has been
+ * deleted, and is removed from the cache. Snapshot the cache by value before resyncing if you need
+ * to diff it, because `upsert()` patches surviving entries in place.
  */
 export class WebhookCache extends GuildScopedCache<string, Webhook, DiscordWebhook> {
 	constructor(client: Client, guild: Guild) {
@@ -50,25 +54,44 @@ export class WebhookCache extends GuildScopedCache<string, Webhook, DiscordWebho
 	}
 
 	/**
-	 * Fetches every webhook in this guild and caches them.
+	 * Fetches every webhook in this guild and caches them, removing cached webhooks the listing no
+	 * longer contains.
 	 * Requires the `MANAGE_WEBHOOKS` permission and will error otherwise.
 	 * @see https://docs.discord.com/developers/resources/webhook#get-guild-webhooks
 	 */
 	async fetchAll(): Promise<Webhook[]> {
 		const fetched = await this.client.rest.get<DiscordWebhook[]>(`/guilds/${this.guild.id}/webhooks`);
-		return fetched.map(webhook => this.upsert(webhook));
+		const webhooks = fetched.map(webhook => this.upsert(webhook));
+
+		const listed = new Set(fetched.map(webhook => webhook.id));
+		for (const id of this.keys()) {
+			if (!listed.has(id)) this.delete(id);
+		}
+		return webhooks;
 	}
 
 	/**
-	 * Fetches every webhook belonging to one channel and caches them. This is the call to make after
-	 * a `WebhooksUpdate` event, which names the channel but not the webhook.
+	 * Fetches every webhook belonging to one channel and caches them, removing cached webhooks of
+	 * that channel the listing no longer contains. This is the call to make after a
+	 * `WebhooksUpdate` event, which names the channel but not the webhook.
+	 *
+	 * A webhook moved to another channel is missing from its old channel's listing just like a
+	 * deleted one, so it drops out of the cache until its new channel is listed. Call
+	 * {@link WebhookCache.fetch} with its id to tell the two apart, or {@link WebhookCache.fetchAll}
+	 * to resync the whole guild.
 	 * Requires the `MANAGE_WEBHOOKS` permission and will error otherwise.
 	 * @param channelId Id of the channel to list webhooks for
 	 * @see https://docs.discord.com/developers/resources/webhook#get-channel-webhooks
 	 */
 	async fetchChannel(channelId: string): Promise<Webhook[]> {
 		const fetched = await this.client.rest.get<DiscordWebhook[]>(`/channels/${channelId}/webhooks`);
-		return fetched.map(webhook => this.upsert(webhook));
+		const webhooks = fetched.map(webhook => this.upsert(webhook));
+
+		const listed = new Set(fetched.map(webhook => webhook.id));
+		for (const [id, webhook] of this) {
+			if (webhook.channelId === channelId && !listed.has(id)) this.delete(id);
+		}
+		return webhooks;
 	}
 
 	/**

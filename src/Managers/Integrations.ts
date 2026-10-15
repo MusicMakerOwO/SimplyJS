@@ -4,13 +4,18 @@ import { Client } from "../Client.js";
 import { DiscordIntegration } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 
+/** Most integrations `GET /guilds/{id}/integrations` returns; anything past it is unreachable */
+const INTEGRATION_LIST_LIMIT = 50;
+
 /**
  * Cache of a single guild's {@link Integration}s.
  *
  * Discord never includes integrations in the `GUILD_CREATE` payload, so this cache starts empty and
  * is filled by the `Integration*` gateway events or by an explicit
  * {@link IntegrationCache.fetchAll} call. A `GuildIntegrationsUpdate` event is Discord's hint that
- * something changed without saying what, so `fetchAll()` is the way to resync after one.
+ * something changed without saying what, so `fetchAll()` is the way to resync after one. A resync
+ * also removes cached integrations the listing no longer contains, so snapshot the cache by value
+ * first if you need to diff it.
  */
 export class IntegrationCache extends GuildScopedCache<string, Integration, DiscordIntegration> {
 	constructor(client: Client, guild: Guild) {
@@ -43,14 +48,23 @@ export class IntegrationCache extends GuildScopedCache<string, Integration, Disc
 	}
 
 	/**
-	 * Fetches every integration in this guild and caches them.
+	 * Fetches every integration in this guild and caches them, removing cached integrations the
+	 * listing no longer contains.
 	 * Requires the `MANAGE_GUILD` permission and will error otherwise.
 	 *
-	 * Discord caps this list at 50 and omits the subscriber fields for bot integrations.
+	 * Discord caps this list at 50 and omits the subscriber fields for bot integrations. A full
+	 * page of 50 may be truncated, so nothing is removed from the cache in that case.
 	 * @see https://docs.discord.com/developers/resources/guild#get-guild-integrations
 	 */
 	async fetchAll(): Promise<Integration[]> {
 		const fetched = await this.client.rest.get<DiscordIntegration[]>(`/guilds/${this.guild.id}/integrations`);
-		return fetched.map(integration => this.upsert(integration));
+		const integrations = fetched.map(integration => this.upsert(integration));
+		if (fetched.length >= INTEGRATION_LIST_LIMIT) return integrations;
+
+		const listed = new Set(fetched.map(integration => integration.id));
+		for (const id of this.keys()) {
+			if (!listed.has(id)) this.delete(id);
+		}
+		return integrations;
 	}
 }
