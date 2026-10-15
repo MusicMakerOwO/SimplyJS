@@ -87,7 +87,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 				undefined,
 				files
 			);
-			return new Message(this.client, response);
+			return new Message(this.client, { ...response, guild_id: this.guildId ?? null });
 		}
 
 		/**
@@ -105,7 +105,7 @@ export function Repliable<TBase extends Constructor<BaseInteraction>>(
 				undefined,
 				files
 			);
-			return new Message(this.client, response);
+			return new Message(this.client, { ...response, guild_id: this.guildId ?? null });
 		}
 
 		/** Deletes this interaction's original response. */

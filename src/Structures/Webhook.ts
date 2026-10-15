@@ -193,7 +193,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 		// a `thread_name` send creates the thread as part of the request, so the thread to address
 		// later is not known up front - it is the channel the returned message landed in
 		const threadId = thread_id ?? (overrides.thread_name ? response.channel_id : undefined);
-		return new WebhookMessage(this.client, response, this.#messageContext(threadId));
+		return new WebhookMessage(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) }, this.#messageContext(threadId));
 	}
 
 	/**
@@ -207,7 +207,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 	async fetchMessage(messageId: string, threadId?: string): Promise<WebhookMessage> {
 		const context = this.#messageContext(threadId);
 		const response = await this.client.rest.get<DiscordMessage>(WebhookMessageRoute(messageId, context));
-		return new WebhookMessage(this.client, response, context);
+		return new WebhookMessage(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) }, context);
 	}
 
 	/**
@@ -236,7 +236,7 @@ export class Webhook extends APIClientStructure<DiscordWebhook> {
 			undefined,
 			files
 		);
-		return new WebhookMessage(this.client, response, context);
+		return new WebhookMessage(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) }, context);
 	}
 
 	/**

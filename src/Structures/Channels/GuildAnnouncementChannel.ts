@@ -20,7 +20,7 @@ export class GuildAnnouncementChannel extends GuildTextChannel {
 			`/channels/${this.id}/messages/${messageId}/crosspost`,
 			{}
 		);
-		return new Message(this.client, response);
+		return new Message(this.client, { ...response, guild_id: this.guildId });
 	}
 
 	/**

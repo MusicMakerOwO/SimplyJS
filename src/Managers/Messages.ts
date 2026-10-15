@@ -43,7 +43,7 @@ export class MessageManager {
 	async fetch(options?: string | MessageFetchOptions): Promise<Message | Message[]> {
 		if (typeof options === 'string') {
 			const response = await this.client.rest.get<DiscordMessage>(`/channels/${this.channel.id}/messages/${options}`);
-			return new Message(this.client, response);
+			return new Message(this.client, { ...response, guild_id: this.channel.guildId });
 		} else {
 			const anchors = [options?.before, options?.after, options?.around].filter(x => x !== undefined);
 			if (anchors.length > 1) throw new Error("Only one of before, after and around may be provided when fetching messages");
@@ -60,7 +60,7 @@ export class MessageManager {
 			const response = await this.client.rest.get<DiscordMessage[]>(`/channels/${this.channel.id}/messages${query}`);
 			const list = new Array<Message>(response.length);
 			for (let i = 0; i < response.length; i++) {
-				list[i] = new Message(this.client, response[i]);
+				list[i] = new Message(this.client, { ...response[i], guild_id: this.channel.guildId });
 			}
 			return list;
 		}

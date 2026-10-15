@@ -210,6 +210,6 @@ export class User extends APIClientStructure<DiscordUser> {
 		}
 
 		const response = await this.client.rest.post<DiscordMessage>(`/channels/${dmChannel.id}/messages`, body, undefined, files);
-		return new Message(this.client, response);
+		return new Message(this.client, { ...response, guild_id: null });
 	}
 }

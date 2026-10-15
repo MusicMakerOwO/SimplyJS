@@ -23,6 +23,6 @@ export class MessageComponentInteraction extends ModalShowable(Updateable(Replia
 	patch(data: MessageComponentInteractionPayload): void {
 		super.patch(data);
 		this.customId = data.data.custom_id;
-		this.message = new Message(this.client, data.message);
+		this.message = new Message(this.client, { ...data.message, guild_id: this.guildId ?? null });
 	}
 }

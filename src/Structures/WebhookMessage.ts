@@ -81,7 +81,7 @@ export class WebhookMessage extends Message {
 			undefined,
 			files
 		);
-		return new WebhookMessage(this.client, response, this.context);
+		return new WebhookMessage(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) }, this.context);
 	}
 
 	/**

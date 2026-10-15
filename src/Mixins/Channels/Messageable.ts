@@ -61,7 +61,7 @@ export function Messageable<TBase extends Constructor<BaseChannel>>(
 		async send(content: string | MessagePayload): Promise<Message> {
 			const { body, files } = PreparePayload(CreateMessagePayload(content));
 			const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.id}/messages`, body, undefined, files);
-			return new Message(this.client, response);
+			return new Message(this.client, { ...response, guild_id: this.guildId });
 		}
 
 		/**

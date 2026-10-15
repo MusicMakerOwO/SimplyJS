@@ -199,7 +199,14 @@ export function PreparePayload<T extends MessagePayload>(
 export class Message extends APIClientStructure<DiscordMessage> {
 	id!: string
 	channelId!: string
-	/** Id of the guild this message was sent in, only present on gateway payloads (`MESSAGE_CREATE` etc.), not in the Discord message object itself */
+	/**
+	 * Id of the guild this message was sent in, or `null` for a direct message.
+	 *
+	 * Discord only sends `guild_id` on gateway payloads (`MESSAGE_CREATE` etc.), so for a message
+	 * that came back from REST the library fills it in from the channel, interaction, or webhook it
+	 * went through. It is only `undefined` when that source did not know its guild either, such as a
+	 * webhook fetched without one or a {@link Message} constructed by hand from a raw payload.
+	 */
 	guildId?: string | null
 	/**
 	 * Raw partial guild member object for the message author, only present on gateway payloads
@@ -361,7 +368,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 			body.allowed_mentions.replied_user ??= false
 		}
 		const response = await this.client.rest.post<DiscordMessage>(`/channels/${this.channelId}/messages`, body, undefined, files);
-		return new Message(this.client, response);
+		return new Message(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) });
 	}
 
 	/**
@@ -384,7 +391,7 @@ export class Message extends APIClientStructure<DiscordMessage> {
 		// this message's own flags, so editing a v2 message keeps it held to the v2 rules
 		const { body, files } = PreparePayload(CreateMessagePayload(content), this.flags);
 		const response = await this.client.rest.patch<DiscordMessage>(`/channels/${this.channelId}/messages/${this.id}`, body, undefined, files);
-		return new Message(this.client, response);
+		return new Message(this.client, { ...response, ...(this.guildId !== undefined && { guild_id: this.guildId }) });
 	}
 
 	/**

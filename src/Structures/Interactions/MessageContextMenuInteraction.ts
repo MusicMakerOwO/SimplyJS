@@ -19,6 +19,6 @@ export class MessageContextMenuInteraction extends BaseCommandInteraction {
 		const resolvedMessage = this.targetId !== undefined
 			? data.data.resolved?.messages?.[this.targetId]
 			: undefined;
-		if (resolvedMessage !== undefined) this.targetMessage = new Message(this.client, resolvedMessage as DiscordMessage);
+		if (resolvedMessage !== undefined) this.targetMessage = new Message(this.client, { ...(resolvedMessage as DiscordMessage), guild_id: this.guildId ?? null });
 	}
 }
