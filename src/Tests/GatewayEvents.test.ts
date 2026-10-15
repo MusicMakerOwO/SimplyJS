@@ -337,7 +337,7 @@ describe("Gateway event handlers mutate caches", () => {
 		await ChannelUpdate.handler(client, channelPayload);
 
 		expect(client.guilds.get(guildPayload.id)?.channels.get(channelPayload.id)?.name).toBe("general");
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelUpdate, undefined, expect.objectContaining({ id: channelPayload.id }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ChannelUpdate, expect.any(Guild), undefined, expect.objectContaining({ id: channelPayload.id }));
 	});
 
 	it("RoleCreate stores the role under the target guild", async () => {
@@ -363,6 +363,16 @@ describe("Gateway event handlers mutate caches", () => {
 		expect(client.guilds.get(guildPayload.id)?.roles.has(rolePayload.id)).toBe(false);
 	});
 
+	it("RoleDelete emits the ids for an uncached role instead of dropping the event", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const emitSpy = vi.spyOn(client, "emit");
+		await GuildCreate.handler(client, createGuild());
+
+		await RoleDelete.handler(client, { guild_id: "guild-1", role_id: "role-uncached" });
+
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.RoleDelete, expect.any(Guild), { id: "role-uncached", guildId: "guild-1" });
+	});
+
 	it("RoleUpdate emits the client update event", async () => {
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		const emitSpy = vi.spyOn(client, "emit");
@@ -372,7 +382,7 @@ describe("Gateway event handlers mutate caches", () => {
 		await GuildCreate.handler(client, guildPayload);
 		await RoleUpdate.handler(client, { guild_id: guildPayload.id, role: rolePayload });
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.RoleUpdate, undefined, expect.objectContaining({ id: rolePayload.id }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.RoleUpdate, expect.any(Guild), undefined, expect.objectContaining({ id: rolePayload.id }));
 	});
 
 	it("MemberCreate adds member to cache and emits MemberCreate event", async () => {
@@ -384,7 +394,7 @@ describe("Gateway event handlers mutate caches", () => {
 		await GuildCreate.handler(client, guildPayload);
 		await MemberCreate.handler(client, member);
 		expect(client.guilds.get(guildPayload.id)?.members.has(member.user.id)).toBe(true);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberCreate, expect.objectContaining({ user: expect.objectContaining({ id: member.user.id }) }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberCreate, expect.any(Guild), expect.objectContaining({ user: expect.objectContaining({ id: member.user.id }) }));
 	});
 
 	it("MemberUpdate updates member in cache and emits MemberUpdate event", async () => {
@@ -398,7 +408,7 @@ describe("Gateway event handlers mutate caches", () => {
 
 		const updatedMember = { ...member, nick: "updated-nick" };
 		await MemberUpdate.handler(client, updatedMember);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberUpdate, expect.anything(), expect.objectContaining({ nick: "updated-nick" }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberUpdate, expect.any(Guild), expect.anything(), expect.objectContaining({ nick: "updated-nick" }));
 	});
 
 	it("MemberDelete removes member from cache and emits MemberDelete event", async () => {
@@ -411,7 +421,60 @@ describe("Gateway event handlers mutate caches", () => {
 		await MemberCreate.handler(client, member);
 		await MemberDelete.handler(client, { guild_id: guildPayload.id, user: member.user });
 		expect(client.guilds.get(guildPayload.id)?.members.has(member.user.id)).toBe(false);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberDelete, expect.objectContaining({ user: expect.objectContaining({ id: member.user.id }) }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.MemberDelete, expect.any(Guild), expect.objectContaining({ user: expect.objectContaining({ id: member.user.id }) }));
+	});
+
+	it("MemberDelete emits the ids and the user for an uncached member", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		const emitSpy = vi.spyOn(client, "emit");
+		await GuildCreate.handler(client, createGuild());
+
+		await MemberDelete.handler(client, { guild_id: "guild-1", user: createUser("member-uncached") });
+
+		const [ , member ] = emitted(emitSpy, ClientEvents.MemberDelete);
+		expect(member).toEqual({ id: "member-uncached", guildId: "guild-1", user: client.users.get("member-uncached") });
+		expect((member as { user: unknown }).user).toBeInstanceOf(User);
+	});
+
+	it("GuildCreate gives every nested structure its guild's id, which Discord omits on them", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		const channel = createChannel();
+		const member: DiscordMember = createMember();
+		delete channel.guild_id;
+		delete (member as { guild_id?: string }).guild_id;
+
+		await GuildCreate.handler(client, { ...createGuild(), channels: [ channel ], members: [ member ] });
+
+		const guild = client.guilds.get("guild-1")!;
+		expect(guild.channels.get("channel-1")!.guildId).toBe("guild-1");
+		expect(guild.roles.get("role-1")!.guildId).toBe("guild-1");
+		expect(guild.members.get("member-1")!.guildId).toBe("guild-1");
+		// and a snapshot keeps it
+		expect(guild.roles.get("role-1")!.clone().guildId).toBe("guild-1");
+	});
+
+	it("guild-scoped events pass the cached guild as their first argument", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds | GatewayIntents.GuildMembers });
+		const emitSpy = vi.spyOn(client, "emit");
+		await GuildCreate.handler(client, createGuild());
+		const guild = client.guilds.get("guild-1")!;
+
+		await ChannelCreate.handler(client, createChannel("channel-9"));
+		await RoleCreate.handler(client, { guild_id: "guild-1", role: createRole("role-9") });
+		await MemberCreate.handler(client, createMember("member-9"));
+
+		for (const event of [ ClientEvents.ChannelCreate, ClientEvents.RoleCreate, ClientEvents.MemberCreate ]) {
+			expect(emitted(emitSpy, event)[0]).toBe(guild);
+		}
+	});
+
+	it("GuildCreate keeps joined_at, the one field that says when the bot joined", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+
+		await GuildCreate.handler(client, { ...createGuild(), joined_at: "2024-02-02T00:00:00.000Z" });
+		await GuildUpdate.handler(client, createGuild());
+
+		expect(client.guilds.get("guild-1")!.joinedAt).toBe("2024-02-02T00:00:00.000Z");
 	});
 
 	it("MembersChunk caches every member in the chunk and emits the mapped payload", async () => {
@@ -843,8 +906,41 @@ describe("Thread gateway event handlers", () => {
 		expect(cached?.isThreadChannel()).toBe(true);
 		expect(emitSpy).toHaveBeenCalledWith(
 			ClientEvents.ThreadCreate,
-			expect.objectContaining({ id: threadPayload.id })
+			expect.any(Guild),
+			expect.objectContaining({ id: threadPayload.id }),
+			false
 		);
+	});
+
+	it("ThreadCreate passes newlyCreated only for a thread that was just created", async () => {
+		const client = await seededClient();
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await ThreadCreate.handler(client, { ...createThread("thread-new"), newly_created: true });
+		await ThreadCreate.handler(client, createThread("thread-added"));
+
+		const calls = emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ThreadCreate);
+		expect(calls.map(([, , thread, newlyCreated]) => [ (thread as GuildThreadChannel).id, newlyCreated ])).toEqual([
+			[ "thread-new", true ],
+			[ "thread-added", false ]
+		]);
+	});
+
+	it("ThreadCreate exposes thread metadata in camelCase", async () => {
+		const client = await seededClient();
+		await ThreadCreate.handler(client, {
+			...createThread(),
+			thread_metadata: { ...createThread().thread_metadata!, create_timestamp: "2024-01-01T00:00:00.000Z" }
+		});
+
+		const thread = client.guilds.get("guild-1")!.channels.get("thread-1") as GuildThreadChannel;
+		expect(thread.threadMetadata).toEqual({
+			archived: false,
+			autoArchiveDuration: 1440,
+			archiveTimestamp: "2024-01-01T00:00:00.000Z",
+			locked: false,
+			createTimestamp: "2024-01-01T00:00:00.000Z"
+		});
 	});
 
 	it("ThreadUpdate patches the cached instance in place and emits both states", async () => {
@@ -868,7 +964,7 @@ describe("Thread gateway event handlers", () => {
 		expect((cachedAfter as GuildThreadChannel).threadMetadata?.archived).toBe(true);
 
 		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
-		const [oldThread, newThread] = emitted(emitSpy, ClientEvents.ThreadUpdate) as [GuildThreadChannel, GuildThreadChannel];
+		const [, oldThread, newThread] = emitted(emitSpy, ClientEvents.ThreadUpdate) as [Guild, GuildThreadChannel, GuildThreadChannel];
 		expect(newThread).toBe(cachedAfter);
 		expect(oldThread).not.toBe(cachedAfter);
 		expect(oldThread.name).toBe("help-thread");
@@ -891,6 +987,7 @@ describe("Thread gateway event handlers", () => {
 
 		expect(emitSpy).toHaveBeenCalledWith(
 			ClientEvents.ThreadDelete,
+			expect.any(Guild),
 			expect.objectContaining({ name: "help-thread" })
 		);
 		expect(client.guilds.get("guild-1")?.channels.has(threadPayload.id)).toBe(false);
@@ -908,7 +1005,7 @@ describe("Thread gateway event handlers", () => {
 
 		await ThreadDelete.handler(client, partial);
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadDelete, partial);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadDelete, expect.any(Guild), partial);
 	});
 
 	it("ignores thread events for uncached guilds", async () => {
@@ -979,6 +1076,7 @@ describe("Auto moderation gateway event handlers", () => {
 		expect(cached?.triggerMetadata.keyword_filter).toEqual(["discord.gg"]);
 		expect(emitSpy).toHaveBeenCalledWith(
 			ClientEvents.AutoModerationRuleCreate,
+			expect.any(Guild),
 			expect.objectContaining({ id: rulePayload.id })
 		);
 	});
@@ -1006,7 +1104,7 @@ describe("Auto moderation gateway event handlers", () => {
 		expect(cachedAfter?.exemptRoles).toEqual(["role-1"]);
 
 		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
-		const [oldRule, newRule] = emitted(emitSpy, ClientEvents.AutoModerationRuleUpdate) as [AutoModerationRule, AutoModerationRule];
+		const [, oldRule, newRule] = emitted(emitSpy, ClientEvents.AutoModerationRuleUpdate) as [Guild, AutoModerationRule, AutoModerationRule];
 		expect(newRule).toBe(cachedAfter);
 		expect(oldRule).not.toBe(cachedAfter);
 		expect(oldRule.name).toBe("No links");
@@ -1024,6 +1122,7 @@ describe("Auto moderation gateway event handlers", () => {
 
 		expect(emitSpy).toHaveBeenCalledWith(
 			ClientEvents.AutoModerationRuleDelete,
+			expect.any(Guild),
 			expect.any(AutoModerationRule)
 		);
 		expect(client.guilds.get("guild-1")?.autoModerationRules.has(rulePayload.id)).toBe(false);
@@ -1037,7 +1136,7 @@ describe("Auto moderation gateway event handlers", () => {
 
 		await AutoModerationRuleDelete.handler(client, rulePayload);
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationRuleDelete, rulePayload);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.AutoModerationRuleDelete, expect.any(Guild), rulePayload);
 	});
 
 	it("ignores auto moderation events for uncached guilds", async () => {
@@ -1343,7 +1442,7 @@ describe("Guild scheduled event gateway event handlers", () => {
 		expect(cached).toBeInstanceOf(GuildScheduledEvent);
 		expect(cached!.name).toBe("Game night");
 		expect(cached!.entityType).toBe(DiscordGuildScheduledEventEntityTypes.VOICE);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventCreate, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventCreate, expect.any(Guild), cached);
 	});
 
 	it("GuildScheduledEventUpdate patches the cached instance in place", async () => {
@@ -1364,7 +1463,7 @@ describe("Guild scheduled event gateway event handlers", () => {
 		expect(updated.status).toBe(DiscordGuildScheduledEventStatus.ACTIVE);
 
 		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
-		const [oldEvent, newEvent] = emitted(emitSpy, ClientEvents.GuildScheduledEventUpdate) as [GuildScheduledEvent, GuildScheduledEvent];
+		const [, oldEvent, newEvent] = emitted(emitSpy, ClientEvents.GuildScheduledEventUpdate) as [Guild, GuildScheduledEvent, GuildScheduledEvent];
 		expect(newEvent).toBe(updated);
 		expect(oldEvent).not.toBe(updated);
 		expect(oldEvent.name).toBe("Game night");
@@ -1379,7 +1478,7 @@ describe("Guild scheduled event gateway event handlers", () => {
 
 		await GuildScheduledEventDelete.handler(client, createScheduledEvent());
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, expect.any(Guild), cached);
 		expect(client.guilds.get("guild-1")!.scheduledEvents.size).toBe(0);
 	});
 
@@ -1390,7 +1489,7 @@ describe("Guild scheduled event gateway event handlers", () => {
 
 		await GuildScheduledEventDelete.handler(client, payload);
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, payload);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventDelete, expect.any(Guild), payload);
 	});
 
 	it("GuildScheduledEventUserAdd emits the cached event, user, and guild", async () => {
@@ -1407,7 +1506,7 @@ describe("Guild scheduled event gateway event handlers", () => {
 			guild_id: "guild-1"
 		});
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventUserAdd, cached, user, guild);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.GuildScheduledEventUserAdd, guild, cached, user);
 	});
 
 	it("GuildScheduledEventUserAdd falls back to bare ids for an uncached event and user", async () => {
@@ -1423,9 +1522,9 @@ describe("Guild scheduled event gateway event handlers", () => {
 
 		expect(emitSpy).toHaveBeenCalledWith(
 			ClientEvents.GuildScheduledEventUserAdd,
+			guild,
 			{ id: "scheduled-event-missing" },
-			{ id: "user-missing" },
-			guild
+			{ id: "user-missing" }
 		);
 	});
 
@@ -1601,7 +1700,7 @@ describe("PresenceUpdate gateway event handler", () => {
 		expect(cached!.userId).toBe("member-1");
 		expect(cached!.guildId).toBe("guild-1");
 		expect(cached!.activities[0]!.name).toBe("Factorio");
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.PresenceUpdate, undefined, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.PresenceUpdate, expect.any(Guild), undefined, cached);
 	});
 
 	it("patches the existing instance in place rather than replacing it", async () => {
@@ -1627,7 +1726,7 @@ describe("PresenceUpdate gateway event handler", () => {
 			activities: [createActivity({ name: "Terraria" })]
 		}));
 
-		const [, oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Presence, Presence];
+		const [, , oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Guild, Presence, Presence];
 		expect(oldPresence).not.toBe(newPresence);
 		expect(oldPresence.status).toBe(Status.ONLINE);
 		expect(oldPresence.activities[0]!.name).toBe("Factorio");
@@ -1644,7 +1743,7 @@ describe("PresenceUpdate gateway event handler", () => {
 		await PresenceUpdate.handler(client, createPresence({ status: Status.OFFLINE, activities: [] }));
 
 		expect(presences.size).toBe(0);
-		const [, oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Presence, Presence];
+		const [, , oldPresence, newPresence] = emitSpy.mock.calls[0] as [unknown, Guild, Presence, Presence];
 		expect(oldPresence.status).toBe(Status.ONLINE);
 		expect(newPresence.status).toBe(Status.OFFLINE);
 	});
@@ -1837,10 +1936,10 @@ describe("Thread membership gateway event handlers", () => {
 		expect(cached).toBeInstanceOf(ThreadMember);
 		expect(cached!.id).toBe("thread-1");
 		expect(cached!.userId).toBe("member-1");
-		expect(cached!.joinedAt).toEqual(new Date("2024-01-01T00:00:00.000Z"));
+		expect(cached!.joinedAt).toBe("2024-01-01T00:00:00.000Z");
 		expect(cached!.thread).toBe(threadOf(client));
 		expect(threadOf(client).member?.user_id).toBe("member-1");
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadMemberUpdate, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ThreadMemberUpdate, expect.any(Guild), cached);
 	});
 
 	it("ThreadMemberUpdate patches the existing instance in place", async () => {
@@ -2117,7 +2216,7 @@ describe("Integration gateway event handlers", () => {
 		expect(cached!.type).toBe("twitch");
 		expect(cached!.guildId).toBe("guild-1");
 		expect(cached!.expireBehavior).toBe(DiscordIntegrationExpireBehaviors.REMOVE_ROLE);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationCreate, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationCreate, expect.any(Guild), cached);
 	});
 
 	it("IntegrationUpdate patches the cached instance in place", async () => {
@@ -2138,7 +2237,7 @@ describe("Integration gateway event handlers", () => {
 		expect(updated.subscriberCount).toBe(42);
 
 		// ...so the emitted old value is a snapshot taken before the patch, not the cached instance
-		const [oldIntegration, newIntegration] = emitted(emitSpy, ClientEvents.IntegrationUpdate) as [Integration, Integration];
+		const [, oldIntegration, newIntegration] = emitted(emitSpy, ClientEvents.IntegrationUpdate) as [Guild, Integration, Integration];
 		expect(newIntegration).toBe(updated);
 		expect(oldIntegration).not.toBe(updated);
 		expect(oldIntegration.enabled).toBe(true);
@@ -2152,7 +2251,7 @@ describe("Integration gateway event handlers", () => {
 		await IntegrationUpdate.handler(client, createIntegration());
 
 		const cached = client.guilds.get("guild-1")!.integrations.get("integration-1")!;
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationUpdate, undefined, cached);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationUpdate, expect.any(Guild), undefined, cached);
 	});
 
 	it("IntegrationDelete emits the cached integration with its guild and drops it from the cache", async () => {
@@ -2168,7 +2267,7 @@ describe("Integration gateway event handlers", () => {
 			application_id: "application-1"
 		});
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, cached, guild, "application-1");
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, guild, cached, "application-1");
 		expect(guild.integrations.size).toBe(0);
 	});
 
@@ -2179,7 +2278,7 @@ describe("Integration gateway event handlers", () => {
 
 		await IntegrationDelete.handler(client, { id: "integration-1", guild_id: "guild-1" });
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, { id: "integration-1" }, guild, undefined);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.IntegrationDelete, guild, { id: "integration-1" }, undefined);
 	});
 
 	it("GuildIntegrationsUpdate emits the guild the change happened in", async () => {
@@ -2329,7 +2428,7 @@ describe("Soundboard sound gateway event handlers", () => {
 
 		await SoundboardSoundDelete.handler(client, { sound_id: "sound-1", guild_id: "guild-1" });
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundDelete, guild, { soundId: "sound-1" });
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.SoundboardSoundDelete, guild, { soundId: "sound-1", guildId: "guild-1" });
 	});
 
 	it("SoundboardSoundsUpdate derives per-sound create and update events, then emits the batch", async () => {
@@ -2449,7 +2548,7 @@ describe("Update event old-value snapshots", () => {
 		});
 
 		const cached = client.guilds.get("guild-1")!.roles.get("role-1")!;
-		const [oldRole, newRole] = emitted(emitSpy, ClientEvents.RoleUpdate) as [Role, Role];
+		const [, oldRole, newRole] = emitted(emitSpy, ClientEvents.RoleUpdate) as [Guild, Role, Role];
 		expect(newRole).toBe(cached);
 		expect(oldRole).not.toBe(cached);
 		expect(oldRole.name).toBe("Role");
@@ -2472,7 +2571,7 @@ describe("Update event old-value snapshots", () => {
 		});
 
 		const cached = client.guilds.get("guild-1")!.channels.get("channel-1")!;
-		const [oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [GuildTextChannel, GuildTextChannel];
+		const [, oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [Guild, GuildTextChannel, GuildTextChannel];
 		expect(newChannel).toBe(cached);
 		expect(oldChannel.name).toBe("general");
 		expect(newChannel.name).toBe("renamed");
@@ -2492,7 +2591,7 @@ describe("Update event old-value snapshots", () => {
 
 		// `messages` is lazily built off a WeakMap precisely so a clone, which carries no private
 		// fields across, still resolves it
-		const [oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [GuildTextChannel, GuildTextChannel];
+		const [, oldChannel, newChannel] = emitted(emitSpy, ClientEvents.ChannelUpdate) as [Guild, GuildTextChannel, GuildTextChannel];
 		expect(oldChannel.messages).toBeDefined();
 		expect(oldChannel.messages).not.toBe(newChannel.messages);
 	});
@@ -2512,7 +2611,7 @@ describe("Update event old-value snapshots", () => {
 		});
 
 		const cached = client.guilds.get("guild-1")!.members.get("member-1")!;
-		const [oldMember, newMember] = emitted(emitSpy, ClientEvents.MemberUpdate) as [Member, Member];
+		const [, oldMember, newMember] = emitted(emitSpy, ClientEvents.MemberUpdate) as [Guild, Member, Member];
 		expect(newMember).toBe(cached);
 		expect(oldMember).not.toBe(cached);
 		expect(oldMember.nick).toBeUndefined();
