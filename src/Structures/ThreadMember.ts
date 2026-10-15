@@ -21,8 +21,8 @@ export class ThreadMember extends APIGuildStructure<DiscordThreadMember> {
 	id!: string
 	/** Id of the user who joined the thread */
 	userId!: string
-	/** When the user last joined the thread */
-	joinedAt!: Date
+	/** When the user last joined the thread, as an ISO8601 timestamp */
+	joinedAt!: string
 	/** Thread-member flags, currently only used for notification settings */
 	flags!: number
 	/**
@@ -47,7 +47,7 @@ export class ThreadMember extends APIGuildStructure<DiscordThreadMember> {
 		this.id = data.id ?? this.id ?? this.thread.id;
 		this.userId = data.user_id ?? this.userId ?? this.client.user?.id ?? "";
 
-		if (data.join_timestamp !== undefined) this.joinedAt = new Date(data.join_timestamp);
+		if (data.join_timestamp !== undefined) this.joinedAt = data.join_timestamp;
 		if (data.flags !== undefined) this.flags = data.flags;
 
 		// `member` is typed as a partial, but Discord only ever sends it complete; a missing user
