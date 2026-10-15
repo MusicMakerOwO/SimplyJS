@@ -4,6 +4,38 @@ import { Messageable } from "../../Mixins/Channels/Messageable.js";
 import { ThreadMemberCache } from "../../Managers/ThreadMembers.js";
 
 /**
+ * Thread-specific state, the camelCase form of Discord's `thread_metadata`.
+ * @see https://docs.discord.com/developers/resources/channel#thread-metadata-object
+ */
+export type ThreadMetadata = {
+	/** Whether the thread is archived */
+	archived: boolean;
+	/** Minutes of inactivity after which the thread stops showing in the channel list: 60, 1440, 4320, or 10080 */
+	autoArchiveDuration: number;
+	/** ISO8601 timestamp of when the thread's archive status last changed, used for calculating recent activity */
+	archiveTimestamp: string;
+	/** Whether the thread is locked; only members with `MANAGE_THREADS` can unarchive a locked thread */
+	locked: boolean;
+	/** Whether non-moderators can add other non-moderators; only present on private threads */
+	invitable?: boolean;
+	/** ISO8601 timestamp of when the thread was created; only populated for threads created after 2022-01-09 */
+	createTimestamp?: string | null;
+};
+
+/** Converts a wire `thread_metadata` into a {@link ThreadMetadata}, leaving absent optional fields absent. */
+function ToThreadMetadata(data: DiscordThreadMetadata): ThreadMetadata {
+	const metadata: ThreadMetadata = {
+		archived: data.archived,
+		autoArchiveDuration: data.auto_archive_duration,
+		archiveTimestamp: data.archive_timestamp,
+		locked: data.locked
+	};
+	if (data.invitable !== undefined) metadata.invitable = data.invitable;
+	if (data.create_timestamp !== undefined) metadata.createTimestamp = data.create_timestamp;
+	return metadata;
+}
+
+/**
  * A thread channel (public, private, or announcement). Threads inherit permission overwrites
  * from their parent channel rather than declaring their own.
  */
@@ -24,7 +56,7 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 	/** Approximate number of members in the thread; Discord stops counting past `50`, so this is not exact for larger threads */
 	declare memberCount?: number
 	/** Thread-specific state: archive status, auto-archive duration, lock status, and timestamps */
-	declare threadMetadata?: DiscordThreadMetadata
+	declare threadMetadata?: ThreadMetadata
 	/** Thread membership data for the current user, only present when the current user has joined the thread */
 	declare member?: DiscordThreadMember
 	/** Total number of messages ever sent in the thread, including deleted ones; unlike `messageCount` this never decreases */
@@ -50,7 +82,7 @@ export class GuildThreadChannel extends Messageable(BaseChannel) {
 		if (data.last_message_id !== undefined) this.lastMessageId = data.last_message_id;
 		if (data.message_count !== undefined) this.messageCount = data.message_count;
 		if (data.member_count !== undefined) this.memberCount = data.member_count;
-		if (data.thread_metadata !== undefined) this.threadMetadata = data.thread_metadata;
+		if (data.thread_metadata !== undefined) this.threadMetadata = ToThreadMetadata(data.thread_metadata);
 		if (data.member !== undefined) {
 			this.member = data.member;
 			this.members.upsert(data.member);
