@@ -3,14 +3,14 @@ import {
 	DiscordStickerFormatTypes,
 	DiscordStickerTypes
 } from "../Types/DiscordAPITypes.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { User } from "./User.js";
 import { Client } from "../Client.js";
 import { Guild } from "./Guild.js";
 
 /** A custom guild sticker, or a standard sticker from a purchasable sticker pack. */
-export class Sticker extends APIGuildStructure<DiscordSticker> {
+export class Sticker extends APIGuildSnowflakeStructure<DiscordSticker> {
 	id!: string
 	/** Sticker pack id for standard stickers, when present */
 	packId?: string

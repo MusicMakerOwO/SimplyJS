@@ -217,3 +217,19 @@ export function ResolveColor(value: number | string): number {
 
 	return parseInt(value.slice(1), 16);
 }
+
+/** Discord's epoch, the first millisecond of 2015, which every snowflake timestamp counts from */
+const DISCORD_EPOCH = 1_420_070_400_000n;
+
+/**
+ * Reads the creation time out of a Discord snowflake id.
+ *
+ * Every id Discord issues (users, guilds, channels, messages, interactions, ...) encodes the
+ * millisecond it was created in its top 42 bits, so this needs no request and no cache.
+ * @param id A snowflake, as Discord sends it (a string) or as a `bigint`.
+ * @returns Milliseconds since the Unix epoch, ready for `new Date(...)`.
+ * @throws {SyntaxError} When `id` is not an integer string.
+ */
+export function SnowflakeTimestamp(id: string | bigint): number {
+	return Number((BigInt(id) >> 22n) + DISCORD_EPOCH);
+}

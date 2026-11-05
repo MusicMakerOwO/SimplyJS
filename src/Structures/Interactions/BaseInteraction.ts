@@ -1,6 +1,6 @@
 import { Client } from "../../Client.js";
 import { DiscordAPIError } from "../../Rest.js";
-import { APIClientStructure } from "../../Contracts/DiscordStructure.js";
+import { APIClientSnowflakeStructure } from "../../Contracts/DiscordStructure.js";
 import { DiscordInteraction, InteractionType, InteractionTypes } from "../../Types/Interactions.js";
 import { InteractionContextType } from "../../Types/ApplicationCommand.js";
 import { DiscordChannel, DiscordGuild } from "../../Types/DiscordAPITypes.js";
@@ -18,7 +18,7 @@ const ALREADY_ACKNOWLEDGED = 40060;
  *
  * @see https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-object
  */
-export class BaseInteraction extends APIClientStructure<DiscordInteraction> {
+export class BaseInteraction extends APIClientSnowflakeStructure<DiscordInteraction> {
 	id!: string
 	applicationId!: string
 	type!: InteractionType

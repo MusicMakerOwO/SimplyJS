@@ -1,5 +1,6 @@
 import { Client } from "../Client.js";
 import { Guild } from "../Structures/index.js";
+import { SnowflakeTimestamp } from "../Utils.js";
 
 /**
  * Shallow-copies a structure onto a fresh instance of its own class, then lets the class detach
@@ -111,4 +112,51 @@ export abstract class APIGuildStructure<T extends object> {
 	 * Runs on the freshly created clone, with the instance it was copied from.
 	 */
 	protected detach(_source: this): void {}
+}
+
+/**
+ * {@link APIClientStructure} for structures identified by a snowflake `id`, which therefore know
+ * when they were created without a request: users, guilds, messages, webhooks, interactions.
+ *
+ * Structures keyed by something else extend {@link APIClientStructure} directly - an invite is
+ * keyed by its code, and a structure whose `id` is borrowed from another object (a thread member's
+ * is the thread's) would report the wrong thing's creation time.
+ */
+export abstract class APIClientSnowflakeStructure<T extends object> extends APIClientStructure<T> {
+	/** The snowflake id this structure is keyed by, which {@link createdTimestamp} is read from */
+	abstract id: string;
+
+	/** When this was created, in milliseconds since the Unix epoch, read from its snowflake id */
+	get createdTimestamp(): number {
+		return SnowflakeTimestamp(this.id);
+	}
+
+	/** When this was created, read from its snowflake id */
+	get createdAt(): Date {
+		return new Date(this.createdTimestamp);
+	}
+}
+
+/**
+ * {@link APIGuildStructure} for structures identified by a snowflake `id`, which therefore know
+ * when they were created without a request: channels, roles, emojis, stickers, integrations,
+ * scheduled events, auto moderation rules.
+ *
+ * The getters repeat {@link APIClientSnowflakeStructure}'s, since the two bases share no
+ * ancestor to hang them on. Structures keyed by something else extend {@link APIGuildStructure}
+ * directly - a member is keyed by its user, whose creation is not the member's.
+ */
+export abstract class APIGuildSnowflakeStructure<T extends object> extends APIGuildStructure<T> {
+	/** The snowflake id this structure is keyed by, which {@link createdTimestamp} is read from */
+	abstract id: string;
+
+	/** When this was created, in milliseconds since the Unix epoch, read from its snowflake id */
+	get createdTimestamp(): number {
+		return SnowflakeTimestamp(this.id);
+	}
+
+	/** When this was created, read from its snowflake id */
+	get createdAt(): Date {
+		return new Date(this.createdTimestamp);
+	}
 }

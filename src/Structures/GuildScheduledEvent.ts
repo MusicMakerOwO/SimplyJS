@@ -8,7 +8,7 @@ import {
 	DiscordGuildScheduledEventStatus,
 	DiscordUser
 } from "../Types/DiscordAPITypes.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { ImageInput, JSONObject } from "../Types/index.js";
@@ -17,7 +17,7 @@ import { EncodeImage } from "../Utils.js";
 /**
  * An event scheduled in a guild, such as a stage, voice, or external meetup.
  */
-export class GuildScheduledEvent extends APIGuildStructure<DiscordGuildScheduledEvent> {
+export class GuildScheduledEvent extends APIGuildSnowflakeStructure<DiscordGuildScheduledEvent> {
 	id!: string
 	/** Channel the event will be hosted in, `null` when `entityType` is `EXTERNAL` */
 	channelId!: string | null

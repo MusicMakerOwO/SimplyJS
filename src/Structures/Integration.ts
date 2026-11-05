@@ -8,7 +8,7 @@ import {
 	DiscordOAuth2Scopes,
 	DiscordUser
 } from "../Types/index.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 import { Role } from "./Role.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
@@ -25,7 +25,7 @@ import { ObjectValues } from "../Types/HelperTypes.js";
  *
  * @see https://docs.discord.com/developers/resources/guild#integration-object
  */
-export class Integration extends APIGuildStructure<DiscordIntegration> {
+export class Integration extends APIGuildSnowflakeStructure<DiscordIntegration> {
 	id!: string;
 	/** The integration name */
 	name!: string;

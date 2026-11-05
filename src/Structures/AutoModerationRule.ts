@@ -6,7 +6,7 @@ import {
 	DiscordAutoModerationRuleTriggerMetadata,
 	DiscordAutoModerationRuleTriggerType
 } from "../Types/DiscordAPITypes.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { JSONObject } from "../Types/index.js";
@@ -15,7 +15,7 @@ import { JSONObject } from "../Types/index.js";
  * An auto moderation rule, describing the content Discord should check for in a guild and the
  * actions to take when a match is found.
  */
-export class AutoModerationRule extends APIGuildStructure<DiscordAutoModerationRule> {
+export class AutoModerationRule extends APIGuildSnowflakeStructure<DiscordAutoModerationRule> {
 	id!: string
 	/** The rule name */
 	name!: string

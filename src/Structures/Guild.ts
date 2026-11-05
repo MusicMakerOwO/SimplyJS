@@ -18,7 +18,7 @@ import {
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { ImageInput, JSONObject } from "../Types/Internal.js";
 import { CDNImageURL, EncodeImage } from "../Utils.js";
-import { APIClientStructure } from "../Contracts/DiscordStructure.js";
+import { APIClientSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { RoleCache } from "../Managers/Roles.js";
 import { StickerCache } from "../Managers/Stickers.js";
 import { EmojiCache } from "../Managers/Emojis.js";
@@ -42,7 +42,7 @@ import { SoundboardSoundCache } from "../Managers/SoundboardSounds.js";
  *
  * @see https://docs.discord.com/developers/resources/guild#guild-object
  */
-export class Guild extends APIClientStructure<DiscordGuild> {
+export class Guild extends APIClientSnowflakeStructure<DiscordGuild> {
 	id!: string;
 	name!: string;
 	/** Icon hash, or `null` when the guild has no icon */

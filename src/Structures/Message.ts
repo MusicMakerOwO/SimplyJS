@@ -7,7 +7,7 @@ import {
 	ChannelMention,
 	Reaction, ResolvedData, RoleSubscriptionData, SharedClientTheme, StickerItem
 } from "../Types/MessageComponents.js";
-import { APIClientStructure } from "../Contracts/DiscordStructure.js";
+import { APIClientSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { DiscordApplication, DiscordChannel, DiscordMember, DiscordSticker } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { Client } from "../Client.js";
@@ -196,7 +196,7 @@ export function PreparePayload<T extends MessagePayload>(
  *
  * @see https://docs.discord.com/developers/resources/message#message-object
  */
-export class Message extends APIClientStructure<DiscordMessage> {
+export class Message extends APIClientSnowflakeStructure<DiscordMessage> {
 	id!: string
 	channelId!: string
 	/**

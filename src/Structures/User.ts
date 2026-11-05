@@ -6,7 +6,7 @@ import {
 	DiscordUser,
 	DiscordUserPrimaryGuild
 } from "../Types/DiscordAPITypes.js";
-import { APIClientStructure } from "../Contracts/DiscordStructure.js";
+import { APIClientSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { MessagePayload } from "../Types/Internal.js";
 import { CDNImageURL } from "../Utils.js";
 import { CreateMessagePayload, Message, PreparePayload } from "./Message.js";
@@ -25,7 +25,7 @@ const dmChannels = new WeakMap<User, DiscordChannel>();
  * A Discord user account. Represents the global identity behind a {@link Member} in a guild,
  * or the other party in a direct message.
  */
-export class User extends APIClientStructure<DiscordUser> {
+export class User extends APIClientSnowflakeStructure<DiscordUser> {
 	id!: string
 	/** Username without discriminator formatting */
 	username!: string

@@ -8,7 +8,7 @@ import {
 	ObjectValues
 } from "../Types/index.js";
 import { Client } from "../Client.js";
-import { APIClientStructure } from "../Contracts/DiscordStructure.js";
+import { APIClientSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { ImageInput, MessagePayload } from "../Types/Internal.js";
 import { CDNImageURL, EncodeImage } from "../Utils.js";
 import { CreateMessagePayload, PreparePayload } from "./Message.js";
@@ -51,7 +51,7 @@ export type WebhookExecuteOptions = {
  *
  * @see https://docs.discord.com/developers/resources/webhook#webhook-object
  */
-export class Webhook extends APIClientStructure<DiscordWebhook> {
+export class Webhook extends APIClientSnowflakeStructure<DiscordWebhook> {
 
 	/** the id of the webhook */
 	id!: string;

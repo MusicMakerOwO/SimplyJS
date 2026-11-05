@@ -1,5 +1,5 @@
 import { Client } from "../Client.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { DiscordRole } from "../Types/DiscordAPITypes.js";
 import { Guild } from "./Guild.js";
 import { BitField, BitFieldValue } from "../DataStructures/BitField.js";
@@ -12,7 +12,7 @@ import { CDNImageURL, EncodeImage, SerializeBitFieldValue } from "../Utils.js";
  *
  * @see https://docs.discord.com/developers/topics/permissions#role-object
  */
-export class Role extends APIGuildStructure<DiscordRole> {
+export class Role extends APIGuildSnowflakeStructure<DiscordRole> {
 	id!: string
 	name!: string
 	/**

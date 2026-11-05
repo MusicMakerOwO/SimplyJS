@@ -1,7 +1,7 @@
 import { Client } from "../../Client.js";
 import { DiscordChannel, DiscordChannelTypes } from "../../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../../Types/HelperTypes.js";
-import { APIGuildStructure } from "../../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../../Contracts/DiscordStructure.js";
 import { Guild } from "../Guild.js";
 import { GuildTextChannel } from "./GuildTextChannel.js";
 import { GuildThreadChannel } from "./GuildThreadChannel.js";
@@ -17,7 +17,7 @@ import { GuildCategoryChannel } from "./GuildCategoryChannel.js";
  *
  * @see https://docs.discord.com/developers/resources/channel#channel-object
  */
-export class BaseChannel extends APIGuildStructure<DiscordChannel> {
+export class BaseChannel extends APIGuildSnowflakeStructure<DiscordChannel> {
 	id!: string
 	type!: ObjectValues<typeof DiscordChannelTypes>
 	name?: string | null

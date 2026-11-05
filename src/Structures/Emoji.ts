@@ -1,11 +1,11 @@
 import { Client } from "../Client.js";
 import { DiscordEmoji } from "../Types/DiscordAPITypes.js";
 import { User } from "./User.js";
-import { APIGuildStructure } from "../Contracts/DiscordStructure.js";
+import { APIGuildSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { Guild } from "./Guild.js";
 
 /** A custom guild emoji, either a static image or, when `animated` is set, a GIF. */
-export class Emoji extends APIGuildStructure<DiscordEmoji> {
+export class Emoji extends APIGuildSnowflakeStructure<DiscordEmoji> {
 	id!: string
 	name!: string
 	/** Whether this emoji is animated */
