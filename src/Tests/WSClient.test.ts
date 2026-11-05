@@ -823,6 +823,30 @@ describe("WSClient lifecycle", () => {
 		expect(wsMockState.instances[1]!.url).toBe("wss://resume.example.com?v=10&encoding=json");
 	});
 
+	it("connects and resumes at gatewayUrl, ignoring the resume url from READY", () => {
+		vi.useFakeTimers();
+		const client = new Client({
+			token: "token",
+			intents: GatewayIntents.Guilds,
+			ws: { jitterOverride: 1, gatewayUrl: "ws://127.0.0.1:9000" }
+		});
+		client.socket.initialize();
+		expect(wsMockState.instances[0]!.url).toBe("ws://127.0.0.1:9000?v=10&encoding=json");
+
+		wsMockState.instances[0]!.emitMessage({
+			op: GatewayOpCodes.Dispatch,
+			d: { ...createReadyPayload(createUser()), resume_gateway_url: "wss://resume.example.com" },
+			s: 1,
+			t: GatewayEvents.Ready
+		});
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+		vi.advanceTimersByTime(0);
+
+		// a proxied client that resumed at Discord's url would bypass its own proxy
+		expect(wsMockState.instances[1]!.url).toBe("ws://127.0.0.1:9000?v=10&encoding=json");
+		client.socket.destroy();
+	});
+
 	it("closes with a resumable code when it tears down to reconnect", () => {
 		vi.useFakeTimers();
 		const socket = new WSClient({} as Client, { jitterOverride: 1 });
