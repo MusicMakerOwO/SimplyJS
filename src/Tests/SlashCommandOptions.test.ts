@@ -176,6 +176,31 @@ describe("SlashCommandOptions scalar accessors", () => {
 
 		expect(() => opts.getInteger("name")).toThrow(TypeError);
 	});
+
+	it("returns the value with required: true, typed without null", () => {
+		const opts = new SlashCommandOptions(client, undefined, options(
+			{ name: "name", type: ApplicationCommandOptionTypes.STRING, value: "Jo" },
+		));
+
+		const value: string = opts.getString("name", true);
+		expect(value).toBe("Jo");
+	});
+
+	it("throws for an absent option with required: true", () => {
+		const opts = new SlashCommandOptions(client, undefined, options());
+
+		expect(() => opts.getString("missing", true)).toThrow('Required option "missing" was not provided');
+		expect(() => opts.getUser("missing", true)).toThrow('Required option "missing" was not provided');
+		expect(opts.getString("missing", false)).toBeNull();
+	});
+
+	it("still reports a wrong type rather than a missing option with required: true", () => {
+		const opts = new SlashCommandOptions(client, undefined, options(
+			{ name: "name", type: ApplicationCommandOptionTypes.STRING, value: "Jo" },
+		));
+
+		expect(() => opts.getInteger("name", true)).toThrow(TypeError);
+	});
 });
 
 // ---------------------------------------------------------------------------
