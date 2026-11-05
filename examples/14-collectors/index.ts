@@ -1,4 +1,4 @@
-import { Client, ClientEvents, createCollector } from "../../dist/index.js";
+import { Client, ClientEvents, createCollector, WSEvents } from "../../dist/index.js";
 import { CommandHandler, FullClient } from "./types.js";
 
 import * as Commands from "./commands";
@@ -74,11 +74,12 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 // gateway socket works with the exact same call and still infers everything - `WSEvents` here
 // instead of `ClientEventMap`, no generics written by hand.
 //
-// `HEARTBEAT_ACK` carries no arguments, so this is the degenerate case of a collector: it is
-// being used purely as "wake me when this fires, or give up after a minute".
-const heartbeat = createCollector(client.socket, "HEARTBEAT_ACK", { max: 1, time: 60_000 });
+// `HeartbeatAck` carries the heartbeat's round trip, so this collector doubles as a latency
+// probe: wake on the next ACK, or give up after a minute. (`client.socket.ping` holds the same
+// number between ACKs.)
+const heartbeat = createCollector(client.socket, WSEvents.HeartbeatAck, { max: 1, time: 60_000 });
 heartbeat.next
-	.then(() => console.log('Gateway acknowledged a heartbeat, the connection is alive'))
+	.then(([latency]) => console.log(`Gateway acknowledged a heartbeat in ${latency}ms, the connection is alive`))
 	.catch(() => console.log('No heartbeat ack within 60s, the gateway connection looks stalled'));
 
 process.on('SIGINT', async () => {
