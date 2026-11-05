@@ -1,4 +1,4 @@
-import { Rest } from "./Rest.js";
+import { Rest, RestOptions } from "./Rest.js";
 import { WSClient, WSOptions, WSEvents } from "./WSClient.js";
 import { ResolveIntents } from "./Intents.js";
 import { ObjectValues } from "./Types/HelperTypes.js";
@@ -35,6 +35,17 @@ type ClientOptions = {
 
 	/** Options forwarded to the underlying {@link WSClient} (jitter, event overrides, etc) */
 	ws?: WSOptions
+
+	/**
+	 * Options forwarded to the underlying {@link Rest} client: rate limit behavior, and `baseUrl`
+	 * for a REST proxy.
+	 *
+	 * @example
+	 * ```ts
+	 * rest: { rateLimitDurationMultiplier: 1.5, baseUrl: "http://rest-proxy:8080/api/v10" }
+	 * ```
+	 */
+	rest?: RestOptions
 
 	/**
 	 * Bounds applied to every collector created on this client, underneath whatever that
@@ -90,7 +101,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 			... options.ws,
 			intents: ResolveIntents(options.intents),
 		});
-		this.rest = new Rest();
+		this.rest = new Rest(options.rest);
 
 		this.socket.setToken(options.token);
 		this.rest.setToken(options.token);

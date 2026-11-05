@@ -197,6 +197,15 @@ export type RestOptions = {
 	 * @default true
 	 */
 	perRouteRateLimits?: boolean;
+	/**
+	 * Where requests are sent: the API root that every route is appended to. Point it at a REST
+	 * proxy to share one set of rate limits between several processes (rate limits are per bot,
+	 * not per process), or at a local server in tests.
+	 *
+	 * No trailing slash - routes start with one.
+	 * @default "https://discord.com/api/v10"
+	 */
+	baseUrl?: string;
 };
 
 /**
@@ -212,6 +221,8 @@ export class Rest {
 	rateLimitDurationMultiplier: number;
 	/** Whether per-route rate limit tracking is enabled, see {@link RestOptions.perRouteRateLimits} */
 	perRouteRateLimits: boolean;
+	/** API root every route is appended to, see {@link RestOptions.baseUrl} */
+	baseUrl: string;
 
 	/**
 	 * TTL cache of rate limit wait keys (see {@link routeToBucket}) to the milliseconds to wait
@@ -243,6 +254,7 @@ export class Rest {
 		this.retryAfterRateLimit = options.retryAfterRateLimit ?? true;
 		this.rateLimitDurationMultiplier = options.rateLimitDurationMultiplier ?? 1;
 		this.perRouteRateLimits = options.perRouteRateLimits ?? true;
+		this.baseUrl = (options.baseUrl ?? DISCORD_API_BASE).replace(/\/+$/, "");
 		this.routeRateLimits = new TTLCache({ ttl: 1000 * 60 * 5 });
 		this.routeToBucket = new Map();
 	}
@@ -460,7 +472,7 @@ export class Rest {
 			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(method, normalizedRoute);
 			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey));
 
-			const response = await fetch(`${DISCORD_API_BASE}${normalizedRoute}`, {
+			const response = await fetch(`${this.baseUrl}${normalizedRoute}`, {
 				method,
 				headers: {
 					// `fetch` has to set Content-Type itself on multipart bodies so it can include the boundary
