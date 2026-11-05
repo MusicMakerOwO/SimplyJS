@@ -823,6 +823,31 @@ describe("WSClient lifecycle", () => {
 		expect(wsMockState.instances[1]!.url).toBe("wss://resume.example.com?v=10&encoding=json");
 	});
 
+	it("measures ping from a heartbeat to its ACK", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+		const mock = wsMockState.instances[0]!;
+		const latencies: number[] = [];
+		socket.on(WSEvents.HeartbeatAck, (latency) => latencies.push(latency));
+		expect(socket.ping).toBe(-1);
+
+		// the gateway asking for a heartbeat sends one immediately
+		mock.emitMessage({ op: GatewayOpCodes.Heartbeat, d: null, s: null, t: null });
+		vi.advanceTimersByTime(42);
+		mock.emitMessage({ op: GatewayOpCodes.HeartbeatACK, d: null, s: null, t: null });
+
+		expect(socket.ping).toBe(42);
+		expect(latencies).toEqual([42]);
+
+		// a stray ACK with no heartbeat outstanding leaves the last measurement alone
+		vi.advanceTimersByTime(1_000);
+		mock.emitMessage({ op: GatewayOpCodes.HeartbeatACK, d: null, s: null, t: null });
+		expect(socket.ping).toBe(42);
+		socket.destroy();
+	});
+
 	it("connects and resumes at gatewayUrl, ignoring the resume url from READY", () => {
 		vi.useFakeTimers();
 		const client = new Client({
