@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
 import { Collector, CollectorOptions, CollectorSource } from "../Collector.js";
-import { ClientEvents, InteractionEvents } from "../Types/SimplyJSTypes.js";
+import { ClientEvents, InteractionEvents, WarningCodes } from "../Types/SimplyJSTypes.js";
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { Awaitable } from "../Types/HelperTypes.js";
 import type { Client } from "../Client.js";
+import { EmitWarning } from "../Warnings.js";
 
 type AnyEmitter = EventEmitter<Record<string, unknown[]>>;
 type AnyCollector = Collector<unknown[]>;
@@ -253,7 +254,9 @@ class CollectorHub implements CollectorSource<unknown[]> {
 		if (this.#unbounded.size <= this.#manager.maxUnbounded) return;
 
 		this.#warned = true;
-		console.warn(
+		EmitWarning(
+			this.#manager.client,
+			WarningCodes.UnboundedCollectors,
 			`${this.#unbounded.size} collectors on "${this.#event}" have no \`time\`, \`idle\` or \`max\`, ` +
 			`so none of them will ever stop on their own. If these are created per command or per ` +
 			`message, they are accumulating - give them a bound, or call \`.stop()\` when the flow they ` +

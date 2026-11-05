@@ -656,7 +656,46 @@ export const ClientEvents = {
 	 */
 	ModalSubmitted: "ModalSubmitted",
 
+	/**
+	 * Fired when the library notices something that will not throw but is almost certainly a
+	 * mistake - a listener for an event your intents can never deliver, an interaction about to
+	 * miss Discord's 3 second window, a gateway event with no handler.
+	 *
+	 * Listener arguments: `warning` ({@link ClientWarning}). Filter on `warning.code`, one of
+	 * {@link WarningCodes}.
+	 *
+	 * Warnings are loud by default: while nothing listens to this event, each one is printed with
+	 * `console.warn`. Adding a listener takes over that output entirely, so a bot can route
+	 * warnings to its own logger, or drop the codes it has decided to accept.
+	 *
+	 * Requires no intents.
+	 */
+	Warn: "Warn",
 } as const;
+
+/**
+ * What a {@link ClientEvents.Warn} is about. Stable identifiers to filter on - the accompanying
+ * `message` is prose and may change between releases.
+ */
+export const WarningCodes = {
+	/** The gateway sent a dispatch event the library has no handler for. Sent once per event name. */
+	UnhandledEvent: "UnhandledEvent",
+	/**
+	 * More than `client.collectors.maxUnbounded` collectors with no `time`, `idle`, or `max` are
+	 * live on one event, so none of them will ever stop on their own - usually a sign they are
+	 * created per command or per message and accumulating. The message includes where the most
+	 * recent one was created. Sent once per event, set `maxUnbounded` to `0` to turn it off.
+	 */
+	UnboundedCollectors: "UnboundedCollectors",
+} as const;
+
+/** The payload of {@link ClientEvents.Warn} */
+export type ClientWarning = {
+	/** Which kind of warning this is - the field to filter on */
+	code: ObjectValues<typeof WarningCodes>;
+	/** Human-readable explanation, including what to do about it */
+	message: string;
+};
 
 /**
  * Audit log action types under library-style names, for `Guild.fetchAuditLogs({ actionType })`.
@@ -944,4 +983,6 @@ export type ClientEventMap = {
 	[ClientEvents.SelectMenuUsed]: [interaction: SelectMenuInteraction];
 	[ClientEvents.AutocompleteUsed]: [interaction: AutocompleteInteraction];
 	[ClientEvents.ModalSubmitted]: [interaction: ModalInteraction];
+
+	[ClientEvents.Warn]: [warning: ClientWarning];
 };

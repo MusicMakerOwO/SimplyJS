@@ -2,6 +2,8 @@ import { Client } from "./Client.js";
 import { GatewayEvents } from "./Types/DiscordGateway.js";
 import { Awaitable, ObjectValues } from "./Types/HelperTypes.js";
 import { EventHandler, JSONObject } from "./Types/Internal.js";
+import { WarningCodes } from "./Types/SimplyJSTypes.js";
+import { EmitWarning } from "./Warnings.js";
 
 import * as AvailableEvents from "./Events/index.js";
 
@@ -42,7 +44,7 @@ export function CreateDispatch(
 		if (!events.has(event)) {
 			if (!warnedUnhandledEvents.has(event)) {
 				warnedUnhandledEvents.add(event);
-				console.warn(`Unhandled event: "${event}" - No internal handler defined`);
+				EmitWarning(client, WarningCodes.UnhandledEvent, `Unhandled event: "${event}" - No internal handler defined`);
 			}
 			return;
 		}
