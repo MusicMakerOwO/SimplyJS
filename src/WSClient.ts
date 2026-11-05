@@ -27,7 +27,10 @@ export const WSEvents = {
 	InvalidSession: "InvalidSession",
 	/** Mirrors op `Hello` (10) - fired once per connection with the heartbeat interval to use */
 	Hello: "Hello",
-	/** Mirrors op `HeartbeatACK` (11) - fired when the gateway acknowledges a heartbeat */
+	/**
+	 * Mirrors op `HeartbeatACK` (11) - fired when the gateway acknowledges a heartbeat, with the
+	 * round trip in milliseconds (the new {@link WSClient.ping}).
+	 */
 	HeartbeatAck: "HeartbeatAck",
 	/** Fired when the gateway sends the `READY` dispatch, indicating successful authentication */
 	Ready: "Ready",
@@ -49,7 +52,7 @@ export type WSEventMap = {
 	[WSEvents.Reconnect]: [];
 	[WSEvents.InvalidSession]: [resumable: boolean];
 	[WSEvents.Hello]: [heartbeatInterval: number];
-	[WSEvents.HeartbeatAck]: [];
+	[WSEvents.HeartbeatAck]: [latency: number];
 	[WSEvents.Ready]: [];
 	[WSEvents.Resumed]: [];
 	[WSEvents.Error]: [error: Error];
@@ -160,6 +163,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#reconnectTimer: NodeJS.Timeout | null = null;
 	#reconnectAttempts: number = 0;
 	#gatewayUrl: string | null;
+	/** When the heartbeat now awaiting its ACK was sent; `null` when none is outstanding */
+	#heartbeatSentAt: number | null = null;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -169,6 +174,14 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	intents: number;
 	/** Consecutive reconnect attempts allowed before the client gives up, see {@link WSOptions.maxReconnectAttempts} */
 	maxReconnectAttempts: number;
+
+	/**
+	 * Round trip of the last acknowledged heartbeat, in milliseconds; `-1` until the first ACK.
+	 *
+	 * Kept across reconnects, so it reads as the last known latency rather than resetting to `-1`
+	 * every time the connection drops. Updated once per heartbeat interval (about 41 seconds).
+	 */
+	ping: number = -1;
 
 	/** Whether Discord authentication has completed */
 	ready: boolean;
@@ -305,6 +318,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		}
 		this.ready = false;
 		this.heartbeatInterval = -1;
+		this.#heartbeatSentAt = null;
 	}
 
 	/** Drops the resume state so the next `HELLO` sends a fresh `IDENTIFY` instead of a `RESUME` */
@@ -372,7 +386,12 @@ export class WSClient extends EventEmitter<WSEventMap> {
 				return;
 			case GatewayOpCodes.HeartbeatACK:
 				this.#heartbeatAcked = true;
-				this.emit(WSEvents.HeartbeatAck);
+				// an ACK with nothing outstanding (a duplicate, or one for a pre-reconnect beat) has no round trip to measure
+				if (this.#heartbeatSentAt !== null) {
+					this.ping = Date.now() - this.#heartbeatSentAt;
+					this.#heartbeatSentAt = null;
+				}
+				this.emit(WSEvents.HeartbeatAck, this.ping);
 				return;
 			case GatewayOpCodes.Reconnect:
 				this.emit(WSEvents.Reconnect);
@@ -477,6 +496,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	/** Sends a heartbeat payload and marks the current one as unacknowledged until `HeartbeatACK` arrives */
 	#sendHeartbeat(): void {
 		this.#heartbeatAcked = false;
+		this.#heartbeatSentAt = Date.now();
 		this.send({
 			op: GatewayOpCodes.Heartbeat,
 			d: this.#sequence,
