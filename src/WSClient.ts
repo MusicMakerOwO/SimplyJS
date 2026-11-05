@@ -132,6 +132,16 @@ export type WSOptions = {
 	 * @default 10
 	 */
 	maxReconnectAttempts?: number;
+
+	/**
+	 * Connect here instead of Discord's gateway - a gateway proxy, or a local gateway for tests.
+	 *
+	 * Also used for resumes, so it wins over the `resume_gateway_url` Discord sends in `READY`;
+	 * without that, a proxied client would resume straight past its proxy.
+	 *
+	 * @default "wss://gateway.discord.gg"
+	 */
+	gatewayUrl?: string;
 }
 
 /**
@@ -149,6 +159,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#destroyed: boolean = false;
 	#reconnectTimer: NodeJS.Timeout | null = null;
 	#reconnectAttempts: number = 0;
+	#gatewayUrl: string | null;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -178,6 +189,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.jitter = options.jitterOverride ?? Math.random();
 		this.intents = options.intents ?? 0;
 		this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
+		this.#gatewayUrl = options.gatewayUrl ?? null;
 
 		this.ready = false;
 
@@ -205,7 +217,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			this.#reconnectTimer = null;
 		}
 
-		const baseUrl = this.#resumeGatewayUrl ?? "wss://gateway.discord.gg";
+		const baseUrl = this.#gatewayUrl ?? this.#resumeGatewayUrl ?? "wss://gateway.discord.gg";
 		const socket = new WebSocket(`${baseUrl}?v=10&encoding=json`);
 		this.#socket = socket;
 
