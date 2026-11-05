@@ -7,9 +7,13 @@ import { DiscordChannel, DiscordGuild } from "../../Types/DiscordAPITypes.js";
 import { JSONObject } from "../../Types/Internal.js";
 import { Member } from "../Member.js";
 import { User } from "../User.js";
+import { EmitWarning } from "../../Warnings.js";
+import { WarningCodes } from "../../Types/SimplyJSTypes.js";
 
 /** Discord's code for an interaction that has already had its one initial response */
 const ALREADY_ACKNOWLEDGED = 40060;
+/** Discord's code for an interaction whose 3 second response window has closed (or that never existed) */
+const UNKNOWN_INTERACTION = 10062;
 
 /**
  * Base class for every interaction type (commands, components, modal submits, autocomplete,
@@ -80,6 +84,15 @@ export class BaseInteraction extends APIClientSnowflakeStructure<DiscordInteract
 	 * reaches Discord, so a transient failure doesn't leave the interaction unanswerable.
 	 */
 	acknowledged = false;
+
+	/**
+	 * When the client received this interaction, in milliseconds since the Unix epoch.
+	 *
+	 * Measured from local receipt rather than read from the snowflake id, because the id carries
+	 * Discord's clock: a host clock running a few seconds ahead would make every interaction look
+	 * late. Discord's 3 second response window starts at about this moment.
+	 */
+	readonly receivedAt: number = Date.now();
 
 	/** Which method acknowledged this interaction, used to make the double-response error specific */
 	#acknowledgedBy: string | null = null;
@@ -178,6 +191,17 @@ export class BaseInteraction extends APIClientSnowflakeStructure<DiscordInteract
 		} catch (error) {
 			if (!(error instanceof DiscordAPIError && error.code === ALREADY_ACKNOWLEDGED)) {
 				this.unacknowledge();
+			}
+
+			if (error instanceof DiscordAPIError && error.code === UNKNOWN_INTERACTION) {
+				const elapsed = Date.now() - this.receivedAt;
+				EmitWarning(
+					this.client,
+					WarningCodes.SlowAcknowledgement,
+					`\`${method}()\` failed with 10062 Unknown interaction ${elapsed.toLocaleString("en-US")}ms after the ` +
+					"interaction was received - Discord only accepts the initial response within 3 seconds. Respond sooner, " +
+					"or defer first (`deferReply()` / `deferUpdate()`) when the work takes longer."
+				);
 			}
 
 			throw error;

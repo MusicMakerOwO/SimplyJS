@@ -689,6 +689,12 @@ export const WarningCodes = {
 	 * empty except in DMs, in messages that mention the bot, and in the bot's own messages. Sent once.
 	 */
 	MissingMessageContent: "MissingMessageContent",
+	/**
+	 * An interaction was still unacknowledged when the slow-acknowledgement threshold passed, or its
+	 * initial response came back `10062 Unknown interaction` because Discord's 3 second window had
+	 * already closed. See `ClientOptions.slowAcknowledgementWarning`.
+	 */
+	SlowAcknowledgement: "SlowAcknowledgement",
 	/** The gateway sent a dispatch event the library has no handler for. Sent once per event name. */
 	UnhandledEvent: "UnhandledEvent",
 	/**

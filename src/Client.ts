@@ -63,6 +63,20 @@ type ClientOptions = {
 	 * ```
 	 */
 	collectorDefaults?: CollectorDefaults
+
+	/**
+	 * Milliseconds after receipt at which an interaction that still has no initial response raises
+	 * a `WarningCodes.SlowAcknowledgement` warning (see `ClientEvents.Warn`), or `false` to turn the
+	 * check off.
+	 *
+	 * Discord rejects an initial response that arrives more than 3 seconds after the interaction,
+	 * so the default leaves half a second to notice. The warning also says how much of the delay
+	 * was spent inside the library, waiting on asynchronous collector filters, before any handler
+	 * saw the interaction.
+	 *
+	 * @default 2500
+	 */
+	slowAcknowledgementWarning?: number | false
 }
 
 /**
@@ -106,6 +120,9 @@ export class Client extends EventEmitter<ClientEventMap> {
 	 */
 	readonly intents: number;
 
+	/** See {@link ClientOptions.slowAcknowledgementWarning} */
+	slowAcknowledgementWarning: number | false;
+
 	constructor(options: ClientOptions) {
 		super();
 
@@ -134,6 +151,8 @@ export class Client extends EventEmitter<ClientEventMap> {
 
 		this.status = Status.ONLINE;
 		this.activity = null;
+
+		this.slowAcknowledgementWarning = options.slowAcknowledgementWarning ?? 2_500;
 
 		this.id = ApplicationIdFromToken(options.token);
 	}
