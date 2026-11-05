@@ -169,9 +169,7 @@ describe("BitField", () => {
 
 	it("throws when start value string is not a valid integer", () => {
 		expect(() => new BitField(TestFlags, "abc"))
-		.toThrow(
-			"Cannot convert abc to a BigInt"
-		);
+		.toThrow('Invalid bitfield value "abc" - expected an integer');
 	});
 });
 

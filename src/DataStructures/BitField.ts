@@ -115,12 +115,19 @@ export class BitField<TFlags extends Record<string, bigint>> {
 		this.value = this.parseBit(value);
 	}
 
-	/** Normalizes a raw bigint/number/numeric-string bit value to a `bigint`, treating an empty string as `0` */
+	/**
+	 * Normalizes a raw bigint/number/numeric-string bit value to a `bigint`, treating an empty string as `0`
+	 * @throws {SyntaxError} When a string is not an integer. Thrown here rather than left to `BigInt()`,
+	 * whose message differs between engines (V8, JavaScriptCore) and does not say what was being parsed.
+	 */
 	private parseBit(value: FlagValue | number): bigint {
-		return typeof value === "bigint"
-			? value
-			: typeof value === "number"
-				? BigInt(value)
-				: BigInt(value.trim() || "0");
+		if (typeof value === "bigint") return value;
+		if (typeof value === "number") return BigInt(value);
+
+		try {
+			return BigInt(value.trim() || "0");
+		} catch {
+			throw new SyntaxError(`Invalid bitfield value "${value}" - expected an integer`);
+		}
 	}
 }
