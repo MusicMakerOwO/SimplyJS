@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { FileAttachment, JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 import { ApplicationIdFromToken, SnowflakeTimestamp } from "./Utils.js";
@@ -264,11 +265,61 @@ export type RestOptions = {
 	baseUrl?: string;
 };
 
+/** Events emitted by {@link Rest}, for observing traffic without wrapping every call */
+export const RestEvents = {
+	/**
+	 * Fired for every response Discord sends, including each `429` and `5xx` that is then retried,
+	 * so one call can produce several. Listener arguments: `info` ({@link RestResponseInfo}).
+	 */
+	Response: "Response",
+	/**
+	 * Fired on every `429`, before the client waits it out (or throws, when
+	 * {@link RestOptions.retryAfterRateLimit} is off). Listener arguments: `info` ({@link RestRateLimitInfo}).
+	 */
+	RateLimited: "RateLimited",
+} as const;
+
+/**
+ * One response, as reported by {@link RestEvents.Response}.
+ *
+ * `route` is the route's template (`/channels/:id/messages`), never the route itself: interaction
+ * and webhook routes carry tokens, and a template is also what you want to group metrics by.
+ */
+export type RestResponseInfo = {
+	method: RestMethod;
+	/** The route's template, see {@link RestResponseInfo} */
+	route: string;
+	/** HTTP status of the response */
+	status: number;
+	/** Which attempt of this call produced the response, starting at 1 */
+	attempt: number;
+	/** Time this call has spent sleeping on rate limits so far, in milliseconds. Excludes time spent queued behind other requests */
+	waitedMs: number;
+	/** Round trip of this attempt alone, in milliseconds */
+	durationMs: number;
+};
+
+/** One `429`, as reported by {@link RestEvents.RateLimited} */
+export type RestRateLimitInfo = {
+	method: RestMethod;
+	/** The route's template - never the route itself, which may carry a token */
+	route: string;
+	/** Whether this is the bot-wide global limit rather than the route's own bucket */
+	global: boolean;
+	/** How long the client will wait before retrying, in milliseconds, after {@link RestOptions.rateLimitDurationMultiplier} */
+	retryAfterMs: number;
+};
+
+export type RestEventMap = {
+	[RestEvents.Response]: [info: RestResponseInfo];
+	[RestEvents.RateLimited]: [info: RestRateLimitInfo];
+};
+
 /**
  * HTTP client for the Discord REST API. Handles authentication, retries on transient server
  * errors, and rate limit tracking/backoff (globally or per-route, see {@link RestOptions.perRouteRateLimits}).
  */
-export class Rest {
+export class Rest extends EventEmitter<RestEventMap> {
 	#token: string | null = null;
 	/**
 	 * The bot's application id, read from the token. Interaction follow-ups go through
@@ -313,6 +364,7 @@ export class Rest {
 	#requestQueues: Map<string, Promise<void>> = new Map();
 
 	constructor(options: RestOptions = {}) {
+		super();
 		this.retryAfterRateLimit = options.retryAfterRateLimit ?? true;
 		this.rateLimitDurationMultiplier = options.rateLimitDurationMultiplier ?? 1;
 		this.perRouteRateLimits = options.perRouteRateLimits ?? true;
@@ -387,6 +439,23 @@ export class Rest {
 
 		this.routeToBucket.set(info.routeKey, bucket);
 		return `bucket:${bucket}:${info.scope}`;
+	}
+
+	/**
+	 * Emits a {@link RestEvents} event without letting a listener's exception reach the request.
+	 *
+	 * These events observe a request that has already happened: by the time one fires, Discord has
+	 * answered and acted on it. A listener that throws - a metrics hook tripping over a bad value -
+	 * must not turn a request Discord accepted into a rejection, or skip the rate limit bookkeeping
+	 * that follows it. An interaction would then look unanswered and be answered twice. The error is
+	 * printed instead, the same way a throwing collector filter is.
+	 */
+	#emitSafely<K extends keyof RestEventMap>(event: K, ...args: RestEventMap[K]): void {
+		try {
+			(this.emit as (event: K, ...args: RestEventMap[K]) => boolean)(event, ...args);
+		} catch (error) {
+			console.error(`Error in a Rest "${event}" listener:`, error);
+		}
 	}
 
 	/** Reads a header holding a duration in seconds as milliseconds, scaled by {@link rateLimitDurationMultiplier} */
@@ -567,10 +636,17 @@ export class Rest {
 			}
 		}
 
+		let attempt = 0;
+		let waitedMs = 0;
+
 		while (true) {
 			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(info);
-			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey, info));
+			const rateLimitWait = this.#remainingRateLimitWait(rateLimitCacheKey, info);
+			waitedMs += Math.max(0, rateLimitWait);
+			await this.#sleep(rateLimitWait);
 
+			attempt += 1;
+			const sentAt = Date.now();
 			const response = await fetch(`${this.baseUrl}${info.route}`, {
 				method,
 				headers: {
@@ -586,21 +662,49 @@ export class Rest {
 			});
 
 			const rawBody = await response.text();
+			const durationMs = Date.now() - sentAt;
+
+			// the limiter's bookkeeping comes before anything a listener can see, so that nothing a
+			// listener does can leave a learned bucket or an exhausted window unrecorded
 			const parsedBody = this.#parseResponseBody(rawBody);
 			const bucketCacheKey = this.#rememberBucket(info, response);
 			this.#recordRateLimitHeaders(response, bucketCacheKey ?? rateLimitCacheKey);
 
+			// payloads are only built for someone who is listening - this runs on every request
+			if (this.listenerCount(RestEvents.Response) > 0) {
+				this.#emitSafely(RestEvents.Response, {
+					method,
+					route: info.template,
+					status: response.status,
+					attempt,
+					waitedMs,
+					durationMs
+				});
+			}
+
 			if (response.status === 429) {
+				const waitMilliseconds = this.#resolveRateLimitWaitMilliseconds(response, parsedBody);
+				const isGlobal = parsedBody?.global === true;
+
+				if (this.listenerCount(RestEvents.RateLimited) > 0) {
+					this.#emitSafely(RestEvents.RateLimited, {
+						method,
+						route: info.template,
+						global: isGlobal,
+						retryAfterMs: waitMilliseconds
+					});
+				}
+
 				if (!this.retryAfterRateLimit || retriesRemaining <= 0) {
 					throw this.#createApiError(response, rawBody, parsedBody);
 				}
 
-				const waitMilliseconds = this.#resolveRateLimitWaitMilliseconds(response, parsedBody);
-				const waitKey = parsedBody?.global === true ? "global" : (bucketCacheKey ?? rateLimitCacheKey);
+				const waitKey = isGlobal ? "global" : (bucketCacheKey ?? rateLimitCacheKey);
 
 				this.routeRateLimits.set(waitKey, waitMilliseconds, waitMilliseconds);
 				retriesRemaining -= 1;
 
+				waitedMs += waitMilliseconds;
 				await this.#sleep(waitMilliseconds);
 				continue;
 			}
