@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Rest } from "../Rest.js";
+import { Rest, RestEvents, RestRateLimitInfo, RestResponseInfo } from "../Rest.js";
 import { Client } from "../Client.js";
 
 describe("Rest request parsing", () => {
@@ -557,4 +557,62 @@ describe("Rest rate limit keys", () => {
 		await unrelated;
 	});
 
+	it("does not let a throwing listener reject a request or skip its rate limit bookkeeping", async () => {
+		const rest = createRest();
+		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		stubFetch(() => new Response("{}", { status: 200, headers: limitHeaders("messages", 0, 5) }));
+		rest.on(RestEvents.Response, () => { throw new Error("broken metrics"); });
+
+		await expect(rest.post(`/channels/${CHANNEL}/messages`, { content: "a" })).resolves.toEqual({});
+		expect(rest.routeToBucket.get("POST /channels/:id/messages")).toBe("messages");
+		expect(rest.routeRateLimits.remainingTTL(`bucket:messages:channels:${CHANNEL}`)).toBeGreaterThan(0);
+		expect(error).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("Rest events", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		vi.useFakeTimers();
+	});
+
+	it("reports each response with the route template, never the token", async () => {
+		const rest = new Rest();
+		rest.setToken("token");
+		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+		const responses: RestResponseInfo[] = [];
+		rest.on(RestEvents.Response, (info) => responses.push(info));
+
+		await rest.post("/interactions/600000000000000001/secret-token/callback?with_response=true", { type: 5 });
+
+		expect(responses).toEqual([{
+			method: "POST",
+			route: "/interactions/:id/:token/callback",
+			status: 204,
+			attempt: 1,
+			waitedMs: 0,
+			durationMs: expect.any(Number)
+		}]);
+		expect(JSON.stringify(responses)).not.toContain("secret-token");
+	});
+
+	it("reports a 429 and the retry that follows it", async () => {
+		const rest = new Rest();
+		rest.setToken("token");
+		vi.stubGlobal("fetch", vi.fn()
+			.mockResolvedValueOnce(new Response(JSON.stringify({ message: "slow down", retry_after: 0.5 }), { status: 429 }))
+			.mockResolvedValueOnce(new Response("{}", { status: 200 })));
+		const limits: RestRateLimitInfo[] = [];
+		const responses: RestResponseInfo[] = [];
+		rest.on(RestEvents.RateLimited, (info) => limits.push(info));
+		rest.on(RestEvents.Response, (info) => responses.push(info));
+
+		const request = rest.get("/users/@me");
+		await vi.advanceTimersByTimeAsync(500);
+		await request;
+
+		expect(limits).toEqual([{ method: "GET", route: "/users/@me", global: false, retryAfterMs: 500 }]);
+		expect(responses.map((r) => [r.status, r.attempt, r.waitedMs])).toEqual([[429, 1, 0], [200, 2, 500]]);
+	});
 });
