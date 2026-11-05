@@ -759,6 +759,22 @@ describe("WSClient lifecycle", () => {
 		expect(wsMockState.instances).toHaveLength(2);
 	});
 
+	it("keeps the process alive while a reconnect waits out its backoff", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+		const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+		// once the socket is closed nothing else is ref'd, so an unref'd reconnect timer lets node exit
+		wsMockState.instances[0]!.close();
+
+		const timer = setTimeoutSpy.mock.results.at(-1)!.value as NodeJS.Timeout;
+		expect(timer.hasRef()).toBe(true);
+
+		socket.destroy();
+	});
+
 	it("supersedes a pending reconnect when initialize() is called directly", () => {
 		vi.useFakeTimers();
 		vi.spyOn(Math, "random").mockReturnValue(1);
