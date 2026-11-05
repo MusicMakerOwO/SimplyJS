@@ -17,7 +17,7 @@ import {
 } from "../Types/DiscordAPITypes.js";
 import { ObjectValues } from "../Types/HelperTypes.js";
 import { ImageInput, JSONObject } from "../Types/Internal.js";
-import { CDNImageURL, EncodeImage } from "../Utils.js";
+import { CDNImageURL, EncodeImage, ShardIdFor } from "../Utils.js";
 import { APIClientSnowflakeStructure } from "../Contracts/DiscordStructure.js";
 import { RoleCache } from "../Managers/Roles.js";
 import { StickerCache } from "../Managers/Stickers.js";
@@ -176,6 +176,14 @@ export class Guild extends APIClientSnowflakeStructure<DiscordGuild> {
 		this.invites  = new GuildInviteManager(client, this);
 
 		this.patch(data);
+	}
+
+	/**
+	 * The shard this guild's events arrive on, out of `client.shardCount`. Always `0` for an
+	 * unsharded bot. With one shard per process, this says which process owns the guild.
+	 */
+	get shardId(): number {
+		return ShardIdFor(this.id, this.client.shardCount);
 	}
 
 	patch(data: DiscordGuildCreate): void {

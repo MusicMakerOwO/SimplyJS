@@ -145,6 +145,14 @@ export type WSOptions = {
 	 * @default "wss://gateway.discord.gg"
 	 */
 	gatewayUrl?: string;
+
+	/**
+	 * The `[shardId, shardCount]` pair sent on `IDENTIFY`. Omitted, `IDENTIFY` carries no `shard`
+	 * field and Discord treats the connection as the bot's only shard.
+	 *
+	 * Set from `ClientOptions.shards`, which validates it; prefer that over setting this directly.
+	 */
+	shard?: readonly [id: number, count: number];
 }
 
 /**
@@ -174,6 +182,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	intents: number;
 	/** Consecutive reconnect attempts allowed before the client gives up, see {@link WSOptions.maxReconnectAttempts} */
 	maxReconnectAttempts: number;
+	/** The `[shardId, shardCount]` this connection identifies as, or `null` when unsharded - see {@link WSOptions.shard} */
+	readonly shard: readonly [id: number, count: number] | null;
 
 	/**
 	 * Round trip of the last acknowledged heartbeat, in milliseconds; `-1` until the first ACK.
@@ -203,6 +213,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.intents = options.intents ?? 0;
 		this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
 		this.#gatewayUrl = options.gatewayUrl ?? null;
+		this.shard = options.shard ?? null;
 
 		this.ready = false;
 
@@ -486,7 +497,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 					browser: "Node.js",
 					device: process.env.npm_package_name ?? "SimplyJS",
 				},
-				intents: this.intents
+				intents: this.intents,
+				...(this.shard ? { shard: [this.shard[0], this.shard[1]] } : {})
 			},
 			t: null,
 			s: null

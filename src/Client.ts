@@ -77,6 +77,60 @@ type ClientOptions = {
 	 * @default 2500
 	 */
 	slowAcknowledgementWarning?: number | false
+
+	/**
+	 * Which shards this process runs, out of how many the bot runs in total. Omit it for an
+	 * unsharded bot, which is fine below Discord's limit of 2,500 guilds per connection; past
+	 * that, Discord closes the connection with `4011 Sharding required`.
+	 *
+	 * For now each process runs exactly one shard, so `ids` must hold a single id: start one
+	 * process per shard, each with the same `count` and its own id. Running several shards in one
+	 * process arrives in 2.0, with this same option shape.
+	 *
+	 * Things that follow from splitting a bot across processes:
+	 * - Each guild's events arrive on one shard only - `ShardIdFor(guildId, count)` or
+	 *   `guild.shardId` says which, so work for a guild can be routed to the process that owns it.
+	 * - Direct messages only arrive on shard 0.
+	 * - REST rate limits, the global one included, are per bot, not per process. A fleet that
+	 *   outgrows that wants a shared REST proxy, see `RestOptions.baseUrl`.
+	 * - Stagger process start-up: Discord allows one `IDENTIFY` per 5 seconds per
+	 *   `max_concurrency` bucket (`GET /gateway/bot`), within a daily session start limit.
+	 *
+	 * @example
+	 * ```ts
+	 * // process 2 of a bot running four shards
+	 * shards: { count: 4, ids: [2] }
+	 * ```
+	 */
+	shards?: { count: number; ids: number[] }
+}
+
+/**
+ * Validates `ClientOptions.shards` and returns the `[id, count]` pair to identify with, or
+ * `undefined` for an unsharded client.
+ * @throws {RangeError} When `count` or an id is not a valid integer, or an id is out of range.
+ * @throws {Error} When `ids` does not hold exactly one id.
+ */
+function ResolveShard(shards: ClientOptions["shards"]): [id: number, count: number] | undefined {
+	if (shards === undefined) return undefined;
+
+	const { count, ids } = shards;
+	if (!Number.isInteger(count) || count < 1) {
+		throw new RangeError(`shards.count must be a positive integer, received ${count}`);
+	}
+	if (ids.length !== 1) {
+		throw new Error(
+			`shards.ids must hold exactly one shard id, received ${ids.length}. Running several shards in one ` +
+			"process arrives in 2.0 - until then, run one process per shard, each with its own id."
+		);
+	}
+
+	const id = ids[0]!;
+	if (!Number.isInteger(id) || id < 0 || id >= count) {
+		throw new RangeError(`Shard id ${id} is out of range: shard ids run from 0 to ${count - 1} for a count of ${count}`);
+	}
+
+	return [id, count];
 }
 
 /**
@@ -123,14 +177,23 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** See {@link ClientOptions.slowAcknowledgementWarning} */
 	slowAcknowledgementWarning: number | false;
 
+	/**
+	 * How many shards the bot runs in total, across every process - `ClientOptions.shards.count`,
+	 * or `1` for an unsharded bot. What `guild.shardId` is computed against.
+	 */
+	readonly shardCount: number;
+
 	constructor(options: ClientOptions) {
 		super();
 
+		const shard = ResolveShard(options.shards);
+		this.shardCount = shard?.[1] ?? 1;
 		this.intents = ResolveIntents(options.intents);
 
 		this.socket = new WSClient(this, {
 			... options.ws,
 			intents: this.intents,
+			...(shard ? { shard } : {}),
 		});
 		this.rest = new Rest(options.rest);
 

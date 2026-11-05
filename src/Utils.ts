@@ -246,3 +246,17 @@ export function SnowflakeTimestamp(id: string | bigint): number {
 export function ApplicationIdFromToken(token: string): string {
 	return Buffer.from(token.split(".")[0] ?? "", "base64").toString("ascii");
 }
+
+/**
+ * The shard a guild's events arrive on, for a bot running `count` shards: `(guild_id >> 22) % count`.
+ *
+ * Use it to route work for a guild to the process that owns it, when each process runs one shard.
+ * Direct messages are not guild-scoped and always arrive on shard 0.
+ * @param guildId The guild's id.
+ * @param count Total number of shards the bot runs, across every process.
+ * @throws {RangeError} When `count` is not a positive integer.
+ */
+export function ShardIdFor(guildId: string | bigint, count: number): number {
+	if (!Number.isInteger(count) || count < 1) throw new RangeError(`Shard count must be a positive integer, received ${count}`);
+	return Number((BigInt(guildId) >> 22n) % BigInt(count));
+}
