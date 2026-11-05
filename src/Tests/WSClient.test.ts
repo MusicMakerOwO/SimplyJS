@@ -926,3 +926,57 @@ describe("WSClient lifecycle", () => {
 		expect(ops).not.toContain(GatewayOpCodes.Resume);
 	});
 });
+
+
+describe("sharding", () => {
+	beforeEach(() => {
+		wsMockState.instances.length = 0;
+		vi.restoreAllMocks();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function identifyOf(client: Client): Record<string, unknown> {
+		client.socket.initialize();
+		const mock = wsMockState.instances.at(-1)!;
+		mock.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+		const identify = mock.sent.map((raw) => JSON.parse(raw) as GatewayPayload).find((p) => p.op === GatewayOpCodes.Identify)!;
+		client.socket.destroy();
+		return identify.d as Record<string, unknown>;
+	}
+
+	it("identifies as the configured shard", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 4, ids: [2] } });
+
+		expect(identifyOf(client).shard).toEqual([2, 4]);
+		expect(client.shardCount).toBe(4);
+		expect(client.socket.shard).toEqual([2, 4]);
+	});
+
+	it("sends no shard field when unsharded", () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+
+		expect(identifyOf(client)).not.toHaveProperty("shard");
+		expect(client.shardCount).toBe(1);
+		expect(client.socket.shard).toBeNull();
+	});
+
+	it("rejects several shards in one process until 2.0", () => {
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [0, 1] } }))
+			.toThrow("arrives in 2.0");
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [] } }))
+			.toThrow("exactly one shard id");
+	});
+
+	it("rejects shard ids and counts out of range", () => {
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [4] } })).toThrow(RangeError);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [-1] } })).toThrow(RangeError);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [1.5] } })).toThrow(RangeError);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 0, ids: [0] } })).toThrow(RangeError);
+	});
+
+});

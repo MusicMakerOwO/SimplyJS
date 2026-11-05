@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApplicationIdFromToken, SnowflakeTimestamp } from "../Utils.js";
+import { ApplicationIdFromToken, ShardIdFor, SnowflakeTimestamp } from "../Utils.js";
 import { Client } from "../Client.js";
 import { User } from "../Structures/User.js";
 import { Guild } from "../Structures/Guild.js";
@@ -17,6 +17,19 @@ describe("SnowflakeTimestamp", () => {
 
 	it("counts from Discord's epoch", () => {
 		expect(SnowflakeTimestamp("0")).toBe(Date.UTC(2015, 0, 1));
+	});
+});
+
+describe("ShardIdFor", () => {
+	it("computes (guild_id >> 22) % count", () => {
+		const expected = Number((BigInt(EXAMPLE_ID) >> 22n) % 4n);
+		expect(ShardIdFor(EXAMPLE_ID, 4)).toBe(expected);
+		expect(ShardIdFor(EXAMPLE_ID, 1)).toBe(0);
+	});
+
+	it("rejects a shard count that is not a positive integer", () => {
+		expect(() => ShardIdFor(EXAMPLE_ID, 0)).toThrow(RangeError);
+		expect(() => ShardIdFor(EXAMPLE_ID, 1.5)).toThrow(RangeError);
 	});
 });
 
@@ -50,5 +63,21 @@ describe("ApplicationIdFromToken", () => {
 
 		expect(ApplicationIdFromToken(token)).toBe(EXAMPLE_ID);
 		expect(new Client({ token, intents: 0 }).id).toBe(EXAMPLE_ID);
+	});
+});
+
+describe("guild.shardId", () => {
+	it("is the guild's shard out of the client's shard count", () => {
+		const guildData = {
+			id: EXAMPLE_ID, name: "g", owner_id: "1", afk_timeout: 60, verification_level: 0,
+			default_message_notifications: 0, explicit_content_filter: 0, roles: [], emojis: [], features: [],
+			mfa_level: 0, system_channel_flags: 0, premium_tier: 0, preferred_locale: "en-US", nsfw_level: 0,
+			premium_progress_bar_enabled: false
+		};
+		const sharded = new Client({ token: "token", intents: 0, shards: { count: 4, ids: [0] } });
+		const unsharded = new Client({ token: "token", intents: 0 });
+
+		expect(new Guild(sharded, guildData as never).shardId).toBe(ShardIdFor(EXAMPLE_ID, 4));
+		expect(new Guild(unsharded, guildData as never).shardId).toBe(0);
 	});
 });
