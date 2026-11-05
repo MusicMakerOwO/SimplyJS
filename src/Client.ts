@@ -12,6 +12,7 @@ import { CollectorDefaults, CollectorManager } from "./Managers/Collectors.js";
 import { ActivityType, ClientActivity, PresenceStatus, Status } from "./Types/DiscordAPITypes.js";
 import { ApplicationCommand, JSONArray } from "./Types/index.js";
 import { awaitEventInternal } from "./Collector.js";
+import { CheckListenerIntents, IsInternalListener } from "./Warnings.js";
 import { ApplicationIdFromToken } from "./Utils.js";
 
 type ClientOptions = {
@@ -95,17 +96,35 @@ export class Client extends EventEmitter<ClientEventMap> {
 	/** User ID resolved from the provided token */
 	id: string;
 
+	/**
+	 * The gateway intents this client identifies with, resolved from `ClientOptions.intents` to a
+	 * bitfield. Fixed at construction.
+	 *
+	 * Read this rather than `client.socket.intents`: intents belong to the client, not to a
+	 * connection, and `client.socket` stops being a single connection once a process runs more
+	 * than one shard.
+	 */
+	readonly intents: number;
+
 	constructor(options: ClientOptions) {
 		super();
 
+		this.intents = ResolveIntents(options.intents);
+
 		this.socket = new WSClient(this, {
 			... options.ws,
-			intents: ResolveIntents(options.intents),
+			intents: this.intents,
 		});
 		this.rest = new Rest(options.rest);
 
 		this.socket.setToken(options.token);
 		this.rest.setToken(options.token);
+
+		// Checked per registration rather than once at login(), so handlers loaded late are covered.
+		// `newListener` is not in ClientEventMap, hence the cast to a plain emitter.
+		(this as EventEmitter).on("newListener", (event: string | symbol, listener: unknown) => {
+			if (!IsInternalListener(listener)) CheckListenerIntents(this, event);
+		});
 
 		this.user = null;
 

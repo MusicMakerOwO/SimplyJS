@@ -4,7 +4,7 @@ import { ClientEvents, InteractionEvents, WarningCodes } from "../Types/SimplyJS
 import { GatewayEvents } from "../Types/DiscordGateway.js";
 import { Awaitable } from "../Types/HelperTypes.js";
 import type { Client } from "../Client.js";
-import { EmitWarning } from "../Warnings.js";
+import { CheckListenerIntents, EmitWarning, MarkInternalListener } from "../Warnings.js";
 
 type AnyEmitter = EventEmitter<Record<string, unknown[]>>;
 type AnyCollector = Collector<unknown[]>;
@@ -102,7 +102,8 @@ class CollectorHub implements CollectorSource<unknown[]> {
 		this.#event = event;
 		this.#arbitrated = ClaimableEvents.has(event) && emitter === (manager.client as unknown as AnyEmitter);
 
-		this.#listener = (...args: unknown[]): void => this.#onEvent(args);
+		// one shared listener per event, so the intent check runs per collector in `prepare()` instead
+		this.#listener = MarkInternalListener((...args: unknown[]): void => this.#onEvent(args));
 		this.#emitter.on(this.#event, this.#listener);
 	}
 
@@ -347,6 +348,10 @@ export class CollectorManager {
 		options: CollectorOptions<TArgs>,
 		useDefaults = true
 	): { source: CollectorSource<TArgs>; options: CollectorOptions<TArgs> } {
+		// a collector on an event the client can never receive never collects - same warning as a
+		// listener. Only for a bot's own collectors: the library's know what they are waiting on.
+		if (useDefaults && emitter === this.client) CheckListenerIntents(this.client, event);
+
 		return {
 			source: this.hubFor(emitter, event) as unknown as CollectorSource<TArgs>,
 			options: useDefaults ? { ...this.defaults, ...options } : options,

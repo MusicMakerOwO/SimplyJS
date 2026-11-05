@@ -678,6 +678,17 @@ export const ClientEvents = {
  * `message` is prose and may change between releases.
  */
 export const WarningCodes = {
+	/**
+	 * A listener was added for an event that none of the client's intents can deliver, so it will
+	 * never fire. Sent once per event name.
+	 */
+	MissingIntent: "MissingIntent",
+	/**
+	 * A `MessageCreate`/`MessageUpdate` listener was added without the privileged `MessageContent`
+	 * intent. Messages still arrive, but `content`, `embeds`, `attachments`, and `components` are
+	 * empty except in DMs, in messages that mention the bot, and in the bot's own messages. Sent once.
+	 */
+	MissingMessageContent: "MissingMessageContent",
 	/** The gateway sent a dispatch event the library has no handler for. Sent once per event name. */
 	UnhandledEvent: "UnhandledEvent",
 	/**

@@ -25,9 +25,9 @@ export function ResolveIntents(
 /**
  * Checks whether a resolved intents bitfield includes a given intent.
  *
- * Not currently used internally - exposed as a building block for consumers (or a future library
- * feature) that want to guard REST calls requiring a privileged intent, e.g. refusing to fetch
- * guild members without `GuildMembers`.
+ * Used internally by `guild.members.fetchGateway()`, which refuses to send a request Discord would
+ * silently ignore, and by the listener check behind `WarningCodes.MissingIntent`. Exposed for
+ * consumers guarding their own intent-dependent code the same way.
  */
 export function HasIntent(bitfield: number, targetIntent: ObjectValues<typeof GatewayIntents>): boolean {
 	return !!(bitfield & targetIntent);

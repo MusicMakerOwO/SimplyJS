@@ -3,6 +3,7 @@ import { defineEvent, JSONObject } from "../Types/Internal.js";
 import { DiscordUser } from "../Types/DiscordAPITypes.js";
 import { Guild } from "../Structures/Guild.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
+import { MarkInternalListener } from "../Warnings.js";
 
 const READY_GUILD_FALLBACK_TIMEOUT_MS = 15_000;
 
@@ -59,7 +60,7 @@ export const Ready = defineEvent({
 			if (requiredGuilds.size === 0) finalize();
 		};
 
-		client.on(ClientEvents.GuildCreate, callback);
+		client.on(ClientEvents.GuildCreate, MarkInternalListener(callback));
 		timeout = setTimeout(finalize, READY_GUILD_FALLBACK_TIMEOUT_MS).unref();
 	}
 });

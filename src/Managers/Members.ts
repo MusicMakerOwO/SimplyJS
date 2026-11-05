@@ -130,7 +130,7 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 			);
 		}
 
-		const intents = this.client.socket.intents;
+		const intents = this.client.intents;
 		// Discord silently drops a request whose intents are missing, so it would otherwise hang
 		// until the timeout with no indication of why.
 		if (!options.userIds && !HasIntent(intents, GatewayIntents.GuildMembers)) {
