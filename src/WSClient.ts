@@ -252,11 +252,15 @@ export class WSClient extends EventEmitter<WSEventMap> {
 
 		this.#reconnectAttempts++;
 
+		// Deliberately ref'd: the socket is already gone, so this timer is the only thing holding the
+		// event loop open until the next one exists. Unref'd, a bot with nothing else ref'd exits
+		// cleanly the first time Discord drops the connection. destroy() and initialize() clear it.
+		// eslint-disable-next-line local/require-unref-on-timers
 		this.#reconnectTimer = setTimeout(() => {
 			this.#reconnectTimer = null;
 			if (this.#destroyed) return;
 			this.initialize();
-		}, Math.max(minimumDelay, backoff)).unref();
+		}, Math.max(minimumDelay, backoff));
 	}
 
 	/** Clears everything tied to the current connection, leaving the session (if any) intact for a resume */
