@@ -4,6 +4,11 @@ import { CreateDispatch } from "../EventDispatcher.js";
 import { createCollector, createInternalCollector } from "../Collector.js";
 import { GatewayEvents, GatewayIntents } from "../Types/DiscordGateway.js";
 import { ClientEvents, ClientWarning, WarningCodes } from "../Types/SimplyJSTypes.js";
+import { InteractionTypes } from "../Types/Interactions.js";
+import { ApplicationCommandTypes } from "../Types/ApplicationCommand.js";
+import { JSONObject } from "../Types/Internal.js";
+import { DiscordAPIError } from "../Rest.js";
+import { SlashCommandInteraction } from "../Structures/Interactions/SlashCommandInteraction.js";
 
 function createClient(intents: number): { client: Client; warnings: ClientWarning[] } {
 	const client = new Client({ token: "token", intents });
@@ -150,5 +155,112 @@ describe("intent/listener check", () => {
 
 		internal.stop();
 		collector.stop();
+	});
+});
+
+function slashCommandPayload(): JSONObject {
+	return {
+		id: "interaction-1",
+		application_id: "app-1",
+		token: "interaction-token",
+		version: 1,
+		app_permissions: "0",
+		entitlements: [],
+		authorizing_integration_owners: {},
+		attachment_size_limit: 25_000_000,
+		data: { id: "command-1", name: "greet", type: ApplicationCommandTypes.CHAT_INPUT },
+		type: InteractionTypes.APPLICATION_COMMAND,
+	};
+}
+
+describe("slow acknowledgement warning", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function receive(client: Client): void {
+		CreateDispatch()(client, GatewayEvents.InteractionCreate, slashCommandPayload());
+	}
+
+	it("warns when an interaction is still unanswered at the threshold", () => {
+		const { client, warnings } = createClient(GatewayIntents.Guilds);
+		client.on(ClientEvents.SlashCommandUsed, () => {});
+
+		receive(client);
+		vi.advanceTimersByTime(2_499);
+		expect(warnings).toEqual([]);
+
+		vi.advanceTimersByTime(1);
+		expect(warnings).toEqual([{ code: WarningCodes.SlowAcknowledgement, message: expect.stringContaining('SlashCommandUsed "greet"') }]);
+		expect(warnings[0]!.message).toContain("2,500ms");
+		expect(warnings[0]!.message).toContain("handlers received it immediately");
+	});
+
+	it("stays quiet for an interaction answered in time", async () => {
+		const { client, warnings } = createClient(GatewayIntents.Guilds);
+		vi.spyOn(client.rest, "post").mockResolvedValue(undefined);
+		client.on(ClientEvents.SlashCommandUsed, (interaction) => void interaction.deferReply());
+
+		receive(client);
+		await vi.advanceTimersByTimeAsync(5_000);
+
+		expect(warnings).toEqual([]);
+	});
+
+	it("honours a custom threshold, and false turns it off", () => {
+		const custom = new Client({ token: "token", intents: GatewayIntents.Guilds, slowAcknowledgementWarning: 1_000 });
+		const off = new Client({ token: "token", intents: GatewayIntents.Guilds, slowAcknowledgementWarning: false });
+		const customWarnings: ClientWarning[] = [];
+		const offWarnings: ClientWarning[] = [];
+		custom.on(ClientEvents.Warn, (w) => customWarnings.push(w));
+		off.on(ClientEvents.Warn, (w) => offWarnings.push(w));
+
+		receive(custom);
+		receive(off);
+		vi.advanceTimersByTime(10_000);
+
+		expect(customWarnings.map((w) => w.message)).toEqual([expect.stringContaining("1,000ms")]);
+		expect(offWarnings).toEqual([]);
+	});
+
+	it("says when nothing handles the interaction at all", () => {
+		const { client, warnings } = createClient(GatewayIntents.Guilds);
+
+		receive(client);
+		vi.advanceTimersByTime(2_500);
+
+		expect(warnings[0]!.message).toContain("Nothing listens for SlashCommandUsed");
+	});
+
+	it("separates time spent in async collector filters from the handler's share", async () => {
+		const { client, warnings } = createClient(GatewayIntents.Guilds);
+		client.on(ClientEvents.SlashCommandUsed, () => {});
+		// a filter that takes two seconds to decide, and then declines
+		const collector = createCollector(client, ClientEvents.SlashCommandUsed, {
+			filter: () => new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2_000).unref())
+		});
+
+		receive(client);
+		await vi.advanceTimersByTimeAsync(2_500);
+
+		expect(warnings[0]!.message).toContain("2,000ms of that was spent in collector filters");
+		collector.stop();
+	});
+
+	it("reports a 10062 Unknown interaction with how late the response was", async () => {
+		const { client, warnings } = createClient(GatewayIntents.Guilds);
+		const interaction = new SlashCommandInteraction(client, slashCommandPayload() as never);
+		vi.spyOn(client.rest, "post").mockRejectedValue(new DiscordAPIError("Unknown interaction", 404, 10062));
+
+		vi.advanceTimersByTime(3_412);
+		await expect(interaction.deferReply()).rejects.toThrow("Unknown interaction");
+
+		expect(warnings).toEqual([{ code: WarningCodes.SlowAcknowledgement, message: expect.stringContaining("3,412ms") }]);
+		expect(interaction.acknowledged).toBe(false);
 	});
 });
