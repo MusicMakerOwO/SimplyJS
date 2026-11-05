@@ -264,7 +264,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		if (typeof code === "number" && FATAL_CLOSE_CODES.has(code)) {
 			// Discord rejected the IDENTIFY itself; retrying sends the same bad payload forever
 			// and burns the session start limit doing it, so stop here.
-			this.#giveUp(`Gateway closed with code ${code}, which cannot be recovered by reconnecting`, code);
+			this.#giveUp(`Gateway closed with code ${code}, which cannot be recovered by reconnecting${this.#fatalCloseAdvice(code)}`, code);
 			return;
 		}
 
@@ -337,6 +337,28 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.#sessionId = null;
 		this.#resumeGatewayUrl = null;
 		this.#sequence = null;
+	}
+
+	/** What to do about a fatal close code, appended to the `Disconnect` reason; empty where the code says it all */
+	#fatalCloseAdvice(code: number): string {
+		switch (code) {
+			case GatewayCloseCodes.AuthenticationFailed:
+				return " - the token is invalid. Check ClientOptions.token, or reset it in the developer portal.";
+			case GatewayCloseCodes.InvalidShard:
+				return ` - Discord rejected the shard this client identified as (${
+					this.shard ? `shard ${this.shard[0]} of ${this.shard[1]}` : "none"
+				}). Check ClientOptions.shards: every id must be below count.`;
+			case GatewayCloseCodes.ShardingRequired:
+				return " - the bot is in too many guilds for one connection (Discord's limit is 2,500 per shard). " +
+					"Set ClientOptions.shards and run one process per shard.";
+			case GatewayCloseCodes.InvalidIntents:
+				return " - ClientOptions.intents is not a valid intents bitfield.";
+			case GatewayCloseCodes.DisallowedIntents:
+				return " - a privileged intent (GuildMembers, GuildPresences, or MessageContent) is not enabled for this " +
+					"bot. Enable it under Bot > Privileged Gateway Intents in the developer portal, or remove it from ClientOptions.intents.";
+			default:
+				return "";
+		}
 	}
 
 	/** Stops reconnecting for good and tells listeners why */
