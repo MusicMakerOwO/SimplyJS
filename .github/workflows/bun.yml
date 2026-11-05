@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_RUNTIME: bun
 
     steps:
       - uses: actions/checkout@v4
@@ -23,5 +25,12 @@ jobs:
       - name: Build
         run: bun run build
 
+      # `--bun` matters: plain `bun run test` executes vitest's node-shebang binary on the runner's
+      # Node, which is how this job once ran the whole suite without ever touching Bun.
+      # src/Tests/Runtime.test.ts fails the job if that happens again.
       - name: Test
-        run: bun run test
+        run: bun --bun run test
+
+      # gateway lifecycle against a real socket, on the built dist/ this job just produced
+      - name: Integration
+        run: bun scripts/integration/gateway.mjs

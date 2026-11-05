@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_RUNTIME: deno
 
     steps:
       - uses: actions/checkout@v4
@@ -23,5 +25,10 @@ jobs:
       - name: Build
         run: deno task build
 
+      # src/Tests/Runtime.test.ts fails the job if this ends up running vitest on Node instead
       - name: Test
         run: deno task test
+
+      # gateway lifecycle against a real socket, on the built dist/ this job just produced
+      - name: Integration
+        run: deno run -A scripts/integration/gateway.mjs
