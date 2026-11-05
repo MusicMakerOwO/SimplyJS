@@ -129,16 +129,18 @@ export class Client extends EventEmitter<ClientEventMap> {
 		if (this.status || this.activity) return this.#updatePresence();
 	}
 
-	/** Logs the bot out and clears cache. Promise resolves after WebSocket fully closes */
+	/**
+	 * Logs the bot out and clears cache.
+	 *
+	 * The socket is torn down synchronously, so the client is already disconnected (`socket.ready`
+	 * is `false`) when the returned promise resolves - it never waits on a close frame from a peer
+	 * that may not send one. Still `async` so callers can `await` it as before.
+	 */
 	async destroy(): Promise<void> {
 		this.guilds.clear();
 		this.users.clear();
 		this.collectors.clear();
 		this.socket.destroy();
-		while(true) {
-			if (!this.socket.ready) return;
-			await new Promise(r => setTimeout(r, 1).unref() );
-		}
 	}
 
 	/** Sets the client's status: online, idle, dnd, invisible, or offline. Other users see `invisible` as `offline` */

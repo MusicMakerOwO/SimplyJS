@@ -75,6 +75,17 @@ const NON_RESUMABLE_CLOSE_CODES: ReadonlySet<number> = new Set([
 	GatewayCloseCodes.SessionTimedOut
 ]);
 
+/**
+ * Close code for a teardown that intends to come back - a reconnect, a missed heartbeat ACK, op 7/9.
+ *
+ * Any code but 1000/1001 keeps the session resumable, and Discord treats 1000/1001 as a logout.
+ * 4200 sits in the application range (`ws` only accepts 1000 and 3000-4999) and clear of Discord's own
+ * 4000-4014, so it is never mistaken for one of them in a log.
+ */
+const RESUMABLE_CLOSE_CODE = 4200;
+/** Close code for {@link WSClient.destroy} - a normal closure, which Discord reads as a logout */
+const LOGOUT_CLOSE_CODE = 1000;
+
 /** Delay before the second reconnect attempt; each further attempt doubles it up to `RECONNECT_MAX_DELAY` */
 const RECONNECT_BASE_DELAY = 1_000;
 /** Ceiling for a single reconnect delay, no matter how many attempts have failed */
@@ -263,11 +274,17 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		}, Math.max(minimumDelay, backoff));
 	}
 
-	/** Clears everything tied to the current connection, leaving the session (if any) intact for a resume */
-	#teardownConnection(): void {
+	/**
+	 * Clears everything tied to the current connection, leaving the session (if any) intact for a resume.
+	 * @param code Close code sent to the gateway - resumable by default, {@link LOGOUT_CLOSE_CODE} to end the session.
+	 */
+	#teardownConnection(code: number = RESUMABLE_CLOSE_CODE): void {
 		if (this.#socket) {
 			this.#socket.removeAllListeners();
-			this.#socket.close();
+			// `ws` emits "error" when a socket that is still connecting gets closed, and an "error"
+			// with no listener throws - which a destroy() mid-reconnect would otherwise hit
+			this.#socket.on("error", () => {});
+			this.#socket.close(code);
 			this.#socket = null;
 		}
 		if (this.#heartbeatTimer) {
@@ -484,6 +501,9 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.#reconnectAttempts = 0;
 		this.#sessionId = null;
 		this.#resumeGatewayUrl = null;
-		if (this.#socket) this.#socket.close()
+		// Tear down now rather than waiting on a close event: a dead peer may never send one, which
+		// left Client.destroy() polling for up to `ws`'s 30s close timeout. 1000 also logs the bot
+		// out, where a bare close() left the session (and the bot's online status) to time out.
+		this.#teardownConnection(LOGOUT_CLOSE_CODE);
 	}
 }
