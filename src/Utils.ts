@@ -53,6 +53,10 @@ const EXTENSIONS_BY_MIME_TYPE: Record<string, string> = {
 /** Whether the bytes look like a JSON object, ignoring leading whitespace */
 function IsJSONObject(bytes: Uint8Array): boolean {
 	for (const byte of bytes) {
+		// 0x20 -> space
+		// 0x09 -> tab
+		// 0x0a -> line feed
+		// 0x0d -> carriage return
 		if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d) continue;
 		return byte === 0x7b; // '{'
 	}
