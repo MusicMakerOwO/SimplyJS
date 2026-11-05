@@ -979,4 +979,42 @@ describe("sharding", () => {
 		expect(() => new Client({ token: "token", intents: 0, shards: { count: 0, ids: [0] } })).toThrow(RangeError);
 	});
 
+	it("names the shards option when Discord demands sharding", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		wsMockState.instances[0]!.close(4011);
+
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("ClientOptions.shards"), 4011);
+	});
+
+	it("points at the developer portal for disallowed intents", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		wsMockState.instances[0]!.close(4014);
+
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("developer portal"), 4014);
+	});
+
+	it("shows the configured shard on an invalid shard close", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1, shard: [3, 4] });
+		socket.setToken("token");
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+		socket.initialize();
+
+		wsMockState.instances[0]!.close(4010);
+
+		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("shard 3 of 4"), 4010);
+	});
 });
