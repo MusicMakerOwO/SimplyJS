@@ -5,7 +5,7 @@ import { DiscordAPIError } from "../Rest.js";
 import { createCollector } from "../Collector.js";
 import { GatewayEvents, GatewayIntents } from "../Types/DiscordGateway.js";
 import { WSEvents } from "../WSClient.js";
-import { ClientEvents } from "../Types/index.js";
+import { ClientEvents, ClientWarning, WarningCodes } from "../Types/index.js";
 import { InteractionCallbackModal, InteractionTypes } from "../Types/Interactions.js";
 import { ApplicationCommandTypes } from "../Types/ApplicationCommand.js";
 import { ComponentTypes, TextInputStyles } from "../Types/Components.js";
@@ -456,6 +456,22 @@ describe("CollectorManager", () => {
 			// warning tells you nothing about which of your files is leaking
 			const firstFrame = message.slice(message.indexOf("created at:")).split("\n")[1];
 			expect(firstFrame).toContain("CollectorManager.test.ts");
+
+			for (const collector of collectors) collector.stop();
+		});
+
+		it("reports through Warn when something listens", () => {
+			const client = makeClient();
+			const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+			const warnings: ClientWarning[] = [];
+			client.on(ClientEvents.Warn, (warning) => warnings.push(warning));
+
+			const collectors = Array.from({ length: 12 }, () =>
+				createCollector(client, ClientEvents.ButtonUsed)
+			);
+
+			expect(warn).not.toHaveBeenCalled();
+			expect(warnings.map((w) => w.code)).toEqual([WarningCodes.UnboundedCollectors]);
 
 			for (const collector of collectors) collector.stop();
 		});

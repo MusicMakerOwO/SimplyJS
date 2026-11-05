@@ -15,7 +15,7 @@ import { SelectMenuInteraction } from "../Structures/Interactions/SelectMenuInte
 import { AutocompleteInteraction } from "../Structures/Interactions/AutocompleteInteraction.js";
 import { ModalInteraction } from "../Structures/Interactions/ModalInteraction.js";
 
-import { ClientEvents } from "../Types/index.js";
+import { ClientEvents, ClientWarning, WarningCodes } from "../Types/index.js";
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -160,6 +160,21 @@ describe("EventDispatcher", () => {
 		dispatch(client, "__UNHANDLED_EVENT__" as never, {});
 
 		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unhandled event"));
+	});
+
+	it("routes the unhandled event warning to Warn once something listens", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+		const dispatch = CreateDispatch();
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const warnings: ClientWarning[] = [];
+		client.on(ClientEvents.Warn, (warning) => warnings.push(warning));
+
+		dispatch(client, "__UNHANDLED_EVENT__" as never, {});
+		dispatch(client, "__UNHANDLED_EVENT__" as never, {});
+
+		// a listener takes the output over entirely, and each event name is only reported once
+		expect(warnSpy).not.toHaveBeenCalled();
+		expect(warnings).toEqual([{ code: WarningCodes.UnhandledEvent, message: expect.stringContaining("__UNHANDLED_EVENT__") }]);
 	});
 
 	it("routes USER_UPDATE and RESUMED to registered handlers", () => {
