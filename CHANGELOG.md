@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### Added
+
+#### Warnings
+
+- `ClientEvents.Warn` and `WarningCodes`: one channel for everything the library notices that will not throw but is almost certainly a mistake. A listener receives a `ClientWarning` (`{ code, message }`) and can filter on `code`. While nothing listens, warnings are printed with `console.warn`, so they are loud by default, and adding a listener takes that output over. The existing "Unhandled event" message now goes through it as `WarningCodes.UnhandledEvent`. A `Warn` listener that throws never escapes into the code that raised the warning (`client.on()`, a timer, an interaction response's error); its error is printed, along with the warning it failed on
+- Intent checks on listeners. Adding a listener (or a collector) for an event none of the client's intents can deliver now raises `WarningCodes.MissingIntent`, naming the intents that would, once per event. A `MessageCreate`/`MessageUpdate` listener without the privileged `MessageContent` intent raises `WarningCodes.MissingMessageContent` once, explaining which fields arrive empty. The check runs on every registration rather than once at `login()`, so handlers loaded late are covered, and it never reports the library's own listeners. Partial coverage, such as `GuildMessages` without `DirectMessages`, is deliberately not warned about
+- Slow acknowledgement warnings. An interaction that still has no initial response 2.5 seconds after it was received raises `WarningCodes.SlowAcknowledgement`, naming the command or custom id. It says how much of that time was spent inside the library on asynchronous collector filters, and whether anything listens for the interaction at all. `ClientOptions.slowAcknowledgementWarning` sets the threshold in milliseconds, or `false` turns the check off. An initial response that fails with `10062 Unknown interaction` raises the same code with how late it was. Time is measured from local receipt (the new `interaction.receivedAt`), not from the snowflake, so a skewed host clock cannot make every interaction look late
+
+#### Sharding
+
+- Sharding, one shard per process. `ClientOptions.shards: { count, ids }` identifies as shard `[id, count]`. For now `ids` holds exactly one id; several shards in one process arrives in 2.0 with the same option shape. `client.shardCount`, `client.socket.shard`, and `guild.shardId` say where a guild's events arrive, so work can be routed to the process that owns a guild
+- `ShardIdFor(guildId, count)` (`src/Utils.ts`): which shard a guild's events arrive on
+
+#### REST
+
+- REST events. `Rest` is now an `EventEmitter`, and `RestEvents.Response` reports every response (`method`, `route`, `status`, `attempt`, `waitedMs`, `durationMs`), retried `429`s and `5xx`s included. `RestEvents.RateLimited` reports every `429` (`method`, `route`, `global`, `retryAfterMs`). `route` is always the route's template (`/interactions/:id/:token/callback`), never the route itself, since interaction and webhook routes carry tokens. Payloads are only built when something listens. A listener that throws is printed and never affects the request: it fires after the response's rate limit headers are recorded, and cannot turn a request Discord accepted into a rejection
+- `ClientOptions.rest`, forwarded to the `Rest` constructor. `retryAfterRateLimit`, `rateLimitDurationMultiplier`, and `perRouteRateLimits` were only reachable by mutating `client.rest` after construction
+- `RestOptions.baseUrl` / `rest.baseUrl` (default `https://discord.com/api/v10`): send REST requests to a proxy, so several processes can share one bot's rate limits, or to a local server in tests
+
+#### Gateway
+
+- `WSOptions.gatewayUrl` (passed as `ClientOptions.ws.gatewayUrl`): connect to a gateway proxy, or a local gateway in tests, instead of `wss://gateway.discord.gg`. It is used for resumes too, overriding the `resume_gateway_url` from `READY`, so a proxied client never resumes past its proxy
+- `WSClient.ping`: the round trip of the last acknowledged heartbeat in milliseconds, `-1` until the first one. `WSEvents.HeartbeatAck` now passes it as a `latency` argument; existing listeners that take no arguments are unaffected
+
+#### Smaller additions
+
+- `SnowflakeTimestamp(id)` (`src/Utils.ts`), which reads the creation time out of any Discord id, and `createdAt` (`Date`) / `createdTimestamp` (ms) getters built on it for `User`, `Guild`, `Role`, every channel, `Message`, `Emoji`, `Sticker`, `Webhook`, every interaction, `GuildScheduledEvent`, `Integration`, and `AutoModerationRule`. They live on two new base classes, `APIClientSnowflakeStructure` and `APIGuildSnowflakeStructure` (`src/Contracts/DiscordStructure.ts`), which a structure keyed by a snowflake `id` extends instead of `APIClientStructure`/`APIGuildStructure`. `Member` and `ThreadMember` have none, since their ids belong to a user and a thread. `Invite.createdAt` (an ISO string) and `Activity.createdAt` (a number) keep their existing types
+- A `required` argument on the `SlashCommandOptions` accessors (`getString`, `getInteger`, `getNumber`, `getBoolean`, `getUser`, `getRole`, `getChannel`, `getMentionable`, `getAttachment`). With `required: true` the return type drops `null`, and an absent option throws `Required option "x" was not provided` instead, which removes the `!` or null check after every accessor for a required option. `getMember` has no `required`, since it can be `null` for reasons other than a missing option
+
+- `client.intents`: the client's resolved intents bitfield. The library's own intent checks read it instead of `client.socket.intents`, which stops being one connection's once a process runs several shards
+- `ApplicationIdFromToken(token)` (`src/Utils.ts`): the application id a bot token encodes. `client.id` and the REST client's interaction exemption both read it from here
+
+#### Testing
+
+- A real-socket integration harness, `scripts/integration/`. A dependency-free fake gateway (real TCP and WebSocket framing) drives the built `dist/` through identify, a network drop and resume, a fatal close, an unreachable gateway, `destroy()` against a silent peer, a missed heartbeat ACK, and a bot *process* surviving a drop. Every CI job runs it on its own runtime with `node`/`bun`/`deno run -A scripts/integration/gateway.mjs`
+
+### Changed
+
+- The unbounded-collector accumulation warning (`client.collectors.maxUnbounded`) now goes through `ClientEvents.Warn` as `WarningCodes.UnboundedCollectors` instead of always printing with `console.warn`
+- A reconnect now closes the old socket with code `4200` instead of no code. Any code but 1000/1001 keeps the session resumable, and 4200 stays clear of Discord's own 4000-4014 so it never reads as one of them in a log
+- **Rate limit keys are route templates.** A route's rate limit key used to be its method plus its first two path segments (`POST:channels/123`), which had two problems. Every route under one channel or guild shared a learned bucket, so an exhausted typing bucket held the next message send for 3 seconds, and a role backfill held a ban in the same guild. And since the key embedded ids and tokens, `rest.routeToBucket` grew by one entry for every interaction, user, channel, and guild the bot touched, and was never pruned. Keys are now the method plus the route's template with every id as `:id` (`POST /channels/:id/messages`), and the major resource (channel, guild, webhook, or now interaction) is appended until a bucket is learned. `routeToBucket`'s key format changed with it; nothing should parse those keys, but its JSDoc describes the new one
+- Deleting a message older than two weeks now has a rate limit bucket of its own (`DELETE /channels/:id/messages/:id:old`), matching Discord's separate, slower limit for it. A bot clearing old messages no longer pushes that window onto recent deletes in the same channel, including once Discord has reported a bucket hash for the route, which may be the same hash for both
+- The `Disconnect` reason for a fatal close now says what to do: `4004` points at the token, `4010` shows the shard the client identified as, `4011` names `ClientOptions.shards`, and `4014` points at the developer portal's privileged intents
+- `BitField` throws its own `SyntaxError` (`Invalid bitfield value "abc" - expected an integer`) for a string that is not an integer, instead of passing `BigInt()`'s message through. That message differed between V8 and JavaScriptCore and did not say what was being parsed
+- CI now tests the runtime each job names. The Bun job ran `bun run test`, which executes vitest's `#!/usr/bin/env node` binary on the runner's Node, so the suite had never actually run on Bun. It now runs `bun --bun run test`, and a new `src/Tests/Runtime.test.ts` fails any job whose runtime differs from its `EXPECTED_RUNTIME`
+
+### Fixed
+
+- A bot exited cleanly, with code 0, the first time Discord dropped its gateway connection. Once the socket closed, the only thing scheduled was the reconnect timer, and `WSClient.#reconnect()` unref'd it, so a bot with nothing else ref'd (an idle bot whose own timers are unref'd too) had an empty event loop and Node exited before the reconnect ran. The reconnect timer is now ref'd; `destroy()` still clears it, so shutdown is unaffected
+- An interaction response could wait out a global rate limit. Discord exempts interaction endpoints from the bot-wide global limit, but `Rest` held every request behind one, so a callback sent right after an unrelated global `429` waited the full `retry_after` (2.5 seconds in testing, nearly all of the interaction's 3 second window). `/interactions/...` and the follow-up routes under `/webhooks/{applicationId}/...` now skip it, with `perRouteRateLimits` on or off
+- `destroy()` waited on a close event and did not log out. `WSClient.destroy()` called `close()` with no code, and `Client.destroy()` then polled until that close event flipped `ready`. Against a dead peer that meant waiting out `ws`'s 30-second close timeout, and a close without 1000 left the session, and with it the bot's online status, alive until Discord timed it out. `destroy()` now tears down immediately and closes with `1000`
+- `HasIntent`'s doc said it was not used internally, though `fetchGateway()` uses it (and now the listener check does too)
+- `examples/14-collectors` collected `"HEARTBEAT_ACK"`, which `WSClient` never emits (the event is `WSEvents.HeartbeatAck`), so its collector always timed out
+
 ## [1.5.0-alpha] 2026 October 16
 
 ### Added

@@ -2,6 +2,13 @@
 
 ## Active backlog
 
+### Partial payload guards
+
+- [ ] `Role.patch()` assigns every field unconditionally and dereferences `data.colors`
+  - Breaks the `"key" in data` guard rule in AGENTS.md: a partial role payload would blank cached
+    fields, and one without `colors` throws. Guard each field and add a `Role` case to
+    `src/Tests/PartialPayloads.test.ts`; then sweep the other structures for the same pattern
+
 ### Upload MIME handling
 
 Raised by the same audit, deferred out of 1.3 - none of it is in the release's headline scope.
@@ -83,7 +90,7 @@ Raised by the Dossier log bot's findings against 1.4.0-alpha. The rest of those 
 ### Quality of Life
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
-  - CI currently runs build + test on Node 20/22/24, Bun, and Deno, and nothing else - no publish
+  - CI currently runs build + test + the integration harness on Node 20/22/24, Bun, and Deno, and nothing else - no publish
     workflow, and `examples/` is neither linted nor typechecked by any script (`eslint.config.ts`
     ignores it, and `npx tsc --noEmit -p examples/tsconfig.json` has to be run by hand)
 - [ ] Examples for Components v2 and file uploads
@@ -91,6 +98,18 @@ Raised by the Dossier log bot's findings against 1.4.0-alpha. The rest of those 
     builder or the `attachments` API, though the README covers both. Next free slots are
     `examples/15-*` and `16-*`, and a new example also goes in the README's examples table
   - Deliberately after the release: examples ship no published code, so they do not gate the tag
+
+### REST follow-ups
+
+Found while reworking rate limit keys for 1.6.
+
+- [ ] A request's queue is chosen at enqueue time, but its rate limit wait key is recomputed on
+  every attempt (`Rest.#request` vs `Rest.#execute`, `src/Rest.ts`). Requests enqueued before and
+  after a route's bucket is learned therefore run in two chains for a moment, and can briefly
+  overlap within one bucket. Harmless in practice (the headers catch up on the next response), but
+  the queue key and the wait key should be the same thing
+- [ ] Make `Rest.routeToBucket` private in 2.0. It is internal state that has been public since 1.x,
+  and its key format changed in 1.6
 
 ## Tests to add
 
@@ -126,10 +145,25 @@ Raised by the Dossier log bot's findings against 1.4.0-alpha. The rest of those 
 - [ ] Type `user_settings` and `auth` in the `READY` payload (`src/Events/Ready.ts`)
   - Both are still `JSONObject`. Neither is documented in Discord's bot-facing API reference - `user_settings` is a user-account field bots receive empty, and `auth` is undocumented entirely
   - Left opaque rather than modeled from reverse-engineered sources; revisit only if Discord documents them or a consumer actually needs to read them
-- [ ] Sharding
-  - `#handleHello` sends `Identify` with no `shard` array and there is no shard manager, so the library hard-stops at the ~2500 guild boundary
-  - `GatewayCloseCodes.ShardingRequired` is correctly treated as fatal, which makes the ceiling a clean failure rather than a silent one - but it is still a ceiling
-  - Likely reshapes `Client` / `WSClient` construction, will result in a v2 bump
+- [x] Sharding, multi-process (1.6)
+  - `ClientOptions.shards: { count, ids }` with exactly one id per process; `IDENTIFY` carries
+    `shard: [id, count]`, and `client.shardCount` / `guild.shardId` / `ShardIdFor()` route work to
+    the process that owns a guild
+  - `4011 Sharding required` now names the option instead of just failing
+- [ ] Sharding, in-process and mixed (2.0)
+  - Same option, any subset of ids per process: `client.shards: ReadonlyMap<number, WSClient>`,
+    `client.socket` as a getter that throws with more than one local shard, `client.ping` /
+    `client.shardFor(guildId)`, `count: "auto"` via `GET /gateway/bot`, an identify queue per
+    `max_concurrency` bucket, and `Ready` once every local shard is ready, plus per-shard events
+  - Library internals must stop reading `client.socket` first: `Client` (login, destroy, presence)
+    and `MemberCache.fetchGateway()`'s send. Intents are already off the socket (`client.intents`).
+    See SIMPLYJS_ROADMAP_BRIEF.md section 4.2
+- [ ] Warn about guild-scoped listeners on a client without `Guilds`
+  - The `MissingIntent` check is "any of" by design, so a `MemberCreate` listener with
+    `GuildMembers` but no `Guilds` passes it - yet the handler returns early for every uncached
+    guild, and without `Guilds` nothing is ever cached, so the listener can never fire. A separate,
+    once-only warning for "guild-scoped listener without `Guilds`" would catch it without mixing
+    "all of" rows back into the intent map
 
 ## Discord gateway event implementation status
 

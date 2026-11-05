@@ -482,6 +482,68 @@ client.on(ClientEvents.Ready, (user) => {
 });
 ```
 
+### Warnings
+
+Some mistakes don't throw - they just make things silently never happen. The library reports the ones it can see through `ClientEvents.Warn`:
+
+| Code | When |
+| --- | --- |
+| `MissingIntent` | A listener or collector was added for an event none of your intents can deliver, so it will never fire. Once per event |
+| `MissingMessageContent` | A `MessageCreate`/`MessageUpdate` listener was added without the privileged `MessageContent` intent, so `content`, `embeds`, `attachments`, and `components` arrive empty outside DMs, mentions, and the bot's own messages. Once |
+| `SlowAcknowledgement` | An interaction still had no response 2.5 seconds after it arrived (Discord gives up at 3), or its response came back `10062 Unknown interaction`. Says how long it took, and how much of that was spent waiting on collector filters before your handler saw it |
+| `UnhandledEvent` | The gateway sent an event the library has no handler for. Once per event |
+| `UnboundedCollectors` | More than `client.collectors.maxUnbounded` (default 10) collectors with no `time`, `idle`, or `max` are live on one event, so they are probably piling up. Names the event and where the latest one was created. Once per event |
+
+While nothing listens to `Warn`, each warning is printed with `console.warn`, so they are loud by default. A listener takes that output over, and if it throws, the error is printed rather than breaking whatever raised the warning:
+
+```ts
+import { ClientEvents, WarningCodes } from "simplyjs";
+
+client.on(ClientEvents.Warn, (warning) => {
+	if (warning.code === WarningCodes.UnhandledEvent) return; // decided to accept these
+	logger.warn(warning.message);
+});
+```
+
+The slow acknowledgement threshold is `ClientOptions.slowAcknowledgementWarning` (milliseconds, default `2500`); `false` turns it off. If a handler needs longer than that, defer first with `deferReply()` or `deferUpdate()`.
+
+### Sharding
+
+Discord caps one gateway connection at 2,500 guilds and closes it with `4011 Sharding required` past that. Split the bot into shards with `ClientOptions.shards`, one process per shard:
+
+```ts
+// run this once per shard, e.g. SHARD_ID=0..3 for four shards
+const client = new Client({
+	token,
+	intents: ["Guilds", "GuildMessages"],
+	shards: { count: 4, ids: [Number(process.env.SHARD_ID)] }
+});
+```
+
+- Each guild's events arrive on exactly one shard. `guild.shardId`, or `ShardIdFor(guildId, count)` for a guild you only have the id of, says which, so work for a guild can be sent to the process that owns it.
+- Direct messages only arrive on shard 0.
+- REST rate limits, the global one included, belong to the bot, not to a process. A larger fleet can share them through a REST proxy with `ClientOptions.rest: { baseUrl }`.
+- Start the processes a few seconds apart: Discord allows one identify per 5 seconds per `max_concurrency` bucket (see `GET /gateway/bot`).
+
+For now `ids` holds exactly one id. Several shards in one process arrives in 2.0, with this same option.
+
+### REST options and observability
+
+`ClientOptions.rest` configures `client.rest`: `retryAfterRateLimit`, `rateLimitDurationMultiplier`, `perRouteRateLimits`, and `baseUrl` for a REST proxy. `client.rest` is also an `EventEmitter`, which makes request metrics a listener rather than a wrapper:
+
+```ts
+import { RestEvents } from "simplyjs";
+
+client.rest.on(RestEvents.Response, ({ method, route, status, durationMs }) => {
+	metrics.timing(`${method} ${route} ${status}`, durationMs); // route is a template: /channels/:id/messages
+});
+client.rest.on(RestEvents.RateLimited, ({ route, global, retryAfterMs }) => {
+	console.log(`rate limited on ${global ? "the global limit" : route} for ${retryAfterMs}ms`);
+});
+```
+
+`route` is always the route's template, never the route itself - interaction and webhook routes carry tokens. For the gateway side, `client.socket.ping` is the last heartbeat round trip in milliseconds (`-1` until the first one).
+
 ## Examples
 
 Full end-to-end projects live in [`examples/`](./examples):
@@ -512,7 +574,7 @@ Gateway messages flow through a fixed pipeline: `WSClient` (`src/WSClient.ts`) o
 Non-obvious design notes:
 
 > **HINT**\
-> **Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a bitfield. There's no event-to-intent gating yet, so a missing intent currently drops events silently rather than failing loudly.
+> **Intents are more flexible than they look.** You can pass a raw `number`, an array of `GatewayIntents` values, or plain key names like `"Guilds"`. `ResolveIntents`/`HasIntent` in `src/Intents.ts` normalize any of these into a bitfield. A listener for an event your intents can never deliver raises a `MissingIntent` warning when it is added (see [Warnings](#warnings)), rather than silently never firing. The check is "any of": `GuildMessages` without `DirectMessages` is a normal choice for a bot that ignores DMs, so partial coverage is never warned about.
 
 > **NOTE**\
 > **Permissions and intents are bigint bitfields, not enums.** The generic `BitField` class (`src/DataStructures/BitField.ts`) backs things like `Role.permissions`. Raw Discord permission flag values live in `Constants.ts`.
@@ -524,9 +586,9 @@ Non-obvious design notes:
 > **`Ready` doesn't fire the moment the gateway says it should.** `src/Events/Ready.ts` collects every guild ID from the `READY` payload (including ones marked `unavailable`), then waits for a matching `GuildCreate` for each one. Only once every guild has arrived, or 15 seconds have passed, does the library emit its own public `Ready` event - so handlers never fire before caches are actually populated.
 
 > **WARNING**\
-> **Timers are required to call `.unref()`.** This is enforced by a custom ESLint rule, `local/require-unref-on-timers` (`eslint.config.ts`). The polling loops in `Client.login()`/`Client.destroy()` are the reference examples if you're adding a new timer.
+> **Timers are required to call `.unref()`.** This is enforced by a custom ESLint rule, `local/require-unref-on-timers` (`eslint.config.ts`). The heartbeat timers in `src/WSClient.ts` are the reference examples if you're adding a new timer. The one deliberate exception is the reconnect timer, which has to keep the process alive between connections.
 
-Structures and caches also split along ownership: `APIClientStructure<T>` holds a reference to `client` only, `APIGuildStructure<T>` holds both `client` and `guild` (`src/Contracts/DiscordStructure.ts`), and caches mirror the split via `GlobalCache`/`GuildScopedCache` (`src/Contracts/CacheStructure.ts`). See `CODE_STYLE_AND_RULES.md` for the full reasoning behind these patterns.
+Structures and caches also split along ownership: `APIClientStructure<T>` holds a reference to `client` only, `APIGuildStructure<T>` holds both `client` and `guild` (`src/Contracts/DiscordStructure.ts`), and structures keyed by a snowflake `id` extend their `APIClientSnowflakeStructure`/`APIGuildSnowflakeStructure` variants, which add `createdAt`/`createdTimestamp`, and caches mirror the split via `GlobalCache`/`GuildScopedCache` (`src/Contracts/CacheStructure.ts`). See `CODE_STYLE_AND_RULES.md` for the full reasoning behind these patterns.
 
 ## Development
 
@@ -537,6 +599,9 @@ npm test            # vitest run (tests live in src/Tests/**/*.ts)
 npm run lint        # eslint .
 npm run lint:fix    # eslint . --fix
 npm run linecount   # top 10 largest .ts files by line count
+
+# gateway lifecycle against a real socket, on the built dist/ (run npm run build first)
+node scripts/integration/gateway.mjs
 ```
 
 ## Status and known limitations
