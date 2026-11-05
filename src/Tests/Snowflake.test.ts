@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SnowflakeTimestamp } from "../Utils.js";
+import { ApplicationIdFromToken, SnowflakeTimestamp } from "../Utils.js";
 import { Client } from "../Client.js";
 import { User } from "../Structures/User.js";
 import { Guild } from "../Structures/Guild.js";
@@ -41,5 +41,14 @@ describe("createdAt", () => {
 
 		expect(role.createdTimestamp).toBe(EXAMPLE_TIMESTAMP);
 		expect(role.clone().createdAt).toEqual(new Date(EXAMPLE_TIMESTAMP));
+	});
+});
+
+describe("ApplicationIdFromToken", () => {
+	it("decodes the token's first segment, and Client.id agrees with it", () => {
+		const token = `${Buffer.from(EXAMPLE_ID).toString("base64")}.x.y`;
+
+		expect(ApplicationIdFromToken(token)).toBe(EXAMPLE_ID);
+		expect(new Client({ token, intents: 0 }).id).toBe(EXAMPLE_ID);
 	});
 });

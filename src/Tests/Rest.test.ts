@@ -356,3 +356,205 @@ describe("Rest options", () => {
 		expect(client.rest.baseUrl).toBe("http://proxy");
 	});
 });
+
+describe("Rest rate limit keys", () => {
+	// snowflake-shaped ids, since route templates collapse 17-20 digit segments
+	const CHANNEL = "400000000000000001";
+	const GUILD = "400000000000000002";
+	// base64 of the application id, as the first segment of a bot token
+	const APP_ID = "500000000000000000";
+	const TOKEN = `${Buffer.from(APP_ID).toString("base64")}.x.y`;
+
+	type Script = (path: string, init: RequestInit) => Response;
+	const limitHeaders = (bucket: string, remaining: number, resetAfter: number): Record<string, string> => ({
+		"X-RateLimit-Bucket": bucket,
+		"X-RateLimit-Remaining": String(remaining),
+		"X-RateLimit-Reset-After": String(resetAfter)
+	});
+
+	/** Stubs fetch with `script`, recording the fake-clock time each path was sent at */
+	function stubFetch(script: Script): { sent: { path: string; at: number }[] } {
+		const sent: { path: string; at: number }[] = [];
+		vi.stubGlobal("fetch", vi.fn(async (input: URL | RequestInfo, init: RequestInit): Promise<Response> => {
+			const path = new URL(String(input)).pathname.replace("/api/v10", "");
+			sent.push({ path, at: Date.now() });
+			return script(path, init);
+		}));
+		return { sent };
+	}
+
+	function createRest(): Rest {
+		const rest = new Rest();
+		rest.setToken(TOKEN);
+		return rest;
+	}
+
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		vi.useFakeTimers();
+	});
+
+	it("does not hold an interaction callback behind an active global limit", async () => {
+		const rest = createRest();
+		let tripped = false;
+		const { sent } = stubFetch((path) => {
+			if (!tripped && path === "/users/@me") {
+				tripped = true;
+				return new Response(JSON.stringify({ message: "global", retry_after: 2.5, global: true }), { status: 429 });
+			}
+			return new Response(null, { status: 204 });
+		});
+
+		const unrelated = rest.get("/users/@me");
+		await vi.advanceTimersByTimeAsync(10);
+		const started = Date.now();
+		await rest.post(`/interactions/${APP_ID}1/token-a/callback`, { type: 5 });
+		const followUp = rest.post(`/webhooks/${APP_ID}/token-a`, { content: "hi" });
+		await vi.advanceTimersByTimeAsync(0);
+		await followUp;
+
+		// both interaction routes go straight through; the 2.5s window only applies to everything else
+		expect(sent.find((s) => s.path.startsWith("/interactions/"))!.at).toBe(started);
+		expect(sent.find((s) => s.path.startsWith("/webhooks/"))!.at).toBe(started);
+
+		await vi.advanceTimersByTimeAsync(2_500);
+		await unrelated;
+	});
+
+	it("still holds an unrelated webhook behind an active global limit", async () => {
+		const rest = createRest();
+		let tripped = false;
+		const { sent } = stubFetch(() => {
+			if (!tripped) {
+				tripped = true;
+				return new Response(JSON.stringify({ message: "global", retry_after: 1, global: true }), { status: 429 });
+			}
+			return new Response(null, { status: 204 });
+		});
+
+		const first = rest.get("/users/@me");
+		await vi.advanceTimersByTimeAsync(10);
+		const webhook = rest.post("/webhooks/600000000000000000/other-token", { content: "hi" });
+		await vi.advanceTimersByTimeAsync(1_000);
+		await Promise.all([first, webhook]);
+
+		expect(sent.find((s) => s.path.startsWith("/webhooks/"))!.at).toBeGreaterThanOrEqual(1_000);
+	});
+
+	it("does not grow routeToBucket with every interaction", async () => {
+		const rest = createRest();
+		stubFetch(() => new Response(null, { status: 204, headers: limitHeaders("callback", 0, 5) }));
+
+		for (let i = 0; i < 50; i += 1) {
+			await rest.post(`/interactions/${600000000000000000n + BigInt(i)}/token-${i}/callback`, { type: 5 });
+		}
+
+		expect(rest.routeToBucket.size).toBe(1);
+		expect([...rest.routeToBucket.keys()]).toEqual(["POST /interactions/:id/:token/callback"]);
+	});
+
+	it("keeps an exhausted interaction bucket from delaying a different interaction", async () => {
+		const rest = createRest();
+		const { sent } = stubFetch(() => new Response(null, { status: 204, headers: limitHeaders("callback", 0, 5) }));
+
+		await rest.post("/interactions/600000000000000001/token-1/callback", { type: 5 });
+		await rest.post("/interactions/600000000000000002/token-2/callback", { type: 5 });
+
+		// each interaction is its own major resource, so one exhausting its window does not hold the next
+		expect(sent[1]!.at).toBe(sent[0]!.at);
+	});
+
+	it("does not hold a message send behind an exhausted typing bucket in the same channel", async () => {
+		const rest = createRest();
+		const { sent } = stubFetch((path) => path.endsWith("/typing")
+			? new Response(null, { status: 204, headers: limitHeaders("typing", 0, 3) })
+			: new Response("{}", { status: 200, headers: limitHeaders("messages", 4, 5) }));
+
+		await rest.post(`/channels/${CHANNEL}/messages`, { content: "a" });
+		await rest.post(`/channels/${CHANNEL}/typing`, {});
+		await rest.post(`/channels/${CHANNEL}/messages`, { content: "b" });
+
+		expect(sent[2]!.at).toBe(sent[1]!.at);
+	});
+
+	it("does not hold a ban behind a role backfill in the same guild", async () => {
+		const rest = createRest();
+		const { sent } = stubFetch((path) => path.includes("/roles/")
+			? new Response(null, { status: 204, headers: limitHeaders("roles", 0, 1) })
+			: new Response(null, { status: 204, headers: limitHeaders("bans", 4, 5) }));
+
+		const backfill = rest.put(`/guilds/${GUILD}/members/700000000000000001/roles/700000000000000002`, null);
+		await vi.advanceTimersByTimeAsync(0);
+		await backfill;
+		const second = rest.put(`/guilds/${GUILD}/members/700000000000000003/roles/700000000000000002`, null);
+		await rest.put(`/guilds/${GUILD}/bans/700000000000000004`, {});
+
+		const ban = sent.find((s) => s.path.includes("/bans/"))!;
+		expect(ban.at).toBe(sent[0]!.at);
+
+		await vi.advanceTimersByTimeAsync(1_000);
+		await second;
+		// while the backfill itself still respects its own exhausted window
+		expect(sent.at(-1)!.at - sent[0]!.at).toBeGreaterThanOrEqual(1_000);
+	});
+
+	it("gives deletes of messages older than two weeks a bucket of their own", async () => {
+		const rest = createRest();
+		const oldId = String((BigInt(Date.now() - 1_420_070_400_000 - 15 * 24 * 60 * 60 * 1000) << 22n));
+		const newId = String((BigInt(Date.now() - 1_420_070_400_000) << 22n));
+		const { sent } = stubFetch((path) => path.endsWith(oldId)
+			? new Response(null, { status: 204, headers: limitHeaders("old-delete", 0, 5) })
+			: new Response(null, { status: 204, headers: limitHeaders("delete", 4, 5) }));
+
+		await rest.delete(`/channels/${CHANNEL}/messages/${oldId}`);
+		await rest.delete(`/channels/${CHANNEL}/messages/${newId}`);
+
+		expect(sent[1]!.at).toBe(sent[0]!.at);
+		expect(rest.routeToBucket.get("DELETE /channels/:id/messages/:id:old")).toBe("old-delete");
+		expect(rest.routeToBucket.get("DELETE /channels/:id/messages/:id")).toBe("delete");
+	});
+
+	it("keeps old and recent deletes apart even when Discord reports the same bucket for both", async () => {
+		const rest = createRest();
+		const oldId = String((BigInt(Date.now() - 1_420_070_400_000 - 15 * 24 * 60 * 60 * 1000) << 22n));
+		const newId = String((BigInt(Date.now() - 1_420_070_400_000) << 22n));
+		const { sent } = stubFetch((path) => path.endsWith(oldId)
+			? new Response(null, { status: 204, headers: limitHeaders("shared", 0, 5) })
+			: new Response(null, { status: 204, headers: limitHeaders("shared", 4, 5) }));
+
+		// learn the bucket for both routes first, so the second round is keyed by hash
+		await rest.delete(`/channels/${CHANNEL}/messages/${newId}`);
+		const firstOld = rest.delete(`/channels/${CHANNEL}/messages/${oldId}`);
+		await vi.advanceTimersByTimeAsync(0);
+		await firstOld;
+		await rest.delete(`/channels/${CHANNEL}/messages/${newId}`);
+
+		// the old delete exhausted its window, which must not hold the recent one behind it
+		expect(sent[2]!.at).toBe(sent[1]!.at);
+	});
+
+	it("keeps the interaction exemption when per-route limits are off", async () => {
+		const rest = new Rest({ perRouteRateLimits: false });
+		rest.setToken(TOKEN);
+		let tripped = false;
+		const { sent } = stubFetch((path) => {
+			if (!tripped && path === "/users/@me") {
+				tripped = true;
+				return new Response(JSON.stringify({ message: "global", retry_after: 2.5, global: true }), { status: 429 });
+			}
+			return new Response(null, { status: 204 });
+		});
+
+		const unrelated = rest.get("/users/@me");
+		await vi.advanceTimersByTimeAsync(10);
+		const started = Date.now();
+		await rest.post(`/interactions/${APP_ID}1/token-a/callback`, { type: 5 });
+
+		expect(sent.find((s) => s.path.startsWith("/interactions/"))!.at).toBe(started);
+
+		await vi.advanceTimersByTimeAsync(2_500);
+		await unrelated;
+	});
+
+});
