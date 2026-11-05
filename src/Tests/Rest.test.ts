@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Rest } from "../Rest.js";
+import { Client } from "../Client.js";
 
 describe("Rest request parsing", () => {
 	beforeEach(() => {
@@ -310,5 +311,48 @@ describe("Rest request parsing", () => {
 		await vi.advanceTimersByTimeAsync(60);
 		await expect(Promise.all([first, second])).resolves.toEqual([{ ok: true }, { ok: true }]);
 		expect(calls).toEqual({ messages: 3, pins: 2 });
+	});
+});
+describe("Rest options", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	it("sends to Discord's API by default", async () => {
+		const rest = new Rest();
+		rest.setToken("token");
+		const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await rest.get("/users/@me");
+
+		expect(fetchMock.mock.calls[0]![0]).toBe("https://discord.com/api/v10/users/@me");
+	});
+
+	it("sends to baseUrl when one is given, tolerating a trailing slash", async () => {
+		const rest = new Rest({ baseUrl: "http://rest-proxy:8080/api/v10/" });
+		rest.setToken("token");
+		const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await rest.get("/users/@me");
+
+		expect(rest.baseUrl).toBe("http://rest-proxy:8080/api/v10");
+		expect(fetchMock.mock.calls[0]![0]).toBe("http://rest-proxy:8080/api/v10/users/@me");
+	});
+
+	it("is configured from ClientOptions.rest", () => {
+		const client = new Client({
+			token: "token",
+			intents: 0,
+			rest: { retryAfterRateLimit: false, rateLimitDurationMultiplier: 2, perRouteRateLimits: false, baseUrl: "http://proxy" }
+		});
+
+		expect(client.rest.retryAfterRateLimit).toBe(false);
+		expect(client.rest.rateLimitDurationMultiplier).toBe(2);
+		expect(client.rest.perRouteRateLimits).toBe(false);
+		expect(client.rest.baseUrl).toBe("http://proxy");
 	});
 });
