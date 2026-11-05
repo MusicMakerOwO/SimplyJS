@@ -233,3 +233,16 @@ const DISCORD_EPOCH = 1_420_070_400_000n;
 export function SnowflakeTimestamp(id: string | bigint): number {
 	return Number((BigInt(id) >> 22n) + DISCORD_EPOCH);
 }
+
+/**
+ * Reads the bot's application id out of its token.
+ *
+ * A bot token's first segment is the application id, base64 encoded, so this needs no request.
+ * `Client.id` and `Rest`'s global-limit exemption for interaction follow-ups both read it from here,
+ * so that the two can never disagree about which id the token belongs to.
+ * @param token A bot token, without the `Bot ` prefix.
+ * @returns The decoded id, or an empty string when the token has no first segment to decode.
+ */
+export function ApplicationIdFromToken(token: string): string {
+	return Buffer.from(token.split(".")[0] ?? "", "base64").toString("ascii");
+}

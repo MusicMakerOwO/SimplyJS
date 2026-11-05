@@ -1,5 +1,6 @@
 import { FileAttachment, JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
+import { ApplicationIdFromToken, SnowflakeTimestamp } from "./Utils.js";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const USER_AGENT = "DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, 1.2.0-alpha)";
@@ -8,16 +9,29 @@ const TRANSIENT_HTTP_STATUS = new Set([500, 502, 503, 504]);
 const EMPTY_RESPONSE_STATUS = new Set([204, 205, 304]);
 const MAX_FILES_PER_REQUEST = 10;
 
+/** Messages older than this are deleted through a separate, much slower rate limit bucket */
+const OLD_MESSAGE_AGE = 14 * 24 * 60 * 60 * 1000;
+
 /**
- * Derives a coarse per-route cache key from a method and route, before Discord has told us
- * which rate limit bucket the route actually belongs to.
+ * Reduces a route to its shape: every id becomes `:id`, and the parts that are unique per request
+ * (interaction and webhook tokens, invite codes, the emoji in a reaction route) are collapsed too.
  *
- * Used as a fallback lookup key in {@link Rest.routeToBucket} and as the initial rate limit cache
- * key until a `X-RateLimit-Bucket` header is observed for that route.
+ * Two jobs depend on this. It is the stable half of a rate limit key, so that `/channels/1/messages`
+ * and `/channels/1/typing` - different Discord buckets - stop sharing one learned bucket and each
+ * other's exhausted windows. And it is the only form of a route that is safe to hand to a listener,
+ * since interaction and webhook routes carry tokens.
+ *
+ * The query string is dropped; it never affects which bucket a request lands in.
  */
-function PerRouteCacheKey(method: string, route: string): string {
-	const [category = "global", id = "global"] = route.split("/").filter(Boolean);
-	return `${method.toUpperCase()}:${category}/${id}`;
+function RouteTemplate(route: string): string {
+	return (route.split("?")[0] ?? route)
+		// tokens and codes are unique per interaction/webhook/invite - never part of a template
+		.replace(/^\/interactions\/\d+\/[^/]+/, "/interactions/:id/:token")
+		.replace(/^\/webhooks\/(\d+)\/[^/]+/, "/webhooks/$1/:token")
+		.replace(/^\/invites\/[^/]+/, "/invites/:code")
+		// every reaction route under one message shares a bucket
+		.replace(/\/reactions\/.*/, "/reactions/:reaction")
+		.replace(/\d{17,20}/g, ":id");
 }
 
 /**
@@ -34,11 +48,53 @@ function MajorResourceKey(route: string): string {
 	if (!resource || !id) return "global";
 	if (resource === "channels" || resource === "guilds") return `${resource}:${id}`;
 	if (resource === "webhooks") return token ? `${resource}:${id}:${token}` : `${resource}:${id}`;
+	// without this, every interaction callback would share one queue and one rate limit window
+	if (resource === "interactions") return `${resource}:${id}`;
 
 	return "global";
 }
 
-type RestMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+export type RestMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+
+/**
+ * Everything the rate limiter needs to know about one request's route, worked out once per call
+ * in `#request` rather than on every attempt - none of it can change while the request is retried.
+ */
+type RouteInfo = {
+	/** The route as it is sent, query string included */
+	route: string;
+	/** {@link RouteTemplate} of the route - also the only form of it that is safe to hand to a listener */
+	template: string;
+	/**
+	 * Lookup key in {@link Rest.routeToBucket}: `<METHOD> <template>`, plus `:old` for the delete of
+	 * a message older than two weeks, so the old and recent delete routes each learn their own bucket.
+	 */
+	routeKey: string;
+	/**
+	 * The major resource the route's limit is scoped to (see {@link MajorResourceKey}), plus `:old`
+	 * for the delete of a message older than two weeks.
+	 *
+	 * The suffix lives here, and not only in {@link routeKey}, because the scope is what survives
+	 * once a bucket is learned. Discord may report the same bucket hash for old and recent deletes;
+	 * if the suffix were only part of the pre-bucket key, both would collapse into one
+	 * `bucket:<hash>:<channel>` queue on the first response and the old-delete window would hold
+	 * every recent delete in the channel - the thing the split exists to prevent.
+	 */
+	scope: string;
+	/** Whether Discord exempts this route from the bot-wide global limit, see `#isGlobalLimitExempt` */
+	globalExempt: boolean;
+};
+
+/**
+ * Whether a request deletes a message older than two weeks, which Discord limits separately from
+ * deleting a recent one. Otherwise a moderation bot clearing old messages would push the shared
+ * window onto every recent delete in the channel.
+ */
+function IsOldMessageDelete(method: RestMethod, path: string): boolean {
+	if (method !== "DELETE") return false;
+	const messageId = /^\/channels\/\d+\/messages\/(\d+)$/.exec(path)?.[1];
+	return messageId !== undefined && Date.now() - SnowflakeTimestamp(messageId) > OLD_MESSAGE_AGE;
+}
 
 type RestRequestOptions = {
 	headers?: Record<string, string>;
@@ -214,6 +270,11 @@ export type RestOptions = {
  */
 export class Rest {
 	#token: string | null = null;
+	/**
+	 * The bot's application id, read from the token. Interaction follow-ups go through
+	 * `/webhooks/{applicationId}/{token}`, which is exempt from the global limit like `/interactions/`.
+	 */
+	#applicationId: string | null = null;
 
 	/** If `false`, throws on `429` responses instead of waiting and retrying */
 	retryAfterRateLimit: boolean;
@@ -231,13 +292,14 @@ export class Rest {
 	 */
 	routeRateLimits: TTLCache<string, number>;
 	/**
-	 * Maps a per-route cache key (method + first two path segments) to the actual Discord
-	 * rate-limit bucket hash returned in the `X-RateLimit-Bucket` response header.
+	 * Maps a per-route cache key (method + route template, e.g. `POST /channels/:id/messages`) to the
+	 * actual Discord rate-limit bucket hash returned in the `X-RateLimit-Bucket` response header.
+	 * Keys hold no ids or tokens, so the map is bounded by the number of distinct routes used.
 	 *
 	 * Discord's real rate limits are keyed by bucket hash, not by route shape: routes that look
 	 * different can share a bucket, and routes that look the same can be split across several.
 	 * The bucket hash for a route is only known after the first response, so the first request
-	 * to a route falls back to the route-shaped key; once a bucket is learned, later requests key
+	 * to a route falls back to `<method> <template>:<major resource>`; once a bucket is learned, later requests key
 	 * off `bucket:<hash>:<major resource>` instead, matching Discord's actual limit grouping.
 	 */
 	routeToBucket: Map<string, string>;
@@ -262,6 +324,7 @@ export class Rest {
 	/** Sets the token for internal use. Set automatically with `client.login()`, not intended for public use */
 	setToken(token: string): void {
 		this.#token = token;
+		this.#applicationId = ApplicationIdFromToken(token) || null;
 	}
 
 	/** Simple check if the token is set, not intended for public use */
@@ -287,29 +350,43 @@ export class Rest {
 		}
 	}
 
+	/** Works out the {@link RouteInfo} for a request, once per call */
+	#describeRoute(method: RestMethod, route: string): RouteInfo {
+		const path = route.split("?")[0] ?? route;
+		const template = RouteTemplate(path);
+		const old = IsOldMessageDelete(method, path) ? ":old" : "";
+
+		return {
+			route,
+			template,
+			routeKey: `${method} ${template}${old}`,
+			scope: `${MajorResourceKey(path)}${old}`,
+			globalExempt: this.#isGlobalLimitExempt(path)
+		};
+	}
+
 	/** Computes the {@link routeRateLimits} lookup key for a request, using a learned bucket when available */
-	#resolveRateLimitCacheKey(method: RestMethod, route: string): string {
+	#resolveRateLimitCacheKey(info: RouteInfo): string {
 		if (!this.perRouteRateLimits) return "global";
 
-		const routeKey = PerRouteCacheKey(method, route);
-		const bucket = this.routeToBucket.get(routeKey);
-		if (!bucket) return routeKey;
+		const bucket = this.routeToBucket.get(info.routeKey);
+		if (!bucket) return `${info.routeKey}:${info.scope}`;
 
-		return `bucket:${bucket}:${MajorResourceKey(route)}`;
+		return `bucket:${bucket}:${info.scope}`;
 	}
 
 	/**
 	 * Records the route's rate-limit bucket hash from the response, if present, and returns the
 	 * bucket-scoped cache key so the caller can key off it going forward.
 	 */
-	#rememberBucket(method: RestMethod, route: string, response: Response): string | null {
+	#rememberBucket(info: RouteInfo, response: Response): string | null {
 		if (!this.perRouteRateLimits) return null;
 
 		const bucket = response.headers.get("X-RateLimit-Bucket");
 		if (!bucket) return null;
 
-		this.routeToBucket.set(PerRouteCacheKey(method, route), bucket);
-		return `bucket:${bucket}:${MajorResourceKey(route)}`;
+		this.routeToBucket.set(info.routeKey, bucket);
+		return `bucket:${bucket}:${info.scope}`;
 	}
 
 	/** Reads a header holding a duration in seconds as milliseconds, scaled by {@link rateLimitDurationMultiplier} */
@@ -342,11 +419,33 @@ export class Rest {
 		this.routeRateLimits.set(cacheKey, resetAfter, resetAfter);
 	}
 
+	/**
+	 * Whether Discord exempts a route from the bot-wide global limit: interaction callbacks, and the
+	 * follow-up and original-response routes under `/webhooks/{applicationId}/{token}`.
+	 *
+	 * Getting this wrong costs nothing worse than today: a route wrongly exempted takes a `429` and
+	 * the normal retry path, and one wrongly not exempted waits as every route used to.
+	 */
+	#isGlobalLimitExempt(route: string): boolean {
+		if (route.startsWith("/interactions/")) return true;
+		return this.#applicationId !== null && route.startsWith(`/webhooks/${this.#applicationId}/`);
+	}
+
 	/** How long to wait before sending, honouring the route's own limit and any global one, whichever is longer */
-	#remainingRateLimitWait(cacheKey: string): number {
+	#remainingRateLimitWait(cacheKey: string, info: RouteInfo): number {
+		// A global limit pauses every bucket, not just the one that happened to trip it - except the
+		// interaction routes Discord exempts. Holding a callback behind it would spend the
+		// interaction's whole 3 second window waiting on a limit that does not apply to it.
+		//
+		// That includes the case where the route's own key *is* `"global"`, which is every route once
+		// `perRouteRateLimits` is off: the exemption is Discord's, not something per-route tracking
+		// grants, so it holds either way.
+		if (info.globalExempt && cacheKey === "global") return 0;
+
 		const routeWait = this.routeRateLimits.remainingTTL(cacheKey) ?? 0;
-		// a global limit pauses every bucket, not just the one that happened to trip it
-		const globalWait = cacheKey === "global" ? 0 : (this.routeRateLimits.remainingTTL("global") ?? 0);
+		const globalWait = cacheKey === "global" || info.globalExempt
+			? 0
+			: (this.routeRateLimits.remainingTTL("global") ?? 0);
 
 		return Math.max(routeWait, globalWait);
 	}
@@ -430,14 +529,14 @@ export class Rest {
 	): Promise<T> {
 		this.isAuthenticated();
 
-		const normalizedRoute = route.startsWith("/") ? route : `/${route}`;
+		const info = this.#describeRoute(method, route.startsWith("/") ? route : `/${route}`);
 
 		// with per-route limits off the caller has taken responsibility for pacing, so stay out of the way
-		if (!this.perRouteRateLimits) return this.#execute<T>(method, normalizedRoute, data, options);
+		if (!this.perRouteRateLimits) return this.#execute<T>(method, info, data, options);
 
 		return this.#enqueue(
-			this.#resolveRateLimitCacheKey(method, normalizedRoute),
-			() => this.#execute<T>(method, normalizedRoute, data, options)
+			this.#resolveRateLimitCacheKey(info),
+			() => this.#execute<T>(method, info, data, options)
 		);
 	}
 
@@ -450,7 +549,7 @@ export class Rest {
 	 */
 	async #execute<T>(
 		method: RestMethod,
-		normalizedRoute: string,
+		info: RouteInfo,
 		data: JSONObject | JSONArray | null,
 		options: RestRequestOptions = {}
 	): Promise<T> {
@@ -469,10 +568,10 @@ export class Rest {
 		}
 
 		while (true) {
-			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(method, normalizedRoute);
-			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey));
+			const rateLimitCacheKey = this.#resolveRateLimitCacheKey(info);
+			await this.#sleep(this.#remainingRateLimitWait(rateLimitCacheKey, info));
 
-			const response = await fetch(`${this.baseUrl}${normalizedRoute}`, {
+			const response = await fetch(`${this.baseUrl}${info.route}`, {
 				method,
 				headers: {
 					// `fetch` has to set Content-Type itself on multipart bodies so it can include the boundary
@@ -488,7 +587,7 @@ export class Rest {
 
 			const rawBody = await response.text();
 			const parsedBody = this.#parseResponseBody(rawBody);
-			const bucketCacheKey = this.#rememberBucket(method, normalizedRoute, response);
+			const bucketCacheKey = this.#rememberBucket(info, response);
 			this.#recordRateLimitHeaders(response, bucketCacheKey ?? rateLimitCacheKey);
 
 			if (response.status === 429) {

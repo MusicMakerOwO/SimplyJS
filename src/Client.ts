@@ -12,6 +12,7 @@ import { CollectorDefaults, CollectorManager } from "./Managers/Collectors.js";
 import { ActivityType, ClientActivity, PresenceStatus, Status } from "./Types/DiscordAPITypes.js";
 import { ApplicationCommand, JSONArray } from "./Types/index.js";
 import { awaitEventInternal } from "./Collector.js";
+import { ApplicationIdFromToken } from "./Utils.js";
 
 type ClientOptions = {
 	/** Bot token used to authenticate both the REST client and the gateway websocket */
@@ -115,7 +116,7 @@ export class Client extends EventEmitter<ClientEventMap> {
 		this.status = Status.ONLINE;
 		this.activity = null;
 
-		this.id = Buffer.from(options.token.split('.')[0], 'base64').toString('ascii');
+		this.id = ApplicationIdFromToken(options.token);
 	}
 
 	/** Start the WebSocket connection, promise resolves when authorization finishes */
