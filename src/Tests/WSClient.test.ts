@@ -57,7 +57,11 @@ const wsMockState = vi.hoisted(() => {
 			}
 		}
 
+		/** Every code this socket was closed with, in order - `undefined` for a bare `close()` */
+		closeCodes: (number | undefined)[] = [];
+
 		close(code?: number): void {
+			this.closeCodes.push(code);
 			for (const handler of this.#closeHandlers) {
 				handler(code);
 			}
@@ -817,6 +821,36 @@ describe("WSClient lifecycle", () => {
 
 		// a resume has to go back to the url the session was handed, not the generic gateway
 		expect(wsMockState.instances[1]!.url).toBe("wss://resume.example.com?v=10&encoding=json");
+	});
+
+	it("closes with a resumable code when it tears down to reconnect", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Reconnect, d: null, s: null, t: null });
+
+		// 1000/1001 would log the bot out and make the resume fail
+		expect(wsMockState.instances[0]!.closeCodes).toEqual([4200]);
+		socket.destroy();
+	});
+
+	it("logs out with 1000 on destroy() and is not ready by the time it returns", () => {
+		vi.useFakeTimers();
+		const socket = new WSClient({} as Client, { jitterOverride: 1 });
+		socket.setToken("token");
+		socket.initialize();
+		const mock = wsMockState.instances[0]!;
+		mock.emitMessage({ op: GatewayOpCodes.Dispatch, d: createReadyPayload(createUser()), s: 1, t: GatewayEvents.Ready });
+		expect(socket.ready).toBe(true);
+
+		socket.destroy();
+
+		// Client.destroy() polls `ready`, so it has to drop without waiting on a close event that a
+		// dead peer may never send
+		expect(socket.ready).toBe(false);
+		expect(mock.closeCodes).toEqual([1000]);
 	});
 
 	it("drops the session on destroy() so the next connection identifies", () => {
