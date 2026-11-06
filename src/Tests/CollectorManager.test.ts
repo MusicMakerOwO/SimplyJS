@@ -443,9 +443,14 @@ describe("CollectorManager", () => {
 			const client = makeClient();
 			const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-			const collectors = Array.from({ length: 12 }, () =>
-				createCollector(client, ClientEvents.ButtonUsed)
-			);
+			// a block body, not `() => createCollector(...)`: JavaScriptCore (Bun) applies proper
+			// tail calls in strict code, which would erase this frame from the stack entirely
+			const collectors = Array.from({ length: 12 }, () => {
+				// Inlining this return fails the test on Bun, 
+				// noinspection UnnecessaryLocalVariableJS
+				const collector = createCollector(client, ClientEvents.ButtonUsed);
+				return collector;
+			});
 
 			expect(warn).toHaveBeenCalledTimes(1);
 			const message = warn.mock.calls[0]![0] as string;
