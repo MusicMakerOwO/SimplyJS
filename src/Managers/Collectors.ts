@@ -51,9 +51,9 @@ export type CollectorDefaults = {
 	max?: number;
 };
 
-/** The library's own frames between `createCollector` and whoever actually called it */
+/** The library's own frames between `createCollector` and whoever actually called it (JavaScriptCore drops the class name from method frames, so `CollectorHub.` is optional) */
 const InternalFrames =
-	/^\s*at (?:CreationSite|CollectorHub\.add|new Collector|CreateCollectorWith|AwaitEventWith|createCollector|createInternalCollector|awaitEvent|awaitEventInternal)\b/;
+	/^\s*at (?:CreationSite|(?:CollectorHub\.)?add|new Collector|CreateCollectorWith|AwaitEventWith|createCollector|createInternalCollector|awaitEvent|awaitEventInternal)\b/;
 
 /**
  * Captures where a collector was created, with the library's own frames trimmed off the top so
