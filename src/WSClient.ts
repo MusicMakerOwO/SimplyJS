@@ -41,7 +41,7 @@ export const WSEvents = {
 	 * on its own (or emits {@link WSEvents.Disconnect} once it gives up), so listening is for logging.
 	 *
 	 * The detail depends on the runtime's `WebSocket`, and is thinner than the `ws` package gave before
-	 * 2.0. Bun and Deno say what failed (a refused connection, a DNS error, the status code of a rejected
+	 * 1.7. Bun and Deno say what failed (a refused connection, a DNS error, the status code of a rejected
 	 * upgrade). Node never says: it carries no error code (no `ECONNREFUSED`), Node 22 uses one generic
 	 * message for every failure, and Node 24 and later leave it empty. An empty message is replaced
 	 * with the gateway url, and the runtime's own error is kept as the `cause`.

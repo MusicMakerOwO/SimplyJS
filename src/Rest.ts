@@ -3,8 +3,10 @@ import { FileAttachment, JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 import { ApplicationIdFromToken, SnowflakeTimestamp } from "./Utils.js";
 
+const { version: PACKAGE_VERSION } = require("../package.json") as { version: string };
+
 const DISCORD_API_BASE = "https://discord.com/api/v10";
-const USER_AGENT = "DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, 1.2.0-alpha)";
+const USER_AGENT = `DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, ${PACKAGE_VERSION})`;
 const DEFAULT_RETRY_COUNT = 3;
 const TRANSIENT_HTTP_STATUS = new Set([500, 502, 503, 504]);
 const EMPTY_RESPONSE_STATUS = new Set([204, 205, 304]);
