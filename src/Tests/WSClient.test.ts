@@ -782,10 +782,13 @@ describe("WSClient lifecycle", () => {
 		socket.initialize();
 
 		expect(wsMockState.instances).toHaveLength(3);
-		expect(vi.getTimerCount()).toBe(0);
+		// the one timer left is the new connection's HELLO timeout, not the queued reconnect
+		expect(vi.getTimerCount()).toBe(1);
 
-		vi.advanceTimersByTime(60_000);
+		// well past the reconnect's 1s backoff, and short of the 30s HELLO timeout
+		vi.advanceTimersByTime(29_000);
 		expect(wsMockState.instances).toHaveLength(3);
+		socket.destroy();
 	});
 
 	it("reconnects to the resume url the READY dispatch supplied", () => {
@@ -968,7 +971,7 @@ describe("native WebSocket", () => {
 
 		// a second reconnect for the same failure would have queued attempt 2 behind attempt 1
 		expect(wsMockState.instances).toHaveLength(2);
-		expect(vi.getTimerCount()).toBe(0);
+		expect(vi.getTimerCount()).toBe(1); // just the new socket's HELLO timeout
 		socket.destroy();
 	});
 
@@ -1014,6 +1017,73 @@ describe("native WebSocket", () => {
 		expect(emitted).toBeInstanceOf(Error);
 		expect(emitted.message).toMatch(/failed$/);
 		expect(emitted).not.toHaveProperty("cause");
+		socket.destroy();
+	});
+
+	it("gives up on a connection that sends no HELLO within 30 seconds", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		const errorSpy = vi.fn();
+		socket.on(WSEvents.Error, errorSpy);
+
+		vi.advanceTimersByTime(29_999);
+		expect(wsMockState.instances).toHaveLength(1);
+
+		vi.advanceTimersByTime(1);
+		expect(errorSpy).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("sent no HELLO") }));
+		// a retry, not a logout - the session (if any) is still resumable
+		expect(wsMockState.instances[0]!.closeCodes).toEqual([4200]);
+
+		// the immediate retry was queued from inside a timer, which the fake clock puts 1ms out
+		vi.advanceTimersByTime(1);
+		expect(wsMockState.instances).toHaveLength(2);
+		socket.destroy();
+	});
+
+	it("disarms the HELLO timeout once HELLO arrives", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		const errorSpy = vi.fn();
+		socket.on(WSEvents.Error, errorSpy);
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+		// short of the first heartbeat (45s with jitter 1), well past the HELLO timeout
+		vi.advanceTimersByTime(40_000);
+
+		expect(errorSpy).not.toHaveBeenCalled();
+		expect(wsMockState.instances).toHaveLength(1);
+		socket.destroy();
+	});
+
+	it("ignores a malformed HELLO, leaving the timeout to retry", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+
+		wsMockState.instances[0]!.emitMessage({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: "soon" }, s: null, t: null });
+		// 30s for the timeout, then 1ms for the retry it queues
+		vi.advanceTimersByTime(30_001);
+
+		expect(wsMockState.instances).toHaveLength(2);
+		socket.destroy();
+	});
+
+	it("leaves no timers behind when destroyed before HELLO", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		expect(vi.getTimerCount()).toBe(1);
+
+		socket.destroy();
+
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("keeps the HELLO timeout from holding the process open", () => {
+		const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+		const socket = connect();
+
+		// the connecting socket holds the event loop itself; a ref'd timer would only delay an exit after destroy()
+		const timer = setTimeoutSpy.mock.results.at(-1)!.value as NodeJS.Timeout;
+		expect(timer.hasRef()).toBe(false);
 		socket.destroy();
 	});
 });
