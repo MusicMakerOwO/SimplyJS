@@ -1,6 +1,5 @@
 import { EventEmitter } from "node:events";
 import { platform } from "node:os";
-import WebSocket from "ws";
 import {
 	GatewayCloseCodes,
 	GatewayEvents,
@@ -36,7 +35,17 @@ export const WSEvents = {
 	Ready: "Ready",
 	/** Fired when the gateway sends the `RESUMED` dispatch, indicating a successful session resume */
 	Resumed: "Resumed",
-	/** Fired when the underlying `ws` socket emits an `error` (ECONNRESET, TLS failure, bad handshake, etc) */
+	/**
+	 * Fired when the connection fails: a refused connection, a DNS or TLS failure, a rejected handshake,
+	 * or a socket that errors after opening. The client reconnects
+	 * on its own (or emits {@link WSEvents.Disconnect} once it gives up), so listening is for logging.
+	 *
+	 * The detail depends on the runtime's `WebSocket`, and is thinner than the `ws` package gave before
+	 * 2.0. Bun and Deno say what failed (a refused connection, a DNS error, the status code of a rejected
+	 * upgrade). Node never says: it carries no error code (no `ECONNREFUSED`), Node 22 uses one generic
+	 * message for every failure, and Node 24 and later leave it empty. An empty message is replaced
+	 * with the gateway url, and the runtime's own error is kept as the `cause`.
+	 */
 	Error: "Error",
 	/**
 	 * Fired when the client stops reconnecting for good - either Discord rejected the connection in a
@@ -82,8 +91,8 @@ const NON_RESUMABLE_CLOSE_CODES: ReadonlySet<number> = new Set([
  * Close code for a teardown that intends to come back - a reconnect, a missed heartbeat ACK, op 7/9.
  *
  * Any code but 1000/1001 keeps the session resumable, and Discord treats 1000/1001 as a logout.
- * 4200 sits in the application range (`ws` only accepts 1000 and 3000-4999) and clear of Discord's own
- * 4000-4014, so it is never mistaken for one of them in a log.
+ * 4200 sits in the application range (Node's and Deno's `WebSocket.close()` throw for anything but 1000
+ * and 3000-4999) and clear of Discord's own 4000-4014, so it is never mistaken for one of them in a log.
  */
 const RESUMABLE_CLOSE_CODE = 4200;
 /** Close code for {@link WSClient.destroy} - a normal closure, which Discord reads as a logout */
@@ -99,6 +108,19 @@ const RECONNECT_MAX_DELAY = 60_000;
  */
 const INVALID_SESSION_MIN_DELAY = 1_000;
 const INVALID_SESSION_MAX_DELAY = 5_000;
+
+/** Decodes binary frames; Discord sends text for `encoding=json`, but a proxy is free not to */
+const TEXT_DECODER = new TextDecoder();
+
+/**
+ * The `Error` to emit for a socket `error` event. Bun and Deno attach one that says what failed, but
+ * Node 24 and later attach a `TypeError` with an empty message, which would log as a bare "TypeError".
+ */
+function DescribeSocketError(event: Event, url: string): Error {
+	const error = (event as Partial<ErrorEvent>).error as unknown;
+	if (error instanceof Error && error.message) return error;
+	return new Error(`WebSocket connection to ${url} failed`, error === undefined ? {} : { cause: error });
+}
 
 export type WSOptions = {
 	/**
@@ -162,6 +184,8 @@ export type WSOptions = {
 export class WSClient extends EventEmitter<WSEventMap> {
 	#token: string | null = null;
 	#socket: WebSocket | null;
+	/** Aborts every listener on {@link #socket} at once, see {@link #teardownConnection} */
+	#listeners: AbortController | null = null;
 	#sequence: number | null;
 	#heartbeatTimer: NodeJS.Timeout | null = null;
 	#heartbeatAcked: boolean = true;
@@ -242,33 +266,49 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		}
 
 		const baseUrl = this.#gatewayUrl ?? this.#resumeGatewayUrl ?? "wss://gateway.discord.gg";
-		const socket = new WebSocket(`${baseUrl}?v=10&encoding=json`);
+		const url = `${baseUrl}?v=10&encoding=json`;
+		const socket = new WebSocket(url);
+		// the default differs by runtime (a Blob on Node and Deno, a Buffer on Bun); pin the one that decodes synchronously
+		socket.binaryType = "arraybuffer";
 		this.#socket = socket;
 
-		socket.on("message", (raw) => this.#handleMessage(raw.toString()));
-		socket.on("error", (err) => this.emit(WSEvents.Error, err));
-		socket.on("close", (code?: number) => this.#handleClose(code));
+		// one signal for every listener, so a teardown can drop them all before it calls close()
+		const listeners = new AbortController();
+		this.#listeners = listeners;
+		const { signal } = listeners;
+
+		socket.addEventListener("message", (event) => {
+			this.#handleMessage(typeof event.data === "string" ? event.data : TEXT_DECODER.decode(event.data as ArrayBuffer));
+		}, { signal });
+		socket.addEventListener("error", (event) => {
+			this.emit(WSEvents.Error, DescribeSocketError(event, url));
+			// Node 22 never follows a failed connect with "close", so the error has to count as one. Where
+			// a "close" does follow (Node 24+, Bun, Deno), this teardown has already aborted its listener.
+			this.#handleClose(1006);
+		}, { signal });
+		socket.addEventListener("close", (event) => this.#handleClose(event.code), { signal });
 	}
 
 	/**
-	 * Handles an unexpected close (network drop, Discord-initiated close, etc). Paths that close the
-	 * socket deliberately (`#reconnect`, op 7/9) call `removeAllListeners()` first, so they never
-	 * reach here - anything that does was not our doing, and the close code decides what happens next.
+	 * Handles an unexpected close (network drop, Discord-initiated close, a failed connect, etc). Paths
+	 * that close the socket deliberately (`#reconnect`, op 7/9, `destroy()`) abort its listeners first,
+	 * so they never reach here - anything that does was not our doing, and the close code decides what
+	 * happens next.
 	 */
-	#handleClose(code?: number): void {
+	#handleClose(code: number): void {
 		this.#teardownConnection();
 
 		// closed by destroy() - stay down
 		if (this.#destroyed) return;
 
-		if (typeof code === "number" && FATAL_CLOSE_CODES.has(code)) {
+		if (FATAL_CLOSE_CODES.has(code)) {
 			// Discord rejected the IDENTIFY itself; retrying sends the same bad payload forever
 			// and burns the session start limit doing it, so stop here.
 			this.#giveUp(`Gateway closed with code ${code}, which cannot be recovered by reconnecting${this.#fatalCloseAdvice(code)}`, code);
 			return;
 		}
 
-		if (typeof code === "number" && NON_RESUMABLE_CLOSE_CODES.has(code)) this.#invalidateSession();
+		if (NON_RESUMABLE_CLOSE_CODES.has(code)) this.#invalidateSession();
 
 		this.#reconnect();
 	}
@@ -316,10 +356,11 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	 */
 	#teardownConnection(code: number = RESUMABLE_CLOSE_CODE): void {
 		if (this.#socket) {
-			this.#socket.removeAllListeners();
-			// `ws` emits "error" when a socket that is still connecting gets closed, and an "error"
-			// with no listener throws - which a destroy() mid-reconnect would otherwise hit
-			this.#socket.on("error", () => {});
+			// Abort before close(): closing a socket that is still connecting dispatches "error" and
+			// "close" synchronously inside close() on Node, and Bun does the same for "close" on an open
+			// one, either of which would re-enter #handleClose and tear down twice.
+			this.#listeners?.abort();
+			this.#listeners = null;
 			this.#socket.close(code);
 			this.#socket = null;
 		}
@@ -567,9 +608,9 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.#reconnectAttempts = 0;
 		this.#sessionId = null;
 		this.#resumeGatewayUrl = null;
-		// Tear down now rather than waiting on a close event: a dead peer may never send one, which
-		// left Client.destroy() polling for up to `ws`'s 30s close timeout. 1000 also logs the bot
-		// out, where a bare close() left the session (and the bot's online status) to time out.
+		// Tear down now rather than waiting on a close event: a dead peer may never send one, and
+		// Node's WebSocket never gives up on a close() the peer does not answer. 1000 also logs the
+		// bot out, where a bare close() left the session (and the bot's online status) to time out.
 		this.#teardownConnection(LOGOUT_CLOSE_CODE);
 	}
 }

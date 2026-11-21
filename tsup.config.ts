@@ -6,6 +6,4 @@ export default defineConfig({
 	dts: true,
 	sourcemap: true,
 	clean: true,
-	// Don't bundle runtime deps — consumers install them
-	external: ["ws"],
 });
