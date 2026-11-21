@@ -108,7 +108,7 @@ Found while reworking rate limit keys for 1.6.
   after a route's bucket is learned therefore run in two chains for a moment, and can briefly
   overlap within one bucket. Harmless in practice (the headers catch up on the next response), but
   the queue key and the wait key should be the same thing
-- [ ] Make `Rest.routeToBucket` private in 2.0. It is internal state that has been public since 1.x,
+- [ ] Make `Rest.routeToBucket` private in the 2.0 beta. It is internal state that has been public since 1.x,
   and its key format changed in 1.6
 
 ## Tests to add
@@ -150,7 +150,7 @@ Found while reworking rate limit keys for 1.6.
     `shard: [id, count]`, and `client.shardCount` / `guild.shardId` / `ShardIdFor()` route work to
     the process that owns a guild
   - `4011 Sharding required` now names the option instead of just failing
-- [x] Sharding, in-process and mixed (2.0)
+- [x] Sharding, in-process and mixed (1.7)
   - Same option, any subset of ids per process (`ids` defaults to all): `client.shards`,
     `client.socket` as a getter that throws with more than one local shard, `client.ping` /
     `client.shardFor(guildId)`, `count: "auto"` via `GET /gateway/bot`, an identify queue per
@@ -166,7 +166,7 @@ Found while reworking rate limit keys for 1.6.
   - `count: "auto"` already fetches it but still connects to `wss://gateway.discord.gg`. Discord
     asks clients to use the returned url (and to cache it rather than fetch it per connection);
     `WSOptions.gatewayUrl` must keep winning so a proxy is never bypassed
-- [x] Native WebSocket, zero runtime dependencies (2.0)
+- [x] Native WebSocket, zero runtime dependencies (1.7)
   - `ws` is gone: `WSClient` uses the runtime's global `WebSocket`, which is why Node 22 is the new
     floor. Every listener shares one `AbortController` that teardown aborts before `close()`, an
     `error` counts as a close (Node 22 sends none after a failed connect), and a connection gets 30
