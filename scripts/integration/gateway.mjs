@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { startFakeGateway } from "./fake-gateway.mjs";
 
-const { Client, WSEvents } = await import(process.env.SIMPLYJS_ENTRY ?? new URL("../../dist/index.js", import.meta.url).href);
+const { Client, ClientEvents, WSEvents } = await import(process.env.SIMPLYJS_ENTRY ?? new URL("../../dist/index.js", import.meta.url).href);
 const runtime = globalThis.Bun ? `bun ${globalThis.Bun.version}` : globalThis.Deno ? `deno ${globalThis.Deno.version.deno}` : `node ${process.version}`;
 // Not unref()d on purpose: the runner has to stay alive while it waits, even after the client has
 // (correctly) let go of the event loop - e.g. once it gives up reconnecting. scripts/** is outside
@@ -41,6 +41,56 @@ const scenarios = {
 		const identify = gateway.received.find((p) => p.op === 2);
 		await client.destroy(); await gateway.stop();
 		return JSON.stringify(identify?.d.shard) === "[2,4]" || `identify: ${JSON.stringify(identify)}`;
+	},
+	async "two shards in one process -> paced identifies, one Ready"() {
+		const gateway = await startFakeGateway();
+		const client = new Client({
+			token: "MQ.x.y", intents: 513, shards: { count: 2 },
+			ws: { gatewayUrl: gateway.url, maxReconnectAttempts: 3, jitterOverride: 0.5 }
+		});
+		const events = [];
+		client.on(ClientEvents.ShardReady, (id) => events.push(`ShardReady ${id}`));
+		client.on(ClientEvents.Ready, () => events.push("Ready"));
+		await client.login();
+		const [first, second] = gateway.identifies;
+		const gap = second ? second.at - first.at : null;
+		// login() sends them as it resolves, so they may still be on the wire
+		await waitFor(() => gateway.received.filter((p) => p.op === 3).length >= 2, 2000);
+		const presences = gateway.received.filter((p) => p.op === 3).length;
+		await client.destroy(); await gateway.stop();
+		const ok = JSON.stringify(first?.shard) === "[0,2]" && JSON.stringify(second?.shard) === "[1,2]" && gap >= 4900 &&
+			events.join() === "ShardReady 0,ShardReady 1,Ready" && presences === 2;
+		return ok || `identifies=${JSON.stringify(gateway.identifies)} gap=${gap} events=${events} presences=${presences}`;
+	},
+	async "count: auto -> GET /gateway/bot sizes and paces the shards"() {
+		const gateway = await startFakeGateway({ gatewayBot: { shards: 3, max_concurrency: 2, remaining: 1000 } });
+		const client = new Client({
+			token: "MQ.x.y", intents: 513, shards: { count: "auto" }, rest: { baseUrl: gateway.restUrl },
+			ws: { gatewayUrl: gateway.url, maxReconnectAttempts: 3, jitterOverride: 0.5 }
+		});
+		await client.login();
+		const shards = gateway.identifies.map((i) => i.shard?.join("/")).join();
+		const gap = gateway.identifies[2] ? gateway.identifies[2].at - gateway.identifies[0].at : null;
+		const count = client.shardCount;
+		await client.destroy(); await gateway.stop();
+		// buckets 0 and 1 identify together, shard 2 waits behind shard 0
+		return (count === 3 && shards === "0/3,1/3,2/3" && gap >= 4900) || `shardCount=${count} identifies=${shards} gap=${gap}`;
+	},
+	async "one shard drops -> only it resumes"() {
+		const gateway = await startFakeGateway({ gatewayBot: { shards: 2, max_concurrency: 2, remaining: 1000 } });
+		const client = new Client({
+			token: "MQ.x.y", intents: 513, shards: { count: "auto" }, rest: { baseUrl: gateway.restUrl },
+			ws: { gatewayUrl: gateway.url, maxReconnectAttempts: 3, jitterOverride: 0.5 }
+		});
+		const resumed = []; client.on(ClientEvents.ShardResumed, (id) => resumed.push(id));
+		await client.login(); gateway.drop(1);
+		const ok = await waitFor(() => resumed.length > 0, 3000);
+		const resumes = gateway.received.filter((p) => p.op === 6).map((p) => p.d.session_id);
+		const stillReady = client.shards.get(0).ready;
+		let socketThrew = false; try { void client.socket; } catch { socketThrew = true; }
+		await client.destroy(); await gateway.stop();
+		return (ok && resumed.join() === "1" && resumes.join() === "session-2" && gateway.connections === 3 && stillReady && socketThrew) ||
+			`resumed=${resumed} resumes=${resumes} connections=${gateway.connections} shard0Ready=${stillReady} socketThrew=${socketThrew}`;
 	},
 	async "network drop -> RESUME"() {
 		const gateway = await startFakeGateway(); const client = makeClient(gateway);
