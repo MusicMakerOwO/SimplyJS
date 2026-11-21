@@ -75,8 +75,9 @@ client.on(ClientEvents.SlashCommandUsed, async (interaction) => {
 // instead of `ClientEventMap`, no generics written by hand.
 //
 // `HeartbeatAck` carries the heartbeat's round trip, so this collector doubles as a latency
-// probe: wake on the next ACK, or give up after a minute. (`client.socket.ping` holds the same
-// number between ACKs.)
+// probe: wake on the next ACK, or give up after a minute. (`client.ping` holds the same number
+// between ACKs. `client.socket` is the one connection of a bot that runs a single shard; with
+// several, pick one from `client.shards`.)
 const heartbeat = createCollector(client.socket, WSEvents.HeartbeatAck, { max: 1, time: 60_000 });
 heartbeat.next
 	.then(([latency]) => console.log(`Gateway acknowledged a heartbeat in ${latency}ms, the connection is alive`))
