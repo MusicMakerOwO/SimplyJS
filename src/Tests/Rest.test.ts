@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Rest, RestEvents, RestRateLimitInfo, RestResponseInfo } from "../Rest.js";
 import { Client } from "../Client.js";
@@ -24,6 +25,24 @@ describe("Rest request parsing", () => {
 		const payload = await rest.get<{ id: string }>("/users/@me");
 
 		expect(payload).toEqual({ id: "1" });
+	});
+
+	it("sends a User-Agent carrying the package version", async () => {
+		const { version } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
+		const rest = new Rest();
+		rest.setToken("token");
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(JSON.stringify({ id: "1" }), {
+				status: 200,
+				headers: { "Content-Type": "application/json" }
+			})
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await rest.get("/users/@me");
+
+		const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+		expect(headers["User-Agent"]).toBe(`DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, ${version})`);
 	});
 
 	it("returns undefined for successful no-content responses", async () => {

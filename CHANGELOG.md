@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A connection that never delivers `HELLO` is abandoned after 30 seconds and retried like any other dropped connection, with a `WSEvents.Error` saying why. A socket that opened but stayed silent used to hang forever, since there was no heartbeat yet to notice, and a connect that never failed (a black-holed SYN) waited on the operating system
+- The `User-Agent` header on every REST request said `1.2.0-alpha`, the version it was written in, and was never updated. It now says the current version, and a test fails when it falls behind `package.json`
 
 ### Removed
 
