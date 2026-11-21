@@ -91,6 +91,20 @@ export default defineConfig(
 		},
 	},
 
+	// `client.socket` throws once a process runs more than one shard, so the library must never read
+	// it - otherwise a multi-shard bot hits that throw from inside library code. Tests may.
+	{
+		files: ["src/**/*.ts"],
+		ignores: ["src/Tests/**"],
+		rules: {
+			"no-restricted-syntax": ["error", {
+				selector: "MemberExpression[property.type='Identifier'][property.name='socket']",
+				message: "Library code must not read `.socket`: `client.socket` throws while a process runs more than one shard. " +
+					"Use `client.shards`, `client.shardFor(guildId)`, or a shard passed in.",
+			}],
+		},
+	},
+
 	// Tell TS-ESLint where your tsconfig is (needed for type-aware rules)
 	{
 		languageOptions: {
