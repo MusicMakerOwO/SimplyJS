@@ -2,8 +2,9 @@ import { EventEmitter } from "node:events";
 import { FileAttachment, JSONArray, JSONObject } from "./Types/Internal.js";
 import { TTLCache } from "./DataStructures/TTLCache.js";
 import { ApplicationIdFromToken, SnowflakeTimestamp } from "./Utils.js";
+import {readFileSync} from "node:fs";
 
-const { version: PACKAGE_VERSION } = require("../package.json") as { version: string };
+const { version: PACKAGE_VERSION } = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const USER_AGENT = `DiscordBot (https://github.com/MusicMakerOwO/SimplyJS, ${PACKAGE_VERSION})`;
