@@ -1,44 +1,26 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { WSClient, WSEvents } from "../WSClient.js";
 import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
 import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
-type MessageHandler = (data: { toString(): string }) => void;
-type CloseHandler = (code?: number) => void;
-type ErrorHandler = (err: Error) => void;
-
 const wsMockState = vi.hoisted(() => {
-	class MockWebSocket {
+	/**
+	 * Stands in for the runtime's global `WebSocket`. It is a real `EventTarget`, so listener options
+	 * such as `signal` behave exactly as they do on Node, Bun, and Deno.
+	 */
+	class MockWebSocket extends EventTarget {
 		sent: string[] = [];
 		url: string;
-		#messageHandlers: MessageHandler[] = [];
-		#closeHandlers: CloseHandler[] = [];
-		#errorHandlers: ErrorHandler[] = [];
+		binaryType: string = "blob";
+		/** Every code this socket was closed with, in order - `undefined` for a bare `close()` */
+		closeCodes: (number | undefined)[] = [];
 
 		constructor(url: string) {
+			super();
 			this.url = url;
 			wsMockState.instances.push(this);
-		}
-
-		on(event: "message" | "close" | "error", handler: MessageHandler | CloseHandler | ErrorHandler): void {
-			if (event === "message") {
-				this.#messageHandlers.push(handler as MessageHandler);
-				return;
-			}
-			if (event === "error") {
-				this.#errorHandlers.push(handler as ErrorHandler);
-				return;
-			}
-
-			this.#closeHandlers.push(handler as CloseHandler);
-		}
-
-		emitError(err: Error): void {
-			for (const handler of this.#errorHandlers) {
-				handler(err);
-			}
 		}
 
 		send(payload: string): void {
@@ -49,28 +31,28 @@ const wsMockState = vi.hoisted(() => {
 			this.emitRaw(JSON.stringify(payload));
 		}
 
-		emitRaw(packet: string): void {
-			for (const handler of this.#messageHandlers) {
-				handler({
-					toString: () => packet
-				});
-			}
+		/** Delivers a frame as-is: a string for a text frame, an `ArrayBuffer` for a binary one */
+		emitRaw(packet: string | ArrayBuffer): void {
+			this.dispatchEvent(new MessageEvent("message", { data: packet }));
 		}
 
-		/** Every code this socket was closed with, in order - `undefined` for a bare `close()` */
-		closeCodes: (number | undefined)[] = [];
+		/**
+		 * Fires `error` the way a runtime does, with its own error (if any) on the event's `error`. Like
+		 * Node 22 after a failed connect, no `close` follows; call {@link emitClose} for runtimes where one does.
+		 */
+		emitError(error?: unknown): void {
+			this.dispatchEvent(Object.assign(new Event("error"), { error }));
+		}
 
+		/** Fires `close` without recording a {@link close} call - the runtime's own close, not one the client asked for */
+		emitClose(code: number): void {
+			this.dispatchEvent(Object.assign(new Event("close"), { code }));
+		}
+
+		/** Records the code and fires `close` synchronously, inside the call, which is what Bun does */
 		close(code?: number): void {
 			this.closeCodes.push(code);
-			for (const handler of this.#closeHandlers) {
-				handler(code);
-			}
-		}
-
-		removeAllListeners(): void {
-			this.#messageHandlers = [];
-			this.#closeHandlers = [];
-			this.#errorHandlers = [];
+			this.emitClose(code ?? 1005);
 		}
 	}
 
@@ -80,9 +62,10 @@ const wsMockState = vi.hoisted(() => {
 	};
 });
 
-vi.mock("ws", () => ({
-	default: wsMockState.MockWebSocket
-}));
+vi.stubGlobal("WebSocket", wsMockState.MockWebSocket);
+afterAll(() => {
+	vi.unstubAllGlobals();
+});
 
 function createUser(id = "user-1"): DiscordUser {
 	return {
@@ -179,6 +162,7 @@ describe("WSClient lifecycle", () => {
 	});
 
 	it("does not crash the process when the socket emits an error", () => {
+		vi.useFakeTimers();
 		const socket = new WSClient({} as Client, {});
 		socket.setToken("token");
 		const errorSpy = vi.fn();
@@ -190,6 +174,7 @@ describe("WSClient lifecycle", () => {
 
 		expect(() => mockSocket.emitError(err)).not.toThrow();
 		expect(errorSpy).toHaveBeenCalledWith(err);
+		socket.destroy();
 	});
 
 	it("clears the stale sequence number on a non-resumable InvalidSession", () => {
@@ -927,6 +912,111 @@ describe("WSClient lifecycle", () => {
 	});
 });
 
+
+describe("native WebSocket", () => {
+	beforeEach(() => {
+		wsMockState.instances.length = 0;
+		vi.restoreAllMocks();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function connect(options: ConstructorParameters<typeof WSClient>[1] = {}): WSClient {
+		const socket = new WSClient({} as Client, { jitterOverride: 1, ...options });
+		socket.setToken("token");
+		socket.initialize();
+		return socket;
+	}
+
+	it("asks for binary frames as an ArrayBuffer and decodes them", () => {
+		const socket = connect();
+		const mock = wsMockState.instances[0]!;
+
+		// the runtime defaults differ (a Blob on Node and Deno, a Buffer on Bun), and a Blob only decodes asynchronously
+		expect(mock.binaryType).toBe("arraybuffer");
+
+		const hello = JSON.stringify({ op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null });
+		mock.emitRaw(new TextEncoder().encode(hello).buffer);
+
+		expect(socket.heartbeatInterval).toBe(45_000);
+		socket.destroy();
+	});
+
+	it("reconnects on an error alone, since Node 22 sends no close after a failed connect", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+
+		wsMockState.instances[0]!.emitError(new Error("connect failed"));
+		vi.advanceTimersByTime(0);
+
+		expect(wsMockState.instances).toHaveLength(2);
+		socket.destroy();
+	});
+
+	it("handles the close that follows an error only once", () => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(1);
+		const socket = connect({ maxReconnectAttempts: 5 });
+		const failed = wsMockState.instances[0]!;
+
+		failed.emitError(new Error("connect failed"));
+		// Node 24+, Bun, and Deno all follow the error with a close of their own
+		failed.emitClose(1006);
+		vi.advanceTimersByTime(0);
+
+		// a second reconnect for the same failure would have queued attempt 2 behind attempt 1
+		expect(wsMockState.instances).toHaveLength(2);
+		expect(vi.getTimerCount()).toBe(0);
+		socket.destroy();
+	});
+
+	it("closes a socket whose close dispatches synchronously without re-entering its own teardown", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		const disconnectSpy = vi.fn();
+		socket.on(WSEvents.Disconnect, disconnectSpy);
+
+		// the mock fires "close" inside close(), as Bun does, so an un-aborted listener would recurse
+		expect(() => socket.destroy()).not.toThrow();
+		expect(wsMockState.instances[0]!.closeCodes).toEqual([1000]);
+		vi.advanceTimersByTime(60_000);
+		expect(wsMockState.instances).toHaveLength(1);
+		expect(disconnectSpy).not.toHaveBeenCalled();
+	});
+
+	it("names the gateway url when the runtime's error says nothing", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		const errorSpy = vi.fn();
+		socket.on(WSEvents.Error, errorSpy);
+
+		// what Node actually delivers for a refused connection, a DNS failure, or a non-101 response
+		const nodeError = new TypeError("");
+		wsMockState.instances[0]!.emitError(nodeError);
+
+		const emitted = errorSpy.mock.calls[0]![0] as Error;
+		expect(emitted.message).toBe("WebSocket connection to wss://gateway.discord.gg?v=10&encoding=json failed");
+		expect(emitted.cause).toBe(nodeError);
+		socket.destroy();
+	});
+
+	it("still emits an Error for an error event that carries none", () => {
+		vi.useFakeTimers();
+		const socket = connect();
+		const errorSpy = vi.fn();
+		socket.on(WSEvents.Error, errorSpy);
+
+		wsMockState.instances[0]!.emitError();
+
+		const emitted = errorSpy.mock.calls[0]![0] as Error;
+		expect(emitted).toBeInstanceOf(Error);
+		expect(emitted.message).toMatch(/failed$/);
+		expect(emitted).not.toHaveProperty("cause");
+		socket.destroy();
+	});
+});
 
 describe("sharding", () => {
 	beforeEach(() => {
