@@ -37,7 +37,7 @@ export const WSEvents = {
 	Resumed: "Resumed",
 	/**
 	 * Fired when the connection fails: a refused connection, a DNS or TLS failure, a rejected handshake,
-	 * or a socket that errors after opening. The client reconnects
+	 * a socket that errors after opening, or a gateway that never sends `HELLO`. The client reconnects
 	 * on its own (or emits {@link WSEvents.Disconnect} once it gives up), so listening is for logging.
 	 *
 	 * The detail depends on the runtime's `WebSocket`, and is thinner than the `ws` package gave before
@@ -108,6 +108,14 @@ const RECONNECT_MAX_DELAY = 60_000;
  */
 const INVALID_SESSION_MIN_DELAY = 1_000;
 const INVALID_SESSION_MAX_DELAY = 5_000;
+
+/**
+ * How long a new connection gets to deliver `HELLO` before it is abandoned and retried. Covers the
+ * TCP/TLS handshake and the upgrade as well: a connect that never fails (a black-holed SYN) would
+ * otherwise wait on the OS, and a socket that opens but never says `HELLO` has no heartbeat yet to
+ * notice it is dead, so it would hang forever.
+ */
+const HELLO_TIMEOUT = 30_000;
 
 /** Decodes binary frames; Discord sends text for `encoding=json`, but a proxy is free not to */
 const TEXT_DECODER = new TextDecoder();
@@ -186,6 +194,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#socket: WebSocket | null;
 	/** Aborts every listener on {@link #socket} at once, see {@link #teardownConnection} */
 	#listeners: AbortController | null = null;
+	/** Armed per connection until `HELLO` arrives, see {@link HELLO_TIMEOUT} */
+	#helloTimer: NodeJS.Timeout | null = null;
 	#sequence: number | null;
 	#heartbeatTimer: NodeJS.Timeout | null = null;
 	#heartbeatAcked: boolean = true;
@@ -287,6 +297,12 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			this.#handleClose(1006);
 		}, { signal });
 		socket.addEventListener("close", (event) => this.#handleClose(event.code), { signal });
+
+		this.#helloTimer = setTimeout(() => {
+			this.#helloTimer = null;
+			this.emit(WSEvents.Error, new Error(`The gateway at ${baseUrl} sent no HELLO within ${HELLO_TIMEOUT / 1000} seconds of connecting`));
+			this.#reconnect();
+		}, HELLO_TIMEOUT).unref();
 	}
 
 	/**
@@ -363,6 +379,10 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			this.#listeners = null;
 			this.#socket.close(code);
 			this.#socket = null;
+		}
+		if (this.#helloTimer) {
+			clearTimeout(this.#helloTimer);
+			this.#helloTimer = null;
 		}
 		if (this.#heartbeatTimer) {
 			clearInterval(this.#heartbeatTimer);
@@ -518,6 +538,10 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#handleHello(data: unknown): void {
 		if (!this.#isHelloPayload(data)) return;
 
+		if (this.#helloTimer) {
+			clearTimeout(this.#helloTimer);
+			this.#helloTimer = null;
+		}
 		this.heartbeatInterval = data.heartbeat_interval;
 		this.#heartbeatAcked = true;
 		this.emit(WSEvents.Hello, data.heartbeat_interval);
