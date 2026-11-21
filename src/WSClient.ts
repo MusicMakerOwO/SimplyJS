@@ -183,11 +183,23 @@ export type WSOptions = {
 	 * Set from `ClientOptions.shards`, which validates it; prefer that over setting this directly.
 	 */
 	shard?: readonly [id: number, count: number];
+
+	/**
+	 * Awaited before every `IDENTIFY` this connection sends (never before a `RESUME`), with the
+	 * heartbeat already running. Discord allows one `IDENTIFY` per 5 seconds per `max_concurrency`
+	 * bucket, so a {@link Client} running several shards sets this to queue them; omitted, `IDENTIFY`
+	 * goes out as soon as `HELLO` arrives.
+	 *
+	 * A connection torn down while it waits sends nothing once the wait ends, and a wait that rejects
+	 * is treated as over rather than stranding the connection.
+	 */
+	beforeIdentify?: () => Promise<void>;
 }
 
 /**
- * Manages the raw Discord gateway websocket connection: identifying, heartbeating, and
- * dispatching incoming payloads to event handlers. One `WSClient` backs each {@link Client}.
+ * Manages one raw Discord gateway websocket connection, which is one shard: identifying,
+ * heartbeating, and dispatching incoming payloads to event handlers. A {@link Client} holds one
+ * per shard it runs, in `client.shards`.
  */
 export class WSClient extends EventEmitter<WSEventMap> {
 	#token: string | null = null;
@@ -207,6 +219,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	#gatewayUrl: string | null;
 	/** When the heartbeat now awaiting its ACK was sent; `null` when none is outstanding */
 	#heartbeatSentAt: number | null = null;
+	/** See {@link WSOptions.beforeIdentify} */
+	#beforeIdentify: (() => Promise<void>) | null;
 
 	/** Interval in milliseconds between heartbeats, set from the gateway's `HELLO` payload; `-1` until connected */
 	heartbeatInterval: number;
@@ -218,6 +232,11 @@ export class WSClient extends EventEmitter<WSEventMap> {
 	maxReconnectAttempts: number;
 	/** The `[shardId, shardCount]` this connection identifies as, or `null` when unsharded - see {@link WSOptions.shard} */
 	readonly shard: readonly [id: number, count: number] | null;
+	/**
+	 * Which shard this connection is: the id from {@link shard}, or `0` when unsharded, since an
+	 * unsharded bot is shard 0 of 1. The key this connection has in `client.shards`.
+	 */
+	readonly shardId: number;
 
 	/**
 	 * Round trip of the last acknowledged heartbeat, in milliseconds; `-1` until the first ACK.
@@ -248,6 +267,8 @@ export class WSClient extends EventEmitter<WSEventMap> {
 		this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
 		this.#gatewayUrl = options.gatewayUrl ?? null;
 		this.shard = options.shard ?? null;
+		this.shardId = this.shard?.[0] ?? 0;
+		this.#beforeIdentify = options.beforeIdentify ?? null;
 
 		this.ready = false;
 
@@ -411,7 +432,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 				}). Check ClientOptions.shards: every id must be below count.`;
 			case GatewayCloseCodes.ShardingRequired:
 				return " - the bot is in too many guilds for one connection (Discord's limit is 2,500 per shard). " +
-					"Set ClientOptions.shards and run one process per shard.";
+					"Set ClientOptions.shards - { count: \"auto\" } runs as many shards as Discord recommends, all in this process.";
 			case GatewayCloseCodes.InvalidIntents:
 				return " - ClientOptions.intents is not a valid intents bitfield.";
 			case GatewayCloseCodes.DisallowedIntents:
@@ -512,7 +533,7 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			this.emit(WSEvents.Resumed);
 
 			// `RESUMED` carries a null `d`, so it has to be dispatched before the payload guard below
-			this.dispatch(this.client, data.t, {});
+			this.dispatch(this.client, data.t, {}, this);
 			return;
 		}
 
@@ -528,12 +549,13 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			if (typeof readyData.resume_gateway_url === "string") this.#resumeGatewayUrl = readyData.resume_gateway_url;
 		}
 
-		this.dispatch(this.client, data.t, data.d as JSONObject);
+		this.dispatch(this.client, data.t, data.d as JSONObject, this);
 	}
 
 	/**
 	 * Handles the gateway's `HELLO` payload: starts the heartbeat interval (scaled by `jitter`)
-	 * and sends the `IDENTIFY` payload to begin authentication.
+	 * and sends `RESUME` for a session it can resume, or `IDENTIFY` once {@link WSOptions.beforeIdentify}
+	 * allows, to begin authentication.
 	 */
 	#handleHello(data: unknown): void {
 		if (!this.#isHelloPayload(data)) return;
@@ -575,6 +597,26 @@ export class WSClient extends EventEmitter<WSEventMap> {
 			return;
 		}
 
+		if (!this.#beforeIdentify) return this.#sendIdentify();
+
+		const socket = this.#socket;
+		const wait = this.#beforeIdentify;
+		void (async () => {
+			try {
+				await wait();
+			} catch {
+				// a broken wait must not strand the connection - identifying late beats never identifying
+			}
+			// torn down while it waited (a reconnect, destroy()) - the connection that wanted this IDENTIFY is gone
+			if (this.#socket !== socket) return;
+			this.#sendIdentify();
+		})().catch((error: unknown) => {
+			this.emit(WSEvents.Error, error instanceof Error ? error : new Error(String(error)));
+		});
+	}
+
+	/** Sends the `IDENTIFY` payload that starts a new session */
+	#sendIdentify(): void {
 		this.send({
 			op: GatewayOpCodes.Identify,
 			d: {

@@ -188,24 +188,51 @@ export type GuildMembersChunkPayload = {
 
 export const ClientEvents = {
 	/**
-	 * Fired once the client is ready for normal use.
+	 * Fired once per `client.login()`, when the client is ready for normal use: every shard this
+	 * process runs has fired {@link ClientEvents.ShardReady}.
 	 *
 	 * Listener arguments: `user` ({@link User}).
 	 *
-	 * Note: this is emitted after the raw `READY` payload is processed and after the
-	 * initial required guilds from that payload have been received, or when the ready
-	 * fallback timeout completes.
+	 * Note: a shard that has to start a new session later (after a non-resumable invalid session)
+	 * fires `ShardReady` again, but not `Ready` - the client as a whole was already ready.
 	 */
 	Ready: "Ready",
 	/**
 	 * Fired when a dropped connection is resumed and the gateway has replayed any missed events.
+	 * Fires alongside {@link ClientEvents.ShardResumed}, which is the same event under a name that
+	 * says it belongs to one shard.
 	 *
-	 * Listener arguments: none.
+	 * Listener arguments: `shardId` (number) - the shard that resumed, `0` for an unsharded bot.
 	 *
 	 * Note: this replaces `Ready` for the reconnect - the client was already ready, so `Ready`
 	 * is not emitted again.
 	 */
 	Resumed: "Resumed",
+	/**
+	 * Fired when one shard is ready: its `READY` payload has been processed and the guilds it listed
+	 * have arrived, or the ready fallback timeout (15 seconds) passed without them. Fires again if
+	 * the shard has to start a new session later.
+	 *
+	 * Listener arguments: `shardId` (number), `0` for an unsharded bot.
+	 */
+	ShardReady: "ShardReady",
+	/**
+	 * Fired when one shard resumes a dropped connection, alongside {@link ClientEvents.Resumed}.
+	 *
+	 * Listener arguments: `shardId` (number), `0` for an unsharded bot.
+	 */
+	ShardResumed: "ShardResumed",
+	/**
+	 * Fired when one shard stops reconnecting for good: Discord rejected the connection in a way
+	 * retrying cannot fix (a bad token, disallowed intents, an invalid shard) or every reconnect
+	 * attempt was used up. The other shards keep running, so a bot with several shards should
+	 * listen for this rather than find out from one shard's guilds going quiet.
+	 *
+	 * Listener arguments: `shardId` (number), `reason` (string) - what happened and what to do
+	 * about it, `code` (number | `null`) - the close code, or `null` when the reconnect attempts
+	 * ran out.
+	 */
+	ShardDisconnect: "ShardDisconnect",
 
 	/**
 	 * Fired when the bot's own account changes (username, avatar, banner, ...), after
@@ -849,7 +876,10 @@ export type UncachedSoundboardSound = {
 
 export type ClientEventMap = {
 	[ClientEvents.Ready]: [user: User];
-	[ClientEvents.Resumed]: [];
+	[ClientEvents.Resumed]: [shardId: number];
+	[ClientEvents.ShardReady]: [shardId: number];
+	[ClientEvents.ShardResumed]: [shardId: number];
+	[ClientEvents.ShardDisconnect]: [shardId: number, reason: string, code: number | null];
 
 	[ClientEvents.ClientUserUpdate]: [oldUser: User | undefined, newUser: User];
 

@@ -53,6 +53,9 @@ type IntentName = keyof typeof GatewayIntents;
 const EventIntents: { readonly [K in ObjectValues<typeof ClientEvents>]: readonly IntentName[] } = {
 	[ClientEvents.Ready]: [],
 	[ClientEvents.Resumed]: [],
+	[ClientEvents.ShardReady]: [],
+	[ClientEvents.ShardResumed]: [],
+	[ClientEvents.ShardDisconnect]: [],
 	[ClientEvents.ClientUserUpdate]: [],
 	// only ever arrives in answer to a request, and `fetchGateway()` checks its own intents
 	[ClientEvents.GuildMembersChunk]: [],

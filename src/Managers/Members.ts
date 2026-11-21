@@ -111,9 +111,13 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 	 * Each chunk is also emitted as `ClientEvents.GuildMembersChunk` as it lands, so a very large
 	 * fetch can be streamed instead of awaited.
 	 *
+	 * The request goes out on the shard that owns the guild, so it works with any number of shards
+	 * in the process - but only for a guild whose shard runs in this one.
+	 *
 	 * @param options Which members to request, and how long to wait for them.
 	 * @throws {Error} If `query` and `userIds` are both given, more than 100 ids are requested, the
-	 * intents required by the request are missing, or the response does not complete in time.
+	 * intents required by the request are missing, the guild's shard runs in another process, or the
+	 * response does not complete in time.
 	 *
 	 * @example
 	 * ```ts
@@ -138,6 +142,15 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 		}
 		if (options.presences && !HasIntent(intents, GatewayIntents.GuildPresences)) {
 			throw new Error("Fetching presences over the gateway requires the privileged `GuildPresences` intent");
+		}
+
+		const shard = this.client.shardFor(this.guild.id);
+		if (!shard) {
+			throw new Error(this.client.shardCount === 0
+				? `Cannot request members of guild ${this.guild.id} before login() has created the shards`
+				: `Guild ${this.guild.id} belongs to shard ${this.guild.shardId} of ${this.client.shardCount}, which this ` +
+					`process does not run (it runs ${[...this.client.shards.keys()].join(", ")}) - request its members ` +
+					"from the process that does");
 		}
 
 		// A nonce is what tells one in-flight request's chunks from another's; Discord caps it at 32
@@ -177,7 +190,7 @@ export class MemberCache extends GuildScopedCache<string, Member, DiscordMember>
 
 		// Sent only once the collector is listening, so a chunk that comes back immediately is caught.
 		try {
-			this.client.socket.requestGuildMembers({
+			shard.requestGuildMembers({
 				guild_id: this.guild.id,
 				limit: options.limit ?? 0,
 				...(options.presences === undefined ? {} : { presences: options.presences }),

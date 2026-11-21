@@ -138,6 +138,33 @@ export type RequestGuildMembersPayload = {
 };
 
 /**
+ * Response of `GET /gateway/bot`: where to connect, how many shards Discord recommends, and how
+ * many new sessions the bot may still start. `ClientOptions.shards` with `count: "auto"` reads it.
+ *
+ * @see https://discord.com/developers/docs/events/gateway#get-gateway-bot
+ */
+export type GatewayBotResponse = {
+	/** WSS url to connect to */
+	url: string;
+	/** Recommended number of shards for the bot's current guild count */
+	shards: number;
+	/** Limits on starting new sessions (every `IDENTIFY`, but not a `RESUME`) */
+	session_start_limit: {
+		/** Sessions the bot may start per reset period */
+		total: number;
+		/** Sessions it may still start before the reset */
+		remaining: number;
+		/** Milliseconds until `remaining` resets to `total` */
+		reset_after: number;
+		/**
+		 * `IDENTIFY` requests allowed per 5 seconds, one per bucket: shard `id` identifies in bucket
+		 * `id % max_concurrency`. `1` for every bot below Discord's large-bot sharding.
+		 */
+		max_concurrency: number;
+	};
+};
+
+/**
  * Gateway intents are a bitfield that tells Discord which groups of events your bot wants to receive.
  *
  * Discord uses this to filter events before they are sent over the gateway connection:

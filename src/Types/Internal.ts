@@ -1,6 +1,7 @@
 import { Awaitable, ObjectValues } from "./HelperTypes.js";
 import { GatewayEvents } from "./DiscordGateway.js";
 import { Client } from "../Client.js";
+import type { WSClient } from "../WSClient.js";
 import { AllowedMentions, Embed, MessageReference, PollCreateRequest } from "./MessageComponents.js";
 import { MessageComponent } from "./Components.js";
 
@@ -13,7 +14,11 @@ export type EventHandler<
 	TData extends JSONObject
 > = {
 	name: TName;
-	handler: (client: Client, data: TData) => Awaitable<void>;
+	/**
+	 * `shard` is the connection the event arrived on - always set when a connection dispatches, and
+	 * only missing when the handler is called by hand.
+	 */
+	handler: (client: Client, data: TData, shard?: WSClient) => Awaitable<void>;
 }
 
 /**

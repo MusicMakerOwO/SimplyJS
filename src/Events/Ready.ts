@@ -26,20 +26,23 @@ type ReadyPayload = {
 };
 
 /**
- * Fires once the client is ready for normal use.
+ * Fires `ShardReady` once the shard that received this `READY` is ready for normal use.
  *
  * Emitted after the raw `READY` payload is processed and either all guilds listed in it have
  * arrived via `GuildCreate`, or {@link READY_GUILD_FALLBACK_TIMEOUT_MS} elapses, whichever
- * comes first.
+ * comes first. Every shard lists only its own guilds, so the shards wait independently.
+ * `ClientEvents.Ready` is not emitted here: `client.login()` emits it once every shard it
+ * started has fired `ShardReady`.
  */
 export const Ready = defineEvent({
 	name   : GatewayEvents.Ready,
-	handler: (client, data: ReadyPayload): void => {
+	handler: (client, data: ReadyPayload, shard): void => {
 		const user = client.users.upsert(data.user);
 		client.user = user;
+		const shardId = shard?.shardId ?? 0;
 
 		const requiredGuilds = new Set<string>( data.guilds.map(x => x.id) );
-		if (requiredGuilds.size === 0) return void client.emit(ClientEvents.Ready, user);
+		if (requiredGuilds.size === 0) return void client.emit(ClientEvents.ShardReady, shardId);
 
 		let timeout: NodeJS.Timeout | undefined;
 
@@ -52,7 +55,7 @@ export const Ready = defineEvent({
 			timeout = undefined;
 
 			client.removeListener(ClientEvents.GuildCreate, callback);
-			client.emit(ClientEvents.Ready, user);
+			client.emit(ClientEvents.ShardReady, shardId);
 		};
 
 		const callback = (guild: Guild) => {
