@@ -582,15 +582,17 @@ describe("Gateway event handlers mutate caches", () => {
 		});
 	});
 
-	it("Ready stores client.user and emits READY", async () => {
-		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
+	it("Ready stores client.user and emits ShardReady for the shard it arrived on", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 2 } });
 		const emitSpy = vi.spyOn(client, "emit");
 		const user = createUser();
 
-		await Ready.handler(client, createReadyPayload(user));
+		await Ready.handler(client, createReadyPayload(user), client.shards.get(1));
 
 		expect(client.user?.id).toBe(user.id);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Ready, expect.objectContaining({ id: user.id }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ShardReady, 1);
+		// Ready is login()'s to emit, once every shard it started is ready
+		expect(emitSpy).not.toHaveBeenCalledWith(ClientEvents.Ready, expect.anything());
 	});
 
 	it("Ready waits for all expected guilds before emitting", async () => {
@@ -601,16 +603,16 @@ describe("Gateway event handlers mutate caches", () => {
 
 		await Ready.handler(client, createReadyPayload(user, ["guild-1", "guild-2"]));
 
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(0);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(0);
 
 		await GuildCreate.handler(client, createGuild("guild-1"));
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(0);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(0);
 
 		await GuildCreate.handler(client, createGuild("guild-2"));
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(1);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(1);
 
 		await vi.advanceTimersByTimeAsync(15_000);
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(1);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(1);
 		vi.useRealTimers();
 	});
 
@@ -621,13 +623,30 @@ describe("Gateway event handlers mutate caches", () => {
 		const user = createUser();
 
 		await Ready.handler(client, createReadyPayload(user, ["guild-missing"]));
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(0);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(0);
 
 		await vi.advanceTimersByTimeAsync(14_999);
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(0);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(0);
 
 		await vi.advanceTimersByTimeAsync(1);
-		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.Ready)).toHaveLength(1);
+		expect(emitSpy.mock.calls.filter(([event]) => event === ClientEvents.ShardReady)).toHaveLength(1);
+		vi.useRealTimers();
+	});
+
+	it("Ready lets each shard wait for its own guilds", async () => {
+		vi.useFakeTimers();
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 2 } });
+		const ready: number[] = [];
+		client.on(ClientEvents.ShardReady, (shardId) => ready.push(shardId));
+
+		await Ready.handler(client, createReadyPayload(createUser(), ["guild-1"]), client.shards.get(0));
+		await Ready.handler(client, createReadyPayload(createUser(), ["guild-2"]), client.shards.get(1));
+
+		await GuildCreate.handler(client, createGuild("guild-2"));
+		expect(ready).toEqual([1]);
+
+		await GuildCreate.handler(client, createGuild("guild-1"));
+		expect(ready).toEqual([1, 0]);
 		vi.useRealTimers();
 	});
 
@@ -2682,13 +2701,22 @@ describe("Update event old-value snapshots", () => {
 		expect(client.user.username).toBe("renamed");
 	});
 
-	it("Resumed emits the client resumed event with no arguments", async () => {
+	it("Resumed emits ShardResumed and Resumed with the shard that resumed", async () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 4, ids: [2, 3] } });
+		const emitSpy = vi.spyOn(client, "emit");
+
+		await Resumed.handler(client, {}, client.shards.get(3));
+
+		expect(emitSpy.mock.calls).toEqual([[ClientEvents.ShardResumed, 3], [ClientEvents.Resumed, 3]]);
+	});
+
+	it("Resumed reports shard 0 for an unsharded bot", async () => {
 		const client = new Client({ token: "token", intents: GatewayIntents.Guilds });
 		const emitSpy = vi.spyOn(client, "emit");
 
-		await Resumed.handler(client, {});
+		await Resumed.handler(client, {}, client.socket);
 
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed, 0);
 	});
 });
 

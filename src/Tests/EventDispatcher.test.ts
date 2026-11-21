@@ -193,7 +193,7 @@ describe("EventDispatcher", () => {
 			undefined,
 			expect.objectContaining({ id: "user-1", username: "renamed" })
 		);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed, 0);
 	});
 
 	it("routes READY to the registered handler", () => {
@@ -205,7 +205,30 @@ describe("EventDispatcher", () => {
 		dispatch(client, GatewayEvents.Ready, createReadyPayload(user));
 
 		expect(client.user?.id).toBe(user.id);
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Ready, expect.objectContaining({ id: user.id }));
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ShardReady, 0);
+	});
+
+	it("hands each handler the shard the event arrived on", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 2 } });
+		const override = vi.fn();
+		const dispatch = CreateDispatch({ [GatewayEvents.Resumed]: override });
+
+		dispatch(client, GatewayEvents.Resumed, {}, client.shards.get(1));
+
+		expect(override).toHaveBeenCalledWith(client, {}, client.shards.get(1));
+	});
+
+	it("reports an unhandled event once per client, not once per shard", () => {
+		const client = new Client({ token: "token", intents: GatewayIntents.Guilds, shards: { count: 2 } });
+		const warnings: unknown[] = [];
+		client.on(ClientEvents.Warn, (warning) => warnings.push(warning));
+
+		// every shard builds its own dispatch function
+		for (const shard of client.shards.values()) {
+			shard.dispatch(client, "__UNHANDLED_EVENT__" as never, {}, shard);
+		}
+
+		expect(warnings).toHaveLength(1);
 	});
 
 	it("registers every soundboard sound event from the Events barrel", () => {

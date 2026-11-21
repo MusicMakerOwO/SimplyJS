@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "../Client.js";
 import { WSClient, WSEvents } from "../WSClient.js";
-import { GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
+import { GatewayBotResponse, GatewayEvents, GatewayIntents, GatewayOpCodes, GatewayPayload } from "../Types/DiscordGateway.js";
 import { ActivityType, DiscordUser, Status } from "../Types/DiscordAPITypes.js";
 import { ClientEvents } from "../Types/SimplyJSTypes.js";
 
@@ -451,8 +451,9 @@ describe("WSClient lifecycle", () => {
 		expect(socket.ready).toBe(true);
 		expect(resumedSpy).toHaveBeenCalledTimes(1);
 		expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("RESUMED"));
-		// RESUMED carries a null `d`, but still has to reach the dispatcher
-		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed);
+		// RESUMED carries a null `d`, but still has to reach the dispatcher - along with the shard it arrived on
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.ShardResumed, 0);
+		expect(emitSpy).toHaveBeenCalledWith(ClientEvents.Resumed, 0);
 	});
 
 	it("does not reconnect after destroy()", () => {
@@ -1125,11 +1126,23 @@ describe("sharding", () => {
 		expect(client.socket.shard).toBeNull();
 	});
 
-	it("rejects several shards in one process until 2.0", () => {
-		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [0, 1] } }))
-			.toThrow("arrives in 2.0");
-		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [] } }))
-			.toThrow("exactly one shard id");
+	it("runs every shard when ids is omitted, and sorts the ids it is given", () => {
+		const all = new Client({ token: "token", intents: 0, shards: { count: 3 } });
+		expect([...all.shards.keys()]).toEqual([0, 1, 2]);
+		expect([...all.shards.values()].map((shard) => shard.shard)).toEqual([[0, 3], [1, 3], [2, 3]]);
+
+		const some = new Client({ token: "token", intents: 0, shards: { count: 8, ids: [6, 4] } });
+		expect([...some.shards.keys()]).toEqual([4, 6]);
+		expect(some.shards.get(6)!.shardId).toBe(6);
+		expect(some.shardCount).toBe(8);
+	});
+
+	it("rejects shard layouts that cannot work", () => {
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [] } })).toThrow(/at least one shard id/);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: 4, ids: [1, 1] } })).toThrow(/more than once/);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: "auto", ids: [0] } as never }))
+			.toThrow(/cannot be combined with count: "auto"/);
+		expect(() => new Client({ token: "token", intents: 0, shards: { count: "Auto" } as never })).toThrow(RangeError);
 	});
 
 	it("rejects shard ids and counts out of range", () => {
@@ -1176,5 +1189,357 @@ describe("sharding", () => {
 		wsMockState.instances[0]!.close(4010);
 
 		expect(disconnectSpy).toHaveBeenCalledWith(expect.stringContaining("shard 3 of 4"), 4010);
+	});
+});
+
+describe("in-process sharding", () => {
+	beforeEach(() => {
+		wsMockState.instances.length = 0;
+		vi.restoreAllMocks();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	type MockSocket = (typeof wsMockState.instances)[number];
+	const HELLO = { op: GatewayOpCodes.Hello, d: { heartbeat_interval: 45_000 }, s: null, t: null };
+	const READY = { op: GatewayOpCodes.Dispatch, d: createReadyPayload(createUser()), s: 1, t: GatewayEvents.Ready };
+
+	/** A guild id whose events arrive on `shardId` (`(id >> 22) % count`) for any count above it */
+	function guildOnShard(shardId: number): string {
+		return String(BigInt(shardId) << 22n);
+	}
+
+	function sentOps(mock: MockSocket): GatewayPayload[] {
+		return mock.sent.map((raw) => JSON.parse(raw) as GatewayPayload);
+	}
+
+	function identifyOf(mock: MockSocket): Record<string, unknown> | undefined {
+		return sentOps(mock).find((payload) => payload.op === GatewayOpCodes.Identify)?.d as Record<string, unknown> | undefined;
+	}
+
+	function shardedClient(shards: NonNullable<ConstructorParameters<typeof Client>[0]["shards"]>): Client {
+		return new Client({ token: "token", intents: GatewayIntents.Guilds, shards, ws: { jitterOverride: 1 } });
+	}
+
+	/** Logs every shard in on the fake clock, answering HELLO and then READY on each connection as the queue lets it identify */
+	async function loginAll(client: Client): Promise<void> {
+		const pending = client.login();
+		await vi.advanceTimersByTimeAsync(0);
+		for (const mock of wsMockState.instances) mock.emitMessage(HELLO);
+
+		const answered = new Set<MockSocket>();
+		for (;;) {
+			await vi.advanceTimersByTimeAsync(0);
+			for (const mock of wsMockState.instances) {
+				if (answered.has(mock) || !identifyOf(mock)) continue;
+				answered.add(mock);
+				mock.emitMessage(READY);
+			}
+			if (answered.size === wsMockState.instances.length) break;
+			await vi.advanceTimersByTimeAsync(5_000);
+		}
+		await pending;
+	}
+
+	describe("client.socket", () => {
+		it("returns the only shard", () => {
+			const unsharded = new Client({ token: "token", intents: 0 });
+			expect(unsharded.socket).toBe(unsharded.shards.get(0));
+
+			const oneOfFour = shardedClient({ count: 4, ids: [2] });
+			expect(oneOfFour.socket).toBe(oneOfFour.shards.get(2));
+		});
+
+		it("throws with several shards, naming them and the replacements", () => {
+			const client = shardedClient({ count: 4, ids: [1, 3] });
+
+			expect(() => client.socket).toThrow(/ambiguous: this process runs shards 1, 3.*client\.shardFor\(guildId\)/);
+		});
+
+		it("throws before login() has resolved count: \"auto\"", () => {
+			const client = shardedClient({ count: "auto" });
+
+			expect(client.shards.size).toBe(0);
+			expect(client.shardCount).toBe(0);
+			expect(() => client.socket).toThrow(/not available yet/);
+		});
+	});
+
+	it("ignores shard and beforeIdentify passed through ClientOptions.ws", () => {
+		const client = new Client({ token: "token", intents: 0, ws: { shard: [3, 4], beforeIdentify: () => Promise.resolve() } });
+
+		expect(client.socket.shard).toBeNull();
+		expect(client.socket.shardId).toBe(0);
+	});
+
+	it("finds a guild's shard, or nothing when another process runs it", () => {
+		const client = shardedClient({ count: 4, ids: [0, 1] });
+
+		expect(client.shardFor(guildOnShard(1))).toBe(client.shards.get(1));
+		expect(client.shardFor(guildOnShard(2))).toBeUndefined();
+		expect(shardedClient({ count: "auto" }).shardFor(guildOnShard(0))).toBeUndefined();
+	});
+
+	it("averages ping across the shards that have measured one", () => {
+		const client = shardedClient({ count: 2 });
+		expect(client.ping).toBe(-1);
+
+		client.shards.get(0)!.ping = 40;
+		expect(client.ping).toBe(40);
+
+		client.shards.get(1)!.ping = 45;
+		expect(client.ping).toBe(43);
+	});
+
+	it("logs in every local shard, identifying them 5 seconds apart", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 2 });
+		const pending = client.login();
+
+		expect(wsMockState.instances).toHaveLength(2);
+		const [first, second] = wsMockState.instances as [MockSocket, MockSocket];
+		first.emitMessage(HELLO);
+		second.emitMessage(HELLO);
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(identifyOf(first)?.shard).toEqual([0, 2]);
+		expect(identifyOf(second)).toBeUndefined();
+
+		await vi.advanceTimersByTimeAsync(4_999);
+		expect(identifyOf(second)).toBeUndefined();
+		await vi.advanceTimersByTimeAsync(1);
+		expect(identifyOf(second)?.shard).toEqual([1, 2]);
+
+		first.emitMessage(READY);
+		second.emitMessage(READY);
+		await pending;
+
+		// presence goes to every shard once login() finishes
+		for (const mock of [first, second]) {
+			expect(sentOps(mock).filter((payload) => payload.op === GatewayOpCodes.PresenceUpdate)).toHaveLength(1);
+		}
+		await client.destroy();
+		expect(first.closeCodes).toEqual([1000]);
+		expect(second.closeCodes).toEqual([1000]);
+	});
+
+	it("extends the login timeout by the identify queue's wait", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 3 });
+		const assertion = expect(client.login()).rejects.toThrow(/within 20 seconds/);
+
+		await vi.advanceTimersByTimeAsync(20_000);
+
+		await assertion;
+		await client.destroy();
+	});
+
+	it("rejects login naming the shard Discord refused", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 2 });
+		const disconnects: unknown[][] = [];
+		client.on(ClientEvents.ShardDisconnect, (...args) => disconnects.push(args));
+		const assertion = expect(client.login()).rejects.toThrow(/on shard 1 - .*developer portal/);
+
+		wsMockState.instances[1]!.close(4014);
+
+		await assertion;
+		expect(disconnects).toEqual([[1, expect.stringContaining("developer portal"), 4014]]);
+		await client.destroy();
+	});
+
+	it("emits Ready once per login, after every shard's ShardReady", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 2 });
+		const events: string[] = [];
+		client.on(ClientEvents.ShardReady, (shardId) => events.push(`ShardReady ${shardId}`));
+		client.on(ClientEvents.Ready, () => events.push("Ready"));
+
+		await loginAll(client);
+		expect(events).toEqual(["ShardReady 0", "ShardReady 1", "Ready"]);
+
+		// shard 1 starts a new session (say, after a non-resumable invalid session)
+		wsMockState.instances[1]!.emitMessage(READY);
+		expect(events.slice(3)).toEqual(["ShardReady 1"]);
+
+		await client.destroy();
+		wsMockState.instances.length = 0;
+		await loginAll(client);
+		expect(events.slice(4)).toEqual(["ShardReady 0", "ShardReady 1", "Ready"]);
+		await client.destroy();
+	});
+
+	it("names the shard that a READY or RESUMED arrived on", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 4, ids: [2] });
+		const events: string[] = [];
+		client.on(ClientEvents.ShardReady, (shardId) => events.push(`ShardReady ${shardId}`));
+		client.on(ClientEvents.ShardResumed, (shardId) => events.push(`ShardResumed ${shardId}`));
+		client.on(ClientEvents.Resumed, (shardId) => events.push(`Resumed ${shardId}`));
+		await loginAll(client);
+
+		wsMockState.instances[0]!.emitClose(1006);
+		await vi.advanceTimersByTimeAsync(0);
+		const resumed = wsMockState.instances[1]!;
+		resumed.emitMessage(HELLO);
+		resumed.emitMessage({ op: GatewayOpCodes.Dispatch, d: null, s: 2, t: GatewayEvents.Resumed });
+
+		expect(events).toEqual(["ShardReady 2", "ShardResumed 2", "Resumed 2"]);
+		await client.destroy();
+	});
+
+	it("sends a presence update to every shard that is ready", async () => {
+		vi.useFakeTimers();
+		const client = shardedClient({ count: 2 });
+		await loginAll(client);
+		const [first, second] = wsMockState.instances as [MockSocket, MockSocket];
+
+		// shard 1 drops, and is still reconnecting when the status changes
+		second.emitClose(1006);
+		client.setStatus(Status.IDLE);
+
+		const presences = (mock: MockSocket) => sentOps(mock).filter((payload) => payload.op === GatewayOpCodes.PresenceUpdate);
+		expect(presences(first).at(-1)?.d).toMatchObject({ status: Status.IDLE });
+		expect(presences(second)).toHaveLength(1); // only the one login() sent
+		await client.destroy();
+	});
+
+	it("sends a gateway member request on the shard that owns the guild", async () => {
+		const client = shardedClient({ count: 2 });
+		const guild = client.guilds.upsert({ id: guildOnShard(1), name: "guild" } as never);
+		const requests = [0, 1].map((id) => vi.spyOn(client.shards.get(id)!, "requestGuildMembers").mockImplementation(() => {}));
+
+		const pending = guild.members.fetchGateway({ userIds: ["1"] });
+		pending.catch(() => undefined);
+
+		expect(requests[0]).not.toHaveBeenCalled();
+		expect(requests[1]).toHaveBeenCalledWith(expect.objectContaining({ guild_id: guild.id, user_ids: ["1"] }));
+		await client.destroy();
+	});
+
+	it("refuses a gateway member request for a guild another process runs", async () => {
+		const client = shardedClient({ count: 4, ids: [0, 1] });
+		const guild = client.guilds.upsert({ id: guildOnShard(2), name: "guild" } as never);
+
+		await expect(guild.members.fetchGateway({ userIds: ["1"] }))
+			.rejects.toThrow(/belongs to shard 2 of 4, which this process does not run \(it runs 0, 1\)/);
+	});
+
+	describe("count: \"auto\"", () => {
+		function gatewayBot(shards: number, remaining: number, maxConcurrency: number): GatewayBotResponse {
+			return {
+				url: "wss://gateway.discord.gg",
+				shards,
+				session_start_limit: { total: 1000, remaining, reset_after: 3_600_000, max_concurrency: maxConcurrency }
+			};
+		}
+
+		it("runs as many shards as Discord recommends, paced by its max_concurrency", async () => {
+			vi.useFakeTimers();
+			const client = shardedClient({ count: "auto" });
+			const get = vi.spyOn(client.rest, "get").mockResolvedValue(gatewayBot(3, 999, 2));
+
+			const pending = client.login();
+			pending.catch(() => undefined);
+			await vi.advanceTimersByTimeAsync(0);
+
+			expect(get).toHaveBeenCalledWith("/gateway/bot");
+			expect(client.shardCount).toBe(3);
+			expect([...client.shards.keys()]).toEqual([0, 1, 2]);
+
+			for (const mock of wsMockState.instances) mock.emitMessage(HELLO);
+			await vi.advanceTimersByTimeAsync(0);
+			// two buckets: shards 0 and 1 identify at once, shard 2 waits behind shard 0
+			expect(wsMockState.instances.map((mock) => identifyOf(mock)?.shard)).toEqual([[0, 3], [1, 3], undefined]);
+			await vi.advanceTimersByTimeAsync(5_000);
+			expect(identifyOf(wsMockState.instances[2]!)?.shard).toEqual([2, 3]);
+			await client.destroy();
+		});
+
+		it("refuses to start more shards than the session start limit has left", async () => {
+			const client = shardedClient({ count: "auto" });
+			vi.spyOn(client.rest, "get").mockResolvedValue(gatewayBot(4, 3, 1));
+
+			await expect(client.login()).rejects.toThrow(/Cannot start 4 shards: .* 3 of 1000 sessions left, and resets in 60 minutes/);
+			expect(wsMockState.instances).toHaveLength(0);
+		});
+	});
+
+	describe("WSOptions.beforeIdentify", () => {
+		function gated(wait: () => Promise<void>): WSClient {
+			const socket = new WSClient({} as Client, { jitterOverride: 1, beforeIdentify: wait });
+			socket.setToken("token");
+			socket.initialize();
+			return socket;
+		}
+
+		it("holds IDENTIFY until the wait resolves", async () => {
+			let release!: () => void;
+			const socket = gated(() => new Promise((resolve) => { release = resolve; }));
+			const mock = wsMockState.instances[0]!;
+
+			mock.emitMessage(HELLO);
+			await Promise.resolve();
+			expect(identifyOf(mock)).toBeUndefined();
+
+			release();
+			await vi.waitFor(() => expect(identifyOf(mock)).toBeDefined());
+			socket.destroy();
+		});
+
+		it("drops the IDENTIFY of a connection torn down while it waited", async () => {
+			vi.useFakeTimers();
+			const releases: (() => void)[] = [];
+			const socket = gated(() => new Promise((resolve) => { releases.push(resolve); }));
+			const first = wsMockState.instances[0]!;
+			first.emitMessage(HELLO);
+
+			first.emitClose(1006);
+			await vi.advanceTimersByTimeAsync(0);
+			const second = wsMockState.instances[1]!;
+			releases[0]!();
+			await vi.advanceTimersByTimeAsync(0);
+
+			// the stale wait sends nowhere: not on the closed socket, nor on one that has not said HELLO
+			expect(identifyOf(first)).toBeUndefined();
+			expect(identifyOf(second)).toBeUndefined();
+
+			second.emitMessage(HELLO);
+			releases[1]!();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(identifyOf(second)).toBeDefined();
+			socket.destroy();
+		});
+
+		it("identifies anyway when the wait rejects", async () => {
+			const socket = gated(() => Promise.reject(new Error("queue broke")));
+			const mock = wsMockState.instances[0]!;
+
+			mock.emitMessage(HELLO);
+
+			await vi.waitFor(() => expect(identifyOf(mock)).toBeDefined());
+			socket.destroy();
+		});
+
+		it("does not hold back a RESUME", () => {
+			vi.useFakeTimers();
+			const wait = vi.fn(() => Promise.resolve());
+			const socket = gated(wait);
+			const first = wsMockState.instances[0]!;
+			first.emitMessage(HELLO);
+			first.emitMessage(READY);
+			expect(wait).toHaveBeenCalledOnce();
+
+			first.emitClose(1006);
+			vi.advanceTimersByTime(0);
+			const second = wsMockState.instances[1]!;
+			second.emitMessage(HELLO);
+
+			expect(sentOps(second).map((payload) => payload.op)).toContain(GatewayOpCodes.Resume);
+			expect(wait).toHaveBeenCalledOnce();
+			socket.destroy();
+		});
 	});
 });
