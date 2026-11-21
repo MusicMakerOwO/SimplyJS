@@ -90,7 +90,7 @@ Raised by the Dossier log bot's findings against 1.4.0-alpha. The rest of those 
 ### Quality of Life
 - [ ] Add release automation + quality gates
   - Automate changelog/version consistency checks before publish
-  - CI currently runs build + test + the integration harness on Node 20/22/24, Bun, and Deno, and nothing else - no publish
+  - CI currently runs build + test + the integration harness on Node 22/24/26, Bun, and Deno, and nothing else - no publish
     workflow, and `examples/` is neither linted nor typechecked by any script (`eslint.config.ts`
     ignores it, and `npx tsc --noEmit -p examples/tsconfig.json` has to be run by hand)
 - [ ] Examples for Components v2 and file uploads
@@ -150,14 +150,32 @@ Found while reworking rate limit keys for 1.6.
     `shard: [id, count]`, and `client.shardCount` / `guild.shardId` / `ShardIdFor()` route work to
     the process that owns a guild
   - `4011 Sharding required` now names the option instead of just failing
-- [ ] Sharding, in-process and mixed (2.0)
-  - Same option, any subset of ids per process: `client.shards: ReadonlyMap<number, WSClient>`,
+- [x] Sharding, in-process and mixed (2.0)
+  - Same option, any subset of ids per process (`ids` defaults to all): `client.shards`,
     `client.socket` as a getter that throws with more than one local shard, `client.ping` /
     `client.shardFor(guildId)`, `count: "auto"` via `GET /gateway/bot`, an identify queue per
-    `max_concurrency` bucket, and `Ready` once every local shard is ready, plus per-shard events
-  - Library internals must stop reading `client.socket` first: `Client` (login, destroy, presence)
-    and `MemberCache.fetchGateway()`'s send. Intents are already off the socket (`client.intents`).
-    See SIMPLYJS_ROADMAP_BRIEF.md section 4.2
+    `max_concurrency` bucket, `Ready` once per `login()`, and `ShardReady` / `ShardResumed` /
+    `ShardDisconnect`
+  - Library code no longer reads `client.socket`, and a lint rule keeps it that way
+- [ ] Keep a shard's presence across a new session
+  - Presence is only sent as op 3 after `login()` and on `setStatus()`/`setStatusMessage()`, to the
+    shards that are ready at that moment. A shard that re-identifies later (a non-resumable invalid
+    session) comes back with the default presence, and one that is reconnecting when the status
+    changes misses the update. Sending `presence` in `IDENTIFY` would cover both
+- [ ] Connect to the gateway url `GET /gateway/bot` returns
+  - `count: "auto"` already fetches it but still connects to `wss://gateway.discord.gg`. Discord
+    asks clients to use the returned url (and to cache it rather than fetch it per connection);
+    `WSOptions.gatewayUrl` must keep winning so a proxy is never bypassed
+- [x] Native WebSocket, zero runtime dependencies (2.0)
+  - `ws` is gone: `WSClient` uses the runtime's global `WebSocket`, which is why Node 22 is the new
+    floor. Every listener shares one `AbortController` that teardown aborts before `close()`, an
+    `error` counts as a close (Node 22 sends none after a failed connect), and a connection gets 30
+    seconds to deliver `HELLO`
+- [ ] Gateway compression (`compress=zlib-stream` or `zstd-stream`)
+  - Still dependency-free: `node:zlib` has both `createInflate` and `createZstdDecompress` on Node
+    22/24/26, Bun, and Deno. `binaryType` is already `arraybuffer`, so the work is one decompression
+    stream per connection, replaced on every reconnect, plus zlib-stream's `Z_SYNC_FLUSH` suffix check
+    before a frame is parsed
 - [ ] Warn about guild-scoped listeners on a client without `Guilds`
   - The `MissingIntent` check is "any of" by design, so a `MemberCreate` listener with
     `GuildMembers` but no `Guilds` passes it - yet the handler returns early for every uncached

@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### Added
+
+#### Sharding
+
+- Several shards in one process. `ClientOptions.shards` keeps its `{ count, ids }` shape and now takes any subset of ids, so every layout uses the one option: `{ count: 4 }` runs all four shards here (`ids` now defaults to every id below `count`), `{ count: 4, ids: [2] }` runs one shard per process as in 1.6, and `{ count: 8, ids: [0, 1, 2, 3] }` splits the shards across processes that each run several
+- `{ count: "auto" }` runs as many shards as Discord recommends, all in this process. `login()` reads the count and `max_concurrency` from `GET /gateway/bot`, and refuses to start, saying when the limit resets, if the daily session start limit has too few sessions left for every shard. `ids` cannot be combined with it, since processes resolving the count separately could disagree
+- An identify queue. A process's shards identify one per 5 seconds per `max_concurrency` bucket, which is Discord's limit, while each one already heartbeats. `login()`'s 10 second timeout grows by however long the queue holds the last shard back, to 25 seconds for four shards. A single shard is not queued and identifies the moment `HELLO` arrives, as before
+- `client.shards`, a `ReadonlyMap` of this process's connections keyed by shard id (an unsharded bot has shard `0`), `client.shardFor(guildId)` for the connection a guild's events arrive on (`undefined` when another process runs it), and `client.ping`, the mean heartbeat round trip across the local shards
+- `ClientEvents.ShardReady` (`shardId`), when one shard's `READY` has been processed and its guilds have arrived, `ClientEvents.ShardResumed` (`shardId`), and `ClientEvents.ShardDisconnect` (`shardId`, `reason`, `code`), when one shard gives up reconnecting while the others keep running
+- `WSClient.shardId`, and `WSOptions.beforeIdentify`, the hook the identify queue runs through: it is awaited before every `IDENTIFY` but never before a `RESUME`, and a connection torn down while it waits sends nothing
+- Gateway event handlers and `WSOptions.eventOverrides` callbacks receive the shard an event arrived on as a third argument
+- `GatewayBotResponse`, the `GET /gateway/bot` response type
+- A lint rule that stops library code from reading `.socket`, so the library can never hit the getter's throw on a bot running several shards
+- Sharding scenarios in the integration harness. The fake gateway serves several shards at once (each connection is the shard its `IDENTIFY` named) and answers `GET /gateway/bot`, and three new scenarios check two shards identifying 5 seconds apart with a single `Ready`, `count: "auto"` sizing and pacing the shards, and one shard dropping and resuming while the other stays up
+
+### Changed
+
+- **Breaking.** `client.socket` is now a getter, and throws while the process runs more than one shard (or, with `count: "auto"`, before `login()` has created any), naming `client.shards` and `client.shardFor()` as the replacements. A bot running one shard, which is every bot until now, is unaffected. `login()`, `destroy()`, presence updates, and `guild.members.fetchGateway()` no longer go through it: they reach every local shard, or the guild's own shard for `fetchGateway()`, which throws for a guild whose shard runs in another process
+- **Breaking.** `ClientEvents.Ready` fires once per `login()`, after every local shard's `ShardReady`. A shard that has to start a new session later, after a non-resumable invalid session, fires `ShardReady` again but not `Ready`; it used to fire `Ready` every time
+- **Breaking.** Node.js 22 or newer is required (`engines.node` is now `>=22.0.0`), for its built-in `WebSocket`. Bun and Deno are unaffected
+- **Breaking.** `WSEvents.Error` carries less detail, because it now reports what the runtime's `WebSocket` reports rather than what the `ws` package did. Bun and Deno still say what failed (a refused connection, a DNS error, the status code of a rejected upgrade), but Node never includes an error code such as `ECONNREFUSED`. Node 22 uses one generic message for every failure, and Node 24 and later leave the message empty. An empty message is replaced with `WebSocket connection to <url> failed`, and the runtime's own error is kept as its `cause`
+- `ClientEvents.Resumed` listeners receive the id of the shard that resumed. `Resumed` and `ShardResumed` fire together, so a bot that never shards can keep the name it uses
+- `shard` and `beforeIdentify` passed through `ClientOptions.ws` are ignored, since `ClientOptions.shards` and the identify queue own them. A `ws.shard` used to reach `IDENTIFY` when `shards` was omitted
+- `client.shardCount` is a read-only getter, `0` until `login()` resolves `count: "auto"`
+- `login()` names the shard Discord refused when the process runs several, and its timeout message gives the timeout it actually used
+- `WarningCodes.UnhandledEvent` is sent once per client rather than once per connection, so several shards do not repeat it
+- `4011 Sharding required` points at `ClientOptions.shards` and `count: "auto"` rather than at one process per shard
+- CI tests Node 22, 24, and 26; the Node 20 job is gone along with the old floor
+
+### Fixed
+
+- A connection that never delivers `HELLO` is abandoned after 30 seconds and retried like any other dropped connection, with a `WSEvents.Error` saying why. A socket that opened but stayed silent used to hang forever, since there was no heartbeat yet to notice, and a connect that never failed (a black-holed SYN) waited on the operating system
+
+### Removed
+
+- **Breaking.** The `ws` dependency. The gateway now runs on the runtime's built-in `WebSocket`, so SimplyJS installs with no runtime dependencies at all
+
 ## [1.6.0-alpha] 2026 November 11
 
 ### Added

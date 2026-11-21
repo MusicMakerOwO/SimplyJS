@@ -30,11 +30,11 @@ SimplyJS is a TypeScript-first Discord library meant for bots that don't need ev
 
 ## Why SimplyJS
 
-Most Discord libraries grow to cover every possible use case, which means a lot of surface area you never touch just to get a bot running. SimplyJS goes the other way: a small, typed core (gateway, REST, caches, structures) that covers the common paths well, and gets out of your way for everything else. No enums to memorize instead of string keys, no hidden magic in the event pipeline, and no dependencies beyond `ws`. If you outgrow it, the internals are small enough to read in an afternoon (see [Advanced / Internals](#advanced--internals)).
+Most Discord libraries grow to cover every possible use case, which means a lot of surface area you never touch just to get a bot running. SimplyJS goes the other way: a small, typed core (gateway, REST, caches, structures) that covers the common paths well, and gets out of your way for everything else. No enums to memorize instead of string keys, no hidden magic in the event pipeline, and no runtime dependencies at all: the gateway runs on the runtime's own `WebSocket`. If you outgrow it, the internals are small enough to read in an afternoon (see [Advanced / Internals](#advanced--internals)).
 
 ## Installation
 
-Requirements: Node.js >= 20 and a Discord bot token.
+Requirements: Node.js >= 22 and a Discord bot token. Bun and Deno are tested in CI as well.
 
 ```bash
 npm install simplyjs
@@ -440,7 +440,7 @@ client.collectors.maxUnbounded = 25;
 
 ### Overriding gateway event handlers
 
-Every dispatch event (`GUILD_CREATE`, `MESSAGE_CREATE`, etc.) has a built-in handler that updates caches/structures before emitting the public client event. Pass an override through the `ws` option to replace that event's entry entirely:
+Every dispatch event (`GUILD_CREATE`, `MESSAGE_CREATE`, etc.) has a built-in handler that updates caches/structures before emitting the public client event. Pass an override through the `ws` option to replace that event's entry entirely. It receives the client, the raw payload, and the shard (`WSClient`) the event arrived on:
 
 ```ts
 import { Client, GatewayEvents } from "simplyjs";
@@ -450,8 +450,8 @@ const client = new Client({
 	intents: ["Guilds", "GuildMessages"],
 	ws: {
 		eventOverrides: {
-			[GatewayEvents.MessageCreate]: (client, data) => {
-				console.log("raw MESSAGE_CREATE payload:", data);
+			[GatewayEvents.MessageCreate]: (client, data, shard) => {
+				console.log(`raw MESSAGE_CREATE payload from shard ${shard?.shardId}:`, data);
 			}
 		}
 	}
@@ -459,7 +459,7 @@ const client = new Client({
 ```
 
 > **WARNING**\
-> This is a full replacement, not a "run before/after" hook - the built-in handler that upserts the message into cache and emits `ClientEvents.MessageCreate` never runs once you override it. `CreateDispatch()` builds one handler map at construction time and doesn't support layering. Overriding `INTERACTION_CREATE` has one extra obligation: hand the interaction to `client.collectors.dispatchInteraction(interaction, event, emit)` rather than emitting it yourself, or collectors never get their first refusal and `interaction.claimed` is never set.
+> This is a full replacement, not a "run before/after" hook - the built-in handler that upserts the message into cache and emits `ClientEvents.MessageCreate` never runs once you override it. `CreateDispatch()` builds one handler map at construction time and doesn't support layering. Two events carry an extra obligation. Overriding `INTERACTION_CREATE`: hand the interaction to `client.collectors.dispatchInteraction(interaction, event, emit)` rather than emitting it yourself, or collectors never get their first refusal and `interaction.claimed` is never set. Overriding `READY`: emit `ClientEvents.ShardReady` with the shard's id once it is ready, since that is what `login()` counts before it emits `ClientEvents.Ready`.
 
 ### Rotating presence/status
 
@@ -509,23 +509,31 @@ The slow acknowledgement threshold is `ClientOptions.slowAcknowledgementWarning`
 
 ### Sharding
 
-Discord caps one gateway connection at 2,500 guilds and closes it with `4011 Sharding required` past that. Split the bot into shards with `ClientOptions.shards`, one process per shard:
+Discord caps one gateway connection at 2,500 guilds and closes it with `4011 Sharding required` past that. Split the bot into shards with `ClientOptions.shards`. One option covers every layout:
 
 ```ts
-// run this once per shard, e.g. SHARD_ID=0..3 for four shards
-const client = new Client({
-	token,
-	intents: ["Guilds", "GuildMessages"],
-	shards: { count: 4, ids: [Number(process.env.SHARD_ID)] }
-});
+// every shard in this process, as many as Discord recommends
+shards: { count: "auto" }
+
+// all four shards in this process (ids defaults to every id below count)
+shards: { count: 4 }
+
+// one shard per process: run this four times, with SHARD_ID=0..3
+shards: { count: 4, ids: [Number(process.env.SHARD_ID)] }
+
+// several shards per process: this one runs half, another runs [4, 5, 6, 7]
+shards: { count: 8, ids: [0, 1, 2, 3] }
 ```
+
+`client.shards` holds this process's connections, keyed by shard id. `client.shardFor(guildId)` returns the one a guild's events arrive on, `client.ping` averages their heartbeat round trips, and `ClientEvents.ShardReady`, `ShardResumed`, and `ShardDisconnect` report each shard's lifecycle, so one shard going down is not silent. `ClientEvents.Ready` fires once per `login()`, after every local shard is ready.
+
+**`client.socket` throws while a process runs more than one shard**, since there is no one connection for it to return. A single-shard bot can keep using it.
 
 - Each guild's events arrive on exactly one shard. `guild.shardId`, or `ShardIdFor(guildId, count)` for a guild you only have the id of, says which, so work for a guild can be sent to the process that owns it.
 - Direct messages only arrive on shard 0.
 - REST rate limits, the global one included, belong to the bot, not to a process. A larger fleet can share them through a REST proxy with `ClientOptions.rest: { baseUrl }`.
-- Start the processes a few seconds apart: Discord allows one identify per 5 seconds per `max_concurrency` bucket (see `GET /gateway/bot`).
-
-For now `ids` holds exactly one id. Several shards in one process arrives in 2.0, with this same option.
+- Discord allows one identify per 5 seconds per `max_concurrency` bucket. The shards of one process are queued for you, so logging in four of them takes about 15 seconds; processes started together have to stagger themselves.
+- `count: "auto"` reads the count from `GET /gateway/bot` at `login()`, and refuses to start if the daily session start limit cannot cover every shard. It always runs every shard in one process, so it takes no `ids`.
 
 ### REST options and observability
 
@@ -542,7 +550,7 @@ client.rest.on(RestEvents.RateLimited, ({ route, global, retryAfterMs }) => {
 });
 ```
 
-`route` is always the route's template, never the route itself - interaction and webhook routes carry tokens. For the gateway side, `client.socket.ping` is the last heartbeat round trip in milliseconds (`-1` until the first one).
+`route` is always the route's template, never the route itself - interaction and webhook routes carry tokens. For the gateway side, `client.ping` is the last heartbeat round trip in milliseconds (`-1` until the first one), averaged across the process's shards; each shard's own is `client.shards.get(id).ping`.
 
 ## Examples
 
@@ -608,7 +616,7 @@ node scripts/integration/gateway.mjs
 
 The project is alpha software; gateway resiliency and Discord API coverage are still being built out (tracked in `TODO.md`). Notably:
 
-- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. Reconnects are close-code aware: fatal codes (bad token, disallowed intents, bad shard/API version) stop retrying and emit `WSEvents.Disconnect`, session-invalidating codes re-identify instead of resuming, and everything else retries with exponential backoff + jitter up to `maxReconnectAttempts` (default 10). A successful resume is observable as `ClientEvents.Resumed`; `ClientEvents.Ready` is not emitted again, since the client was already ready and the gateway replays whatever was missed.
+- `WSClient` handles `GatewayOpCodes.Reconnect` / `InvalidSession`, tracks `session_id`/`resume_gateway_url` from `READY`, and resumes instead of re-identifying when possible; heartbeat ACKs are tracked and an unacked heartbeat triggers a reconnect. Reconnects are close-code aware: fatal codes (bad token, disallowed intents, bad shard/API version) stop retrying and emit `WSEvents.Disconnect`, session-invalidating codes re-identify instead of resuming, and everything else retries with exponential backoff + jitter up to `maxReconnectAttempts` (default 10). A successful resume is observable as `ClientEvents.Resumed` (and `ShardResumed`), with the id of the shard that resumed; `ClientEvents.Ready` is not emitted again, since the client was already ready and the gateway replays whatever was missed.
 - Gateway event coverage is partial. Dispatch handlers exist for guilds, channels, threads (including membership), members, roles, messages, reactions, emojis, stickers, soundboard sounds, invites, integrations, presences, the bot's own profile updates (`ClientUserUpdate`), and typing indicators, but events like `VoiceStateUpdate`, stage instances, voice channel effects, entitlements, and subscriptions are not yet handled.
 - `channel.messages` holds no cache, unlike every other manager. A channel's message history is unbounded, so `fetch(id)` and `fetch({ limit, before, after, around })` always hit the API and hand back fresh `Message` instances — there is nothing to read synchronously and nothing to go stale. It is available on text, voice, and thread channels; announcement and stage channels do not have it yet. `before`, `after`, and `around` are mutually exclusive.
 - `guild.integrations` is not seeded from `GUILD_CREATE` — Discord does not send integrations there — so it starts empty and only fills from `Integration*` gateway events or an explicit `guild.integrations.fetchAll()`. `GuildIntegrationsUpdate` says only that *something* changed in a guild, so treat it as a signal to refetch. A refetch also drops cached integrations Discord no longer lists, except when it returns a full page of 50, which may be truncated.
@@ -628,7 +636,7 @@ The project is alpha software; gateway resiliency and Discord API coverage are s
 Before opening a PR:
 
 - Read `CODE_STYLE_AND_RULES.md` — it documents the actual patterns this codebase expects (event handler shape, `as const` + `ObjectValues` instead of enums, getter-vs-method rules, `.unref()` on timers, etc.), and PRs that don't follow it will need rework.
-- Run `npm run check` (lint + typecheck) and `npm test` locally — the CI workflows (`.github/workflows/node.js.yml`, `bun.yml`, `deno.yml`) build and test the project on Node 20/22/24, Bun, and Deno for every push/PR to `main`, so failures there will block merge anyway.
+- Run `npm run check` (lint + typecheck) and `npm test` locally — the CI workflows (`.github/workflows/node.js.yml`, `bun.yml`, `deno.yml`) build and test the project on Node 22/24/26, Bun, and Deno for every push/PR to `main`, so failures there will block merge anyway.
 - If you're adding a new gateway event handler, cache, or structure, make sure it's exported from the right barrel file (`src/Events/index.ts`, `src/index.ts`, etc.) — see section 11 of `CODE_STYLE_AND_RULES.md`.
 - If you fix or add something meaningful, add an entry to `CHANGELOG.md` and check off (or add) the matching item in `TODO.md`.
 

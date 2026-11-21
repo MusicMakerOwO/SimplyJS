@@ -121,17 +121,23 @@ This replaces an earlier, undocumented convention where snake_case was meant to 
 
 ### Client bootstraps auth, gateway, and caches
 
-`src/Client.ts` is the main entry point. It wires the token into both `Rest` and `WSClient`, resolves intents, and creates top-level caches.
+`src/Client.ts` is the main entry point. It resolves intents, builds one `WSClient` per shard the process runs (`client.shards`, keyed by shard id), wires the token into each of them and into `Rest`, and creates top-level caches.
 
 ```ts
-this.socket = new WSClient(this, {
-	intents: ResolveIntents(options.intents),
-});
-this.rest = new Rest();
-
-this.socket.setToken(options.token);
+for (const id of ids) {
+	const shard = new WSClient(this, {
+		...this.#wsOptions,
+		intents: this.intents,
+		...(this.#sharded ? { shard: [id, this.#shardCount] as const } : {}),
+	});
+	shard.setToken(this.#token);
+	this.#shards.set(id, shard);
+}
+this.rest = new Rest(options.rest);
 this.rest.setToken(options.token);
 ```
+
+Library code reaches a connection through `client.shards`, `client.shardFor(guildId)`, or the `shard` an event handler is passed, never through `client.socket`: that getter throws once a process runs more than one shard, and a lint rule rejects `.socket` reads in `src/`.
 
 ### Keep REST concerns in `src/Rest.ts`
 
@@ -144,9 +150,9 @@ return this.upsert(fetched);
 
 ### Keep gateway behavior in `src/WSClient.ts`
 
-`WSClient` owns the handshake, heartbeat scheduling, dispatching, and disconnect lifecycle. The dispatch path is:
+`WSClient` owns one connection's handshake, heartbeat scheduling, dispatching, and disconnect lifecycle. The dispatch path is:
 
-`message` → parse payload → `CreateDispatch()` result → event handler
+`message` → parse payload → `CreateDispatch()` result → event handler, called as `(client, data, shard)`
 
 ## 5) Gateway and event rules
 
